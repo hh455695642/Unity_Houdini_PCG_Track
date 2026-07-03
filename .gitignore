@@ -105,7 +105,10 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ss]ceneDependencyCache*
 
 # Local Codex / MCP generated workspace skills
-/.agents/
+/.agents/*
+!/.agents/scripts/
+!/.agents/scripts/Ensure-HoudiniMcp.ps1
+!/.agents/scripts/Test-Ensure-HoudiniMcp.ps1
 
 # Houdini Engine local cache and machine settings
 heu_settings.ini
