@@ -1,0 +1,6335 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!29 &1
+OcclusionCullingSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_OcclusionBakeSettings:
+    smallestOccluder: 5
+    smallestHole: 0.25
+    backfaceThreshold: 100
+  m_SceneGUID: 00000000000000000000000000000000
+  m_OcclusionCullingData: {fileID: 0}
+--- !u!104 &2
+RenderSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 9
+  m_Fog: 0
+  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_FogMode: 3
+  m_FogDensity: 0.01
+  m_LinearFogStart: 0
+  m_LinearFogEnd: 300
+  m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
+  m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
+  m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
+  m_AmbientIntensity: 1
+  m_AmbientMode: 0
+  m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
+  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_HaloStrength: 0.5
+  m_FlareStrength: 1
+  m_FlareFadeSpeed: 3
+  m_HaloTexture: {fileID: 0}
+  m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}
+  m_DefaultReflectionMode: 0
+  m_DefaultReflectionResolution: 128
+  m_ReflectionBounces: 1
+  m_ReflectionIntensity: 1
+  m_CustomReflection: {fileID: 0}
+  m_Sun: {fileID: 0}
+  m_UseRadianceAmbientProbe: 0
+--- !u!157 &3
+LightmapSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 12
+  m_GIWorkflowMode: 1
+  m_GISettings:
+    serializedVersion: 2
+    m_BounceScale: 1
+    m_IndirectOutputScale: 1
+    m_AlbedoBoost: 1
+    m_EnvironmentLightingMode: 0
+    m_EnableBakedLightmaps: 1
+    m_EnableRealtimeLightmaps: 0
+  m_LightmapEditorSettings:
+    serializedVersion: 12
+    m_Resolution: 2
+    m_BakeResolution: 40
+    m_AtlasSize: 1024
+    m_AO: 0
+    m_AOMaxDistance: 1
+    m_CompAOExponent: 1
+    m_CompAOExponentDirect: 0
+    m_ExtractAmbientOcclusion: 0
+    m_Padding: 2
+    m_LightmapParameters: {fileID: 0}
+    m_LightmapsBakeMode: 1
+    m_TextureCompression: 1
+    m_FinalGather: 0
+    m_FinalGatherFiltering: 1
+    m_FinalGatherRayCount: 256
+    m_ReflectionCompression: 2
+    m_MixedBakeMode: 2
+    m_BakeBackend: 1
+    m_PVRSampling: 1
+    m_PVRDirectSampleCount: 32
+    m_PVRSampleCount: 512
+    m_PVRBounces: 2
+    m_PVREnvironmentSampleCount: 256
+    m_PVREnvironmentReferencePointCount: 2048
+    m_PVRFilteringMode: 1
+    m_PVRDenoiserTypeDirect: 1
+    m_PVRDenoiserTypeIndirect: 1
+    m_PVRDenoiserTypeAO: 1
+    m_PVRFilterTypeDirect: 0
+    m_PVRFilterTypeIndirect: 0
+    m_PVRFilterTypeAO: 0
+    m_PVREnvironmentMIS: 1
+    m_PVRCulling: 1
+    m_PVRFilteringGaussRadiusDirect: 1
+    m_PVRFilteringGaussRadiusIndirect: 5
+    m_PVRFilteringGaussRadiusAO: 2
+    m_PVRFilteringAtrousPositionSigmaDirect: 0.5
+    m_PVRFilteringAtrousPositionSigmaIndirect: 2
+    m_PVRFilteringAtrousPositionSigmaAO: 1
+    m_ExportTrainingData: 0
+    m_TrainingDataDestination: TrainingData
+    m_LightProbeSampleCountMultiplier: 4
+  m_LightingDataAsset: {fileID: 0}
+  m_LightingSettings: {fileID: 0}
+--- !u!196 &4
+NavMeshSettings:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_BuildSettings:
+    serializedVersion: 3
+    agentTypeID: 0
+    agentRadius: 0.5
+    agentHeight: 2
+    agentSlope: 45
+    agentClimb: 0.4
+    ledgeDropHeight: 0
+    maxJumpAcrossDistance: 0
+    minRegionArea: 2
+    manualCellSize: 0
+    cellSize: 0.16666667
+    manualTileSize: 0
+    tileSize: 256
+    buildHeightMesh: 0
+    maxJobWorkers: 0
+    preserveTilesOutsideBounds: 0
+    debug:
+      m_Flags: 0
+  m_NavMeshData: {fileID: 0}
+--- !u!1 &209773543
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 209773545}
+  - component: {fileID: 209773544}
+  m_Layer: 0
+  m_Name: curve_road_surface_test1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &209773544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 209773543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d22482c65bf0a248a742275874c35f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _houdiniAsset: {fileID: 387833318}
+  _bakeTargets: []
+--- !u!4 &209773545
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 209773543}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 387833319}
+  - {fileID: 340135084}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &233609934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d66a2560bc02844b93f5cd39436c51a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _geoInfo:
+    type: 0
+    nameSH: 362
+    nodeId: 3
+    isEditable: 0
+    isTemplated: 0
+    isDisplayGeo: 1
+    hasGeoChanged: 0
+    hasMaterialChanged: 0
+    pointGroupCount: 0
+    primitiveGroupCount: 0
+    edgeGroupCount: 0
+    partCount: 1
+  _geoName: OUT_ROAD_MESH
+  _parts:
+  - {fileID: 2046827123}
+  _containerObjectNode: {fileID: 1879181129}
+  _inputNode: {fileID: 0}
+  _geoCurve: {fileID: 0}
+  _volumeCache: {fileID: 0}
+  _volumeCaches: []
+--- !u!1 &330585543
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 330585546}
+  - component: {fileID: 330585545}
+  - component: {fileID: 330585544}
+  - component: {fileID: 330585547}
+  m_Layer: 0
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!81 &330585544
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+--- !u!20 &330585545
+Camera:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_ClearFlags: 1
+  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_projectionMatrixMode: 1
+  m_GateFitMode: 2
+  m_FOVAxisMode: 0
+  m_Iso: 200
+  m_ShutterSpeed: 0.005
+  m_Aperture: 16
+  m_FocusDistance: 10
+  m_FocalLength: 50
+  m_BladeCount: 5
+  m_Curvature: {x: 2, y: 11}
+  m_BarrelClipping: 0.25
+  m_Anamorphism: 0
+  m_SensorSize: {x: 36, y: 24}
+  m_LensShift: {x: 0, y: 0}
+  m_NormalizedViewPortRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  near clip plane: 0.3
+  far clip plane: 1000
+  field of view: 60
+  orthographic: 0
+  orthographic size: 5
+  m_Depth: -1
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingPath: -1
+  m_TargetTexture: {fileID: 0}
+  m_TargetDisplay: 0
+  m_TargetEye: 3
+  m_HDR: 1
+  m_AllowMSAA: 1
+  m_AllowDynamicResolution: 0
+  m_ForceIntoRT: 0
+  m_OcclusionCulling: 1
+  m_StereoConvergence: 10
+  m_StereoSeparation: 0.022
+--- !u!4 &330585546
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &330585547
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 330585543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 1
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_Version: 2
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+--- !u!1 &340135081
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 340135084}
+  - component: {fileID: 340135083}
+  - component: {fileID: 340135082}
+  m_Layer: 0
+  m_Name: curve_road_surface_test1_OUT_ROAD_MESH_OUT_ROAD_MESH_0
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!33 &340135082
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 340135081}
+  m_Mesh: {fileID: 478779976}
+--- !u!23 &340135083
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 340135081}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 1537465310}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!4 &340135084
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 340135081}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 209773545}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &387833317
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 387833319}
+  - component: {fileID: 387833318}
+  m_Layer: 0
+  m_Name: HDA_Data
+  m_TagString: EditorOnly
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &387833318
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 387833317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 740823ef63d3f6d468aaab5799b16654, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _assetType: 1
+  _assetInfo:
+    nodeId: 0
+    objectNodeId: 0
+    hasEverCooked: 1
+    nameSH: 386
+    labelSH: 383
+    filePathSH: 384
+    versionSH: 389
+    fullOpNameSH: 390
+    helpTextSH: 391
+    helpURLSH: 385
+    objectCount: -1
+    handleCount: 0
+    transformInputCount: 1
+    geoInputCount: 0
+    geoOutputCount: 0
+    haveObjectsChanged: 0
+    haveMaterialsChanged: 0
+  _nodeInfo:
+    id: 0
+    parentId: 2
+    nameSH: 365
+    type: 1
+    isValid: 1
+    totalCookCount: 2
+    uniqueHoudiniNodeId: 32
+    internalNodePathSH: 366
+    parmCount: 58
+    parmIntValueCount: 20
+    parmFloatValueCount: 45
+    parmStringValueCount: 8
+    parmChoiceCount: 58
+    childNodeCount: 5
+    inputCount: 1
+    outputCount: 1
+    createdPostAssetLoad: 1
+    isTimeDependent: 0
+  _assetName: curve_road_surface_test1
+  _assetOpName: pcgbike::Object/curve_road_surface_test::1.1
+  _assetHelp: 
+  _assetPath: Assets/Generated/Road/CurveRoadSurface_Test.hda
+  _loadAssetFromMemory: 0
+  _alwaysOverwriteOnLoad: 0
+  _assetFileObject: {fileID: 102900000, guid: 05be0bee30050c040b78e0772e8ad4ad, type: 3}
+  _objectNodes:
+  - {fileID: 1879181129}
+  _rootGameObject: {fileID: 209773543}
+  _materialCache:
+  - {fileID: 1642273754}
+  _parameters: {fileID: 759912970}
+  _lastSyncedTransformMatrix:
+    e00: 1
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 1
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 1
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 1
+  _lastSyncedChildTransformMatrices:
+  - e00: 1
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 1
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 1
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 1
+  - e00: 1
+    e01: 0
+    e02: 0
+    e03: 0
+    e10: 0
+    e11: 1
+    e12: 0
+    e13: 0
+    e20: 0
+    e21: 0
+    e22: 1
+    e23: 0
+    e30: 0
+    e31: 0
+    e32: 0
+    e33: 1
+  _assetCacheFolderPath: Assets/HoudiniEngineAssetCache/Working/CurveRoadSurface_Test
+    2
+  _subassetNames:
+  - pcgbike::Object/curve_road_surface_test::1.1
+  _selectedSubassetIndex: 0
+  _totalCookCount: 4
+  _requestBuildAction: 0
+  _checkParameterChangeForCook: 0
+  _skipCookCheck: 0
+  _uploadParameters: 1
+  _forceUploadInputs: 0
+  _upstreamCookChanged: 0
+  _cookStatus: 0
+  _lastCookResult: 1
+  _isCookingAssetReloaded: 0
+  _sessionID: 2723424207600
+  _uiLocked: 1
+  _showHDAOptions: 0
+  _showGenerateSection: 1
+  _showBakeSection: 0
+  _showEventsSection: 0
+  _showCurvesSection: 0
+  _showInputNodesSection: 0
+  _showToolsSection: 0
+  _showTerrainSection: 0
+  _instanceInputUIState: {fileID: 1087875223}
+  _reloadDataEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  _cookedDataEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  _bakedDataEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  _preAssetEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  _generateUVs: 0
+  _generateTangents: 1
+  _generateNormals: 1
+  _pushTransformToHoudini: 1
+  _transformChangeTriggersCooks: 0
+  _cookingTriggersDownCooks: 1
+  _autoCookOnParameterChange: 1
+  _ignoreNonDisplayNodes: 0
+  _useOutputNodes: 1
+  _generateMeshUsingPoints: 0
+  _useLODGroups: 1
+  _splitGeosByGroup: 0
+  _sessionSyncAutoCook: 1
+  _bakeUpdateKeepPreviousTransformValues: 0
+  _curveEditorEnabled: 1
+  _curves: []
+  _curveDrawCollision: 0
+  _curveDrawColliders: []
+  _curveDrawLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  _curveProjectMaxDistance: 1000
+  _curveProjectDirection: {x: 0, y: -1, z: 0}
+  _curveProjectDirectionToView: 1
+  _curveDisableScaleRotation: 1
+  _curveFrameSelectedNodes: 1
+  _curveFrameSelectedNodeDistance: 20
+  _inputNodes:
+  - {fileID: 565582031}
+  - {fileID: 1604479193}
+  _handles: []
+  _handlesEnabled: 1
+  _volumeCaches: []
+  _attributeStores: []
+  _editableNodesToolsEnabled: 0
+  _toolsInfo: {fileID: 648641308}
+  _serializedMetaData: {fileID: 1990386778}
+--- !u!4 &387833319
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 387833317}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 209773545}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &410087039
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 410087041}
+  - component: {fileID: 410087040}
+  - component: {fileID: 410087042}
+  m_Layer: 0
+  m_Name: Directional Light
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!108 &410087040
+Light:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410087039}
+  m_Enabled: 1
+  serializedVersion: 10
+  m_Type: 1
+  m_Shape: 0
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Intensity: 2
+  m_Range: 10
+  m_SpotAngle: 30
+  m_InnerSpotAngle: 21.80208
+  m_CookieSize: 10
+  m_Shadows:
+    m_Type: 2
+    m_Resolution: -1
+    m_CustomResolution: -1
+    m_Strength: 1
+    m_Bias: 0.05
+    m_NormalBias: 0.4
+    m_NearPlane: 0.2
+    m_CullingMatrixOverride:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 0
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: 0
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    m_UseCullingMatrixOverride: 0
+  m_Cookie: {fileID: 0}
+  m_DrawHalo: 0
+  m_Flare: {fileID: 0}
+  m_RenderMode: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingLayerMask: 1
+  m_Lightmapping: 4
+  m_LightShadowCasterMode: 0
+  m_AreaSize: {x: 1, y: 1}
+  m_BounceIntensity: 1
+  m_ColorTemperature: 5000
+  m_UseColorTemperature: 1
+  m_BoundingSphereOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_UseBoundingSphereOverride: 0
+  m_UseViewFrustumForShadowCasterCull: 1
+  m_ShadowRadius: 0
+  m_ShadowAngle: 0
+--- !u!4 &410087041
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410087039}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!114 &410087042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410087039}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 1
+--- !u!43 &478779976
+Mesh:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: OUT_ROAD_MESH_0_mesh
+  serializedVersion: 11
+  m_SubMeshes:
+  - serializedVersion: 2
+    firstByte: 0
+    indexCount: 198
+    topology: 0
+    baseVertex: 0
+    firstVertex: 0
+    vertexCount: 198
+    localAABB:
+      m_Center: {x: -2.0983343, y: 0.18664292, z: -3.311592}
+      m_Extent: {x: 22.351093, y: 0.21627253, z: 12.669589}
+  m_Shapes:
+    vertices: []
+    shapes: []
+    channels: []
+    fullWeights: []
+  m_BindPose: []
+  m_BoneNameHashes: 
+  m_RootBoneNameHash: 0
+  m_BonesAABB: []
+  m_VariableBoneCountWeights:
+    m_Data: 
+  m_MeshCompression: 0
+  m_IsReadable: 0
+  m_KeepVertices: 1
+  m_KeepIndices: 1
+  m_IndexFormat: 0
+  m_IndexBuffer: 00000100020003000400050006000700080009000a000b000c000d000e000f0010001100120013001400150016001700180019001a001b001c001d001e001f0020002100220023002400250026002700280029002a002b002c002d002e002f0030003100320033003400350036003700380039003a003b003c003d003e003f0040004100420043004400450046004700480049004a004b004c004d004e004f0050005100520053005400550056005700580059005a005b005c005d005e005f0060006100620063006400650066006700680069006a006b006c006d006e006f0070007100720073007400750076007700780079007a007b007c007d007e007f0080008100820083008400850086008700880089008a008b008c008d008e008f0090009100920093009400950096009700980099009a009b009c009d009e009f00a000a100a200a300a400a500a600a700a800a900aa00ab00ac00ad00ae00af00b000b100b200b300b400b500b600b700b800b900ba00bb00bc00bd00be00bf00c000c100c200c300c400c500
+  m_VertexData:
+    serializedVersion: 3
+    m_VertexCount: 198
+    m_Channels:
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 3
+    - stream: 0
+      offset: 12
+      format: 0
+      dimension: 3
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    - stream: 0
+      offset: 0
+      format: 0
+      dimension: 0
+    m_DataSize: 4752
+    _typelessdata: a605a24100000000154d40c1caeaccbad1ff7f3fee62ea3ab3f47b4100000000ebb27fc170c4c9bad3ff7f3fe06ce53aed0172416cd60fbbbb6274c12e5803bbb1ff7f3f0fa5163bed0172416cd60fbbbb6274c12e5803bbb1ff7f3f0fa5163bbc3a9d416cd60fbb316735c1a80622bb88ff7f3f51313b3ba605a24100000000154d40c1caeaccbad1ff7f3fee62ea3abc3a9d416cd60fbb316735c1a80622bb88ff7f3f51313b3bed0172416cd60fbbbb6274c12e5803bbb1ff7f3f0fa5163b37fa64413db7fbbb1a4465c17c9c44bb4fff7f3fefd8633b37fa64413db7fbbb1a4465c17c9c44bb4fff7f3fefd8633b0fe296413db7fbbb72ac26c1e4c24abb43ff7f3f29bb6b3bbc3a9d416cd60fbb316735c1a80622bb88ff7f3f51313b3b0fe296413db7fbbb72ac26c1e4c24abb43ff7f3f29bb6b3b37fa64413db7fbbb1a4465c17c9c44bb4fff7f3fefd8633bf6b05541d6b972bc2f7553c1942049bb47ff7f3fd1c6693bf6b05541d6b972bc2f7553c1942049bb47ff7f3fd1c6693b7b3a8f41d6b972bcabd614c1d1e541bb54ff7f3fc0b8603b0fe296413db7fbbb72ac26c1e4c24abb43ff7f3f29bb6b3b7b3a8f41d6b972bcabd614c1d1e541bb54ff7f3fc0b8603bf6b05541d6b972bc2f7553c1942049bb47ff7f3fd1c6693b8abe444107ccb3bc37cf3fc1dcb92abb7bff7f3fd15a453b8abe444107ccb3bc37cf3fc1dcb92abb7bff7f3fd15a453b61a0864107ccb3bc95e400c1564619bb95ff7f3fbadc2f3b7b3a8f41d6b972bcabd614c1d1e541bb54ff7f3fc0b8603b61a0864107ccb3bc95e400c1564619bb95ff7f3fbadc2f3b8abe444107ccb3bc37cf3fc1dcb92abb7bff7f3fd15a453b25c9324109bfe0bca93a2bc1ba52dbbac9ff7f3f5b90fa3a25c9324109bfe0bca93a2bc1ba52dbbac9ff7f3f5b90fa3a6cd27a4109bfe0bc628bd7c04c2da3bae3ff7f3f0550b83a61a0864107ccb3bc95e400c1564619bb95ff7f3fbadc2f3b6cd27a4109bfe0bc628bd7c04c2da3bae3ff7f3f0550b83a25c9324109bfe0bca93a2bc1ba52dbbac9ff7f3f5b90fa3a9f7e2041d6b9f2bcf7a716c1fedd42b9ffff7f3f02ca5f399f7e2041d6b9f2bcf7a716c1fedd42b9ffff7f3f02ca5f393bcd6741d6b9f2bc08c3acc047aceb39fcff7f3fac96feb96cd27a4109bfe0bc628bd7c04c2da3bae3ff7f3f0550b83a3bcd6741d6b9f2bc08c3acc047aceb39fcff7f3fac96feb99f7e2041d6b9f2bcf7a716c1fedd42b9ffff7f3f02ca5f3987950e415540dcbcb90f03c1749c0e3babff7f3fa2d519bb87950e415540dcbcb90f03c1749c0e3babff7f3fa2d519bbbecb54415540dcbcdd2e83c07b944a3b5bff7f3f447451bb3bcd6741d6b9f2bc08c3acc047aceb39fcff7f3fac96feb9becb54415540dcbcdd2e83c07b944a3b5bff7f3f447451bb87950e415540dcbcb90f03c1749c0e3babff7f3fa2d519bba7fdfc406cd68fbcf043e4c0e1e5f73b43fc7f3fc54af7bba7fdfc406cd68fbcf043e4c0e1e5f73b43fc7f3fc54af7bb20ae41416cd68fbc7b3d36c01f55303cc7f87f3f249127bcbecb54415540dcbcdd2e83c07b944a3b5bff7f3f447451bb20ae41416cd68fbc7b3d36c01f55303cc7f87f3f249127bca7fdfc406cd68fbcf043e4c0e1e5f73b43fc7f3fc54af7bb695bb9406f92293db961a4c0a3e0a93cc9e57f3fce8c9dbc695bb9406f92293db961a4c0a3e0a93cc9e57f3fce8c9dbcc2591d416f92293d8be533bf354fd03c83da7f3fdaa4b6bc20ae41416cd68fbc7b3d36c01f55303cc7f87f3f249127bcc2591d416f92293d8be533bf354fd03c83da7f3fdaa4b6bc695bb9406f92293db961a4c0a3e0a93cc9e57f3fce8c9dbcb7a498407c2cd23dd6b188c0310f0f3d34bb7f3f63cff2bcb7a498407c2cd23dd6b188c0310f0f3d34bb7f3f63cff2bcd22209417c2cd23df2ddbd3e384f143d95b97f3ffaf6ecbcc2591d416f92293d8be533bf354fd03c83da7f3fdaa4b6bcd22209417c2cd23df2ddbd3e384f143d95b97f3ffaf6ecbcb7a498407c2cd23dd6b188c0310f0f3d34bb7f3f63cff2bc42226f401820333eb23b5dc0c3bd2c3d22a27f3fb4da06bd42226f401820333eb23b5dc0c3bd2c3d22a27f3fb4da06bd8ee2eb401820333ec98da83fa61e2b3d05a77f3f61ebfebcd22209417c2cd23df2ddbd3e384f143d95b97f3ffaf6ecbc8ee2eb401820333ec98da83fa61e2b3d05a77f3f61ebfebc42226f401820333eb23b5dc0c3bd2c3d22a27f3fb4da06bd464a2d405c8d7f3e16e62cc0a263333db09f7f3f70bf02bd464a2d405c8d7f3e16e62cc0a263333db09f7f3f70bf02bd2ee7c5405c8d7f3e230f0c4052ad293d54ac7f3ff8d7ecbc8ee2eb401820333ec98da83fa61e2b3d05a77f3f61ebfebc2ee7c5405c8d7f3e230f0c4052ad293d54ac7f3ff8d7ecbc464a2d405c8d7f3e16e62cc0a263333db09f7f3f70bf02bde87fd43f9eb4a23e0f92fdbf95831f3df0b67f3f3d93dabce87fd43f9eb4a23e0f92fdbf95831f3df0b67f3f3d93dabcabf59f409eb4a23e2a474040c1a60e3ddfc67f3f0c90bcbc2ee7c5405c8d7f3e230f0c4052ad293d54ac7f3ff8d7ecbcabf59f409eb4a23e2a474040c1a60e3ddfc67f3f0c90bcbce87fd43f9eb4a23e0f92fdbf95831f3df0b67f3f3d93dabc8e8e113f75dfbd3ef185a2bf8c56cb3c2de37f3fe4ed84bc8e8e113f75dfbd3ef185a2bf8c56cb3c2de37f3fe4ed84bc827e734075dfbd3eec197240d791883c25f37f3fbb2e2fbcabf59f409eb4a23e2a474040c1a60e3ddfc67f3f0c90bcbc827e734075dfbd3eec197240d791883c25f37f3fbb2e2fbc8e8e113f75dfbd3ef185a2bf8c56cb3c2de37f3fe4ed84bc404af0bfef4ace3e2a58913e83425b3b7cff7f3f2f810cbb404af0bfef4ace3e2a58913e83425b3b7cff7f3f2f810cbb7c1ab03fef4ace3e1e6aaa4057fd30bba8ff7f3f26c4e73a827e734075dfbd3eec197240d791883c25f37f3fbb2e2fbc7c1ab03fef4ace3e1e6aaa4057fd30bba8ff7f3f26c4e73a404af0bfef4ace3e2a58913e83425b3b7cff7f3f2f810cbb86b94cc0fceec53ed1a3943f0f883bbce3f97f3f0475f43b86b94cc0fceec53ed1a3943f0f883bbce3f97f3f0475f43bcc53ae3dfceec53e49d9c5407aa560bc53f77f3f66950f3c7c1ab03fef4ace3e1e6aaa4057fd30bba8ff7f3f26c4e73acc53ae3dfceec53e49d9c5407aa560bc53f77f3f66950f3c86b94cc0fceec53ed1a3943f0f883bbce3f97f3f0475f43b27cf8ec0ca68b63e8af0fc3fbe909abcc1ef7f3f4899413c27cf8ec0ca68b63e8af0fc3fbe909abcc1ef7f3f4899413ce725a9bfca68b63e4dd1e240dee2a2bc91ee7f3f827f3f3ccc53ae3dfceec53e49d9c5407aa560bc53f77f3f66950f3ce725a9bfca68b63e4dd1e240dee2a2bc91ee7f3f827f3f3c27cf8ec0ca68b63e8af0fc3fbe909abcc1ef7f3f4899413c97a1b4c03168a23e7fd42a403ac4d1bcc7e37f3fb6e26a3c97a1b4c03168a23e7fd42a403ac4d1bcc7e37f3fb6e26a3cf83734c03168a23e90bcfe401657ccbc93e67f3fbf1f4b3ce725a9bfca68b63e4dd1e240dee2a2bc91ee7f3f827f3f3cf83734c03168a23e90bcfe401657ccbc93e67f3fbf1f4b3c97a1b4c03168a23e7fd42a403ac4d1bcc7e37f3fb6e26a3c76bfd5c0099d8c3ea9154b403a3641bd12a97f3f1b15a93c76bfd5c0099d8c3ea9154b403a3641bd12a97f3f1b15a93ced248dc0099d8c3e91a40b41fa092ebd14bd7f3f94917b3cf83734c03168a23e90bcfe401657ccbc93e67f3fbf1f4b3ced248dc0099d8c3e91a40b41fa092ebd14bd7f3f94917b3c76bfd5c0099d8c3ea9154b403a3641bd12a97f3f1b15a93cc013e2c0506e6f3e904b5840381748bdc9ab7f3f80055d3cc013e2c0506e6f3e904b5840381748bdc9ab7f3f80055d3c69cbd1c0506e6f3e5bba1541e365ddbc0ee87f3ffe5bde39ed248dc0099d8c3e91a40b41fa092ebd14bd7f3f94917b3c69cbd1c0506e6f3e5bba1541e365ddbc0ee87f3ffe5bde39c013e2c0506e6f3e904b5840381748bdc9ab7f3f80055d3c18f60bc1da4b283ecb425440053299bd31457f3f27be21bc18f60bc1da4b283ecb425440053299bd31457f3f27be21bc64131dc1da4b283e01871341c97886bd4e6c7f3fac7962bc69cbd1c0506e6f3e5bba1541e365ddbc0ee87f3ffe5bde3964131dc1da4b283e01871341c97886bd4e6c7f3fac7962bc18f60bc1da4b283ecb425440053299bd31457f3f27be21bcf8290fc1baf2003e88064840da8b8fbd7a527f3f90cc9ebcf8290fc1baf2003e88064840da8b8fbd7a527f3f90cc9ebc543e40c1baf2003e1c83044115c8afbc85ea7f3f1fc464bc64131dc1da4b283e01871341c97886bd4e6c7f3fac7962bc543e40c1baf2003e1c83044115c8afbc85ea7f3f1fc464bcf8290fc1baf2003e88064840da8b8fbd7a527f3f90cc9ebc4b921bc13333b33d3b8223403e9bc5bc3ee37f3f9bd48cbc4b921bc13333b33d3b8223403e9bc5bc3ee37f3f9bd48cbcb56d58c13333b33de23ee64035028fbc98ee7f3f328a76bc543e40c1baf2003e1c83044115c8afbc85ea7f3f1fc464bcb56d58c13333b33de23ee64035028fbc98ee7f3f328a76bc4b921bc13333b33d3b8223403e9bc5bc3ee37f3f9bd48cbcb9602ac19b62543d6ed2d93fc3888bbcabee7f3ffc2b7dbcb9602ac19b62543d6ed2d93fc3888bbcabee7f3ffc2b7dbc6d536dc19b62543d2210c040fb1160bcbff37f3f5bfc5fbcb56d58c13333b33de23ee64035028fbc98ee7f3f328a76bc6d536dc19b62543d2210c040fb1160bcbff37f3f5bfc5fbcb9602ac19b62543d6ed2d93fc3888bbcabee7f3ffc2b7dbc24b63ac17940b23c0872263f0feb38bc70f77f3f8f8b3dbc24b63ac17940b23c0872263f0feb38bc70f77f3f8f8b3dbc145980c17940b23c3a3b98400c5f0cbcc4fa7f3ff92c18bc6d536dc19b62543d2210c040fb1160bcbff37f3f5bfc5fbc145980c17940b23c3a3b98400c5f0cbcc4fa7f3ff92c18bc24b63ac17940b23c0872263f0feb38bc70f77f3f8f8b3dbc2eaf5ac1cdcc1cbc9d00c2bf7a5baebbf0fd7f3fe5c8c0bb2eaf5ac1cdcc1cbc9d00c2bf7a5baebbf0fd7f3fe5c8c0bb696c91c1cdcc1cbc4f401c40c3455fbb1bff7f3f70ee81bb145980c17940b23c3a3b98400c5f0cbcc4fa7f3ff92c18bc696c91c1cdcc1cbc4f401c40c3455fbb1bff7f3f70ee81bb2eaf5ac1cdcc1cbc9d00c2bf7a5baebbf0fd7f3fe5c8c0bb6d9368c1666666bc480c27c0496da9baddff7f3fe869cdba6d9368c1666666bc480c27c0496da9baddff7f3fe869cdba4a569ac1666666bc9018863fd42e2abaf7ff7f3f038a5eba696c91c1cdcc1cbc4f401c40c3455fbb1bff7f3f70ee81bb4a569ac1666666bc9018863fd42e2abaf7ff7f3f038a5eba6d9368c1666666bc480c27c0496da9baddff7f3fe869cdba751b78c1000070bc74947ac0ccc4ec380000803f5e6b2839751b78c1000070bc74947ac0ccc4ec380000803f5e6b283945dea2c1000070bc605cc5bebf80da39fcff7f3fdb31193a4a569ac1666666bc9018863fd42e2abaf7ff7f3f038a5eba45dea2c1000070bc605cc5bebf80da39fcff7f3fdb31193a751b78c1000070bc74947ac0ccc4ec380000803f5e6b283948db83c1cdcc4cbce827a9c0a1ae6f3aebff7f3f5a14a93a48db83c1cdcc4cbce827a9c0a1ae6f3aebff7f3f5a14a93ab824abc1cdcc4cbc6060ebbfea138d3ae3ff7f3fa498ca3a45dea2c1000070bc605cc5bebf80da39fcff7f3fdb31193ab824abc1cdcc4cbc6060ebbfea138d3ae3ff7f3fa498ca3a48db83c1cdcc4cbce827a9c0a1ae6f3aebff7f3f5a14a93a16538bc1000010bc0353d4c0e132b23ad0ff7f3f8bbf003b16538bc1000010bc0353d4c0e132b23ad0ff7f3f8bbf003beae0b2c1000010bcfa194fc075bfbb3acbff7f3f0bd6083bb824abc1cdcc4cbc6060ebbfea138d3ae3ff7f3fa498ca3aeae0b2c1000010bcfa194fc075bfbb3acbff7f3f0bd6083b16538bc1000010bc0353d4c0e132b23ad0ff7f3f8bbf003b4e1f92c19a9999bbf029fcc0b502c53ac4ff7f3ffdd90f3b4e1f92c19a9999bbf029fcc0b502c53ac4ff7f3ffdd90f3bb2c0b9c19a9999bb10d68fc0fbdbc33ac5ff7f3fcd900e3beae0b2c1000010bcfa194fc075bfbb3acbff7f3f0bd6083bb2c0b9c19a9999bb10d68fc0fbdbc33ac5ff7f3fcd900e3b4e1f92c19a9999bbf029fcc0b502c53ac4ff7f3ffdd90f3b5ff697c13333b3bac3250fc1e2eea43ad7ff7f3f6515ef3a5ff697c13333b3bac3250fc1e2eea43ad7ff7f3f6515ef3aa165bfc13333b3ba7ad4b0c0298f8b3ae3ff7f3f6115c83ab2c0b9c19a9999bb10d68fc0fbdbc33ac5ff7f3fcd900e3ba165bfc13333b3ba7ad4b0c0298f8b3ae3ff7f3f6115c83a5ff697c13333b3bac3250fc1e2eea43ad7ff7f3f6515ef3a93679cc100000000d8b61bc1ac125c3aeeff7f3ffa079d3a93679cc100000000d8b61bc1ac125c3aeeff7f3ffa079d3a6d98c3c1000000005092c8c0a2b4633aedff7f3ff1ffa03aa165bfc13333b3ba7ad4b0c0298f8b3ae3ff7f3f6115c83a
+  m_CompressedMesh:
+    m_Vertices:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_UV:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Normals:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Tangents:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Weights:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_NormalSigns:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_TangentSigns:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_FloatColors:
+      m_NumItems: 0
+      m_Range: 0
+      m_Start: 0
+      m_Data: 
+      m_BitSize: 0
+    m_BoneIndices:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_Triangles:
+      m_NumItems: 0
+      m_Data: 
+      m_BitSize: 0
+    m_UVInfo: 0
+  m_LocalAABB:
+    m_Center: {x: -2.0983343, y: 0.18664292, z: -3.311592}
+    m_Extent: {x: 22.351093, y: 0.21627253, z: 12.669589}
+  m_MeshUsageFlags: 0
+  m_CookingOptions: 30
+  m_BakedConvexCollisionMesh: 
+  m_BakedTriangleCollisionMesh: 
+  m_MeshMetrics[0]: 1
+  m_MeshMetrics[1]: 1
+  m_MeshOptimizationFlags: 1
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
+--- !u!114 &565582031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8512ec9bb36e55e4dab2691b35626896, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _inputNodeType: 2
+  _inputObjectType: 6
+  _pendingInputObjectType: 6
+  _inputObjects:
+  - _gameObject: {fileID: 1378191859}
+    _terrainReference: {fileID: 0}
+    _boundingVolumeReference: {fileID: 0}
+    _tilemapReference: {fileID: 0}
+    _syncdTransform:
+      e00: 1
+      e01: 0
+      e02: 0
+      e03: 16.793839
+      e10: 0
+      e11: 1
+      e12: 0
+      e13: 0
+      e20: 0
+      e21: 0
+      e22: 1
+      e23: -18.214653
+      e30: 0
+      e31: 0
+      e32: 0
+      e33: 1
+    _syncdChildTransforms: []
+    _useTransformOffset: 0
+    _translateOffset: {x: 0, y: 0, z: 0}
+    _rotateOffset: {x: 0, y: 0, z: 0}
+    _scaleOffset: {x: 1, y: 1, z: 1}
+  _inputObjectsConnectedAssetIDs: 0d000000
+  _inputAsset: {fileID: 0}
+  _connectedInputAsset: {fileID: 0}
+  _inputAssetInfos: []
+  _nodeID: 0
+  _inputIndex: 0
+  _requiresCook: 1
+  _requiresUpload: 0
+  _inputName: shop_materialpath
+  _labelName: Material
+  _paramName: shop_materialpath
+  _connectedNodeID: 14
+  _keepWorldTransform: 1
+  _packGeometryBeforeMerging: 0
+  _parentAsset: {fileID: 387833318}
+  _meshSettings:
+    _exportColliders: 0
+  _tilemapSettings:
+    _createGroupsForTiles: 1
+    _exportUnusedTiles: 1
+    _applyTileColor: 1
+    _applyTilemapOrientation: 1
+  _splineSettings:
+    _samplingResolution: 23.2
+  _usingSelectFromHierarchy: 0
+--- !u!114 &648641308
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40c73216ad1e23b43a82620464ff135d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _paintBrushSize: 1
+  _paintBrushOpacity: 1
+  _paintIntValue: 
+  _paintFloatValue: []
+  _paintStringValue: []
+  _lastAttributesGeoID: 0
+  _lastAttributesPartID: 0
+  _lastAttributeNodeName: 
+  _lastAttributeName: 
+  _brushHandleColor: {r: 0, g: 0, b: 0, a: 1}
+  _affectedAreaPaintColor: {r: 1, g: 1, b: 0, a: 1}
+  _liveUpdate: 1
+  _isPainting: 0
+  _editPointBoxSize: 0.1
+  _editPointBoxUnselectedColor: {r: 1, g: 0, b: 0, a: 1}
+  _editPointBoxSelectedColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  _recacheRequired: 1
+  _paintMergeMode: 0
+  _showOnlyEditGeometry: 1
+  _alwaysCookUpstream: 1
+  _paintMeshVisiblity: 0
+--- !u!114 &759912970
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59d17581e5b7f4946a3c54d1fe65c9c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _uiLabel: ASSET PARAMETERS
+  _paramInts: 0000000000000000000000000000000000000000000000000100000001000000000000000000000001000000000000000100000001000000000000000000000000000000000000000100000001000000
+  _paramFloats:
+  - 0
+  - 0
+  - 0
+  - 0
+  - -0
+  - 0
+  - 1
+  - 1
+  - 1
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 1
+  - 0
+  - 0
+  - 0
+  - 1
+  - 0
+  - 0
+  - 1
+  - 1
+  - 1
+  - 6
+  - 1.5
+  - -18
+  - 0
+  - -14
+  - -9
+  - 0
+  - -4
+  - -1
+  - 0.4
+  - 2
+  - 8
+  - 0.2
+  - 6.5
+  - 15
+  - 0
+  - 1.5
+  - 22
+  - 0
+  - -8
+  _paramStrings:
+  - 
+  - 
+  - 
+  - on
+  - 
+  - /obj/merge1/merge1
+  - 
+  - 
+  _paramChoices:
+  - parentParmId: 7
+    labelSH: 260
+    valueSH: 301
+  - parentParmId: 7
+    labelSH: 302
+    valueSH: 205
+  - parentParmId: 7
+    labelSH: 258
+    valueSH: 246
+  - parentParmId: 7
+    labelSH: 247
+    valueSH: 369
+  - parentParmId: 7
+    labelSH: 287
+    valueSH: 288
+  - parentParmId: 7
+    labelSH: 289
+    valueSH: 290
+  - parentParmId: 8
+    labelSH: 299
+    valueSH: 300
+  - parentParmId: 8
+    labelSH: 291
+    valueSH: 292
+  - parentParmId: 8
+    labelSH: 293
+    valueSH: 294
+  - parentParmId: 8
+    labelSH: 295
+    valueSH: 296
+  - parentParmId: 8
+    labelSH: 283
+    valueSH: 284
+  - parentParmId: 8
+    labelSH: 285
+    valueSH: 286
+  - parentParmId: 15
+    labelSH: 256
+    valueSH: 257
+  - parentParmId: 15
+    labelSH: 250
+    valueSH: 251
+  - parentParmId: 15
+    labelSH: 252
+    valueSH: 253
+  - parentParmId: 15
+    labelSH: 216
+    valueSH: 217
+  - parentParmId: 15
+    labelSH: 214
+    valueSH: 215
+  - parentParmId: 15
+    labelSH: 242
+    valueSH: 243
+  - parentParmId: 16
+    labelSH: 204
+    valueSH: 372
+  - parentParmId: 16
+    labelSH: 254
+    valueSH: 255
+  - parentParmId: 17
+    labelSH: 265
+    valueSH: 266
+  - parentParmId: 17
+    labelSH: 263
+    valueSH: 264
+  - parentParmId: 18
+    labelSH: 210
+    valueSH: 211
+  - parentParmId: 18
+    labelSH: 156
+    valueSH: 157
+  - parentParmId: 22
+    labelSH: 201
+    valueSH: 371
+  - parentParmId: 22
+    labelSH: 194
+    valueSH: 195
+  - parentParmId: 22
+    labelSH: 196
+    valueSH: 197
+  - parentParmId: 22
+    labelSH: 162
+    valueSH: 163
+  - parentParmId: 22
+    labelSH: 164
+    valueSH: 165
+  - parentParmId: 26
+    labelSH: 190
+    valueSH: 191
+  - parentParmId: 26
+    labelSH: 192
+    valueSH: 193
+  - parentParmId: 31
+    labelSH: 354
+    valueSH: 19
+  - parentParmId: 31
+    labelSH: 20
+    valueSH: 100
+  - parentParmId: 31
+    labelSH: 147
+    valueSH: 353
+  - parentParmId: 31
+    labelSH: 29
+    valueSH: 30
+  - parentParmId: 31
+    labelSH: 101
+    valueSH: 102
+  - parentParmId: 31
+    labelSH: 99
+    valueSH: 373
+  - parentParmId: 32
+    labelSH: 148
+    valueSH: 149
+  - parentParmId: 32
+    labelSH: 150
+    valueSH: 151
+  - parentParmId: 34
+    labelSH: 172
+    valueSH: 173
+  - parentParmId: 34
+    labelSH: 185
+    valueSH: 355
+  - parentParmId: 36
+    labelSH: 113
+    valueSH: 114
+  - parentParmId: 36
+    labelSH: 111
+    valueSH: 112
+  - parentParmId: 38
+    labelSH: 136
+    valueSH: 137
+  - parentParmId: 38
+    labelSH: 138
+    valueSH: 123
+  - parentParmId: 39
+    labelSH: 128
+    valueSH: 129
+  - parentParmId: 39
+    labelSH: 130
+    valueSH: 131
+  - parentParmId: 40
+    labelSH: 66
+    valueSH: 63
+  - parentParmId: 40
+    labelSH: 64
+    valueSH: 59
+  - parentParmId: 41
+    labelSH: 54
+    valueSH: 51
+  - parentParmId: 41
+    labelSH: 52
+    valueSH: 47
+  - parentParmId: 41
+    labelSH: 48
+    valueSH: 49
+  - parentParmId: 47
+    labelSH: 92
+    valueSH: 93
+  - parentParmId: 47
+    labelSH: 94
+    valueSH: 79
+  - parentParmId: 48
+    labelSH: 68
+    valueSH: 69
+  - parentParmId: 48
+    labelSH: 70
+    valueSH: 71
+  - parentParmId: 57
+    labelSH: 358
+    valueSH: 359
+  - parentParmId: 57
+    labelSH: 360
+    valueSH: 310
+  _rootParameters: 00000000
+  _parameterList:
+  - _unityIndex: 0
+    _name: standardfolder
+    _labelName: 
+    _help: 
+    _childParameterIDs: 0100000002000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 0
+      parentId: -1
+      childIndex: 0
+      type: 11
+      scriptType: 0
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 2
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 364
+      labelSH: 0
+      templateNameSH: 349
+      helpSH: 0
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 2
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 1
+    _name: standardfolder_0
+    _labelName: Standard
+    _help: 
+    _childParameterIDs: 03000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 1
+      parentId: -1
+      childIndex: 1
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 346
+      labelSH: 347
+      templateNameSH: 341
+      helpSH: 348
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 2
+    _name: standardfolder_1
+    _labelName: Spare
+    _help: 
+    _childParameterIDs: 1d000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 2
+      parentId: -1
+      childIndex: 2
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 342
+      labelSH: 343
+      templateNameSH: 337
+      helpSH: 344
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 3
+    _name: stdswitcher4
+    _labelName: 
+    _help: 
+    _childParameterIDs: 040000000500000006000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 3
+      parentId: 1
+      childIndex: 0
+      type: 11
+      scriptType: 0
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 350
+      labelSH: 0
+      templateNameSH: 351
+      helpSH: 0
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 3
+    _tabSelectedIndex: 1
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 4
+    _name: stdswitcher4_0
+    _labelName: Transform
+    _help: 
+    _childParameterIDs: 0700000008000000090000000a0000000b0000000c0000000d0000000e0000000f000000100000001100000012000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 4
+      parentId: 1
+      childIndex: 1
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 23
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 340
+      labelSH: 333
+      templateNameSH: 335
+      helpSH: 334
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 5
+    _name: stdswitcher4_1
+    _labelName: Render
+    _help: 
+    _childParameterIDs: 130000001400000015000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 5
+      parentId: 1
+      childIndex: 2
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 4
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 336
+      labelSH: 311
+      templateNameSH: 331
+      helpSH: 312
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 6
+    _name: stdswitcher4_2
+    _labelName: Misc
+    _help: 
+    _childParameterIDs: 160000001700000018000000190000001a0000001b0000001c000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 6
+      parentId: 1
+      childIndex: 3
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 8
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 332
+      labelSH: 307
+      templateNameSH: 313
+      helpSH: 308
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 7
+    _name: xOrd
+    _labelName: Transform Order
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 00000000
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels:
+    - m_Text: Scale Rot Trans
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Scale Trans Rot
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Rot Scale Trans
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Rot Trans Scale
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Trans Scale Rot
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Trans Rot Scale
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    _choiceStringValues: []
+    _choiceIntValues: 000000000100000002000000030000000400000005000000
+    _parmInfo:
+      id: 7
+      parentId: 4
+      childIndex: 0
+      type: 0
+      scriptType: 32
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 6
+      nameSH: 261
+      labelSH: 262
+      templateNameSH: 298
+      helpSH: 297
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 1
+      labelNone: 0
+      intValuesIndex: 0
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 0
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 8
+    _name: rOrd
+    _labelName: Rotate Order
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 00000000
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels:
+    - m_Text: Rx Ry Rz
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Rx Rz Ry
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Ry Rx Rz
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Ry Rz Rx
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Rz Rx Ry
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Rz Ry Rx
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    _choiceStringValues: []
+    _choiceIntValues: 000000000100000002000000030000000400000005000000
+    _parmInfo:
+      id: 8
+      parentId: 4
+      childIndex: 1
+      type: 0
+      scriptType: 32
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 6
+      nameSH: 279
+      labelSH: 280
+      templateNameSH: 282
+      helpSH: 281
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 1
+      intValuesIndex: 1
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 6
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 9
+    _name: t
+    _labelName: Translate
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 0
+    - 0
+    - 0
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 9
+      parentId: 4
+      childIndex: 2
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 4
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 314
+      labelSH: 206
+      templateNameSH: 327
+      helpSH: 207
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 0
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 10
+    _name: r
+    _labelName: Rotate
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 0
+    - -0
+    - 0
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 10
+      parentId: 4
+      childIndex: 3
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 4
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 328
+      labelSH: 329
+      templateNameSH: 323
+      helpSH: 330
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 360
+      UIMin: 0
+      UIMax: 360
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 3
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 11
+    _name: s
+    _labelName: Scale
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 1
+    - 1
+    - 1
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 11
+      parentId: 4
+      childIndex: 4
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 4
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 326
+      labelSH: 319
+      templateNameSH: 325
+      helpSH: 324
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 6
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 12
+    _name: p
+    _labelName: Pivot Translate
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 0
+    - 0
+    - 0
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 12
+      parentId: 4
+      childIndex: 5
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 3
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 320
+      labelSH: 321
+      templateNameSH: 315
+      helpSH: 322
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 9
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 13
+    _name: pr
+    _labelName: Pivot Rotate
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 0
+    - 0
+    - 0
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 13
+      parentId: 4
+      childIndex: 6
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 3
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 316
+      labelSH: 317
+      templateNameSH: 303
+      helpSH: 318
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 12
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 14
+    _name: scale
+    _labelName: Uniform Scale
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 1
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 14
+      parentId: 4
+      childIndex: 7
+      type: 4
+      scriptType: 1
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 306
+      labelSH: 259
+      templateNameSH: 305
+      helpSH: 304
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 15
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 15
+    _name: pre_xform
+    _labelName: Modify Pre-Transform
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 00000000
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 15
+      parentId: 4
+      childIndex: 8
+      type: 3
+      scriptType: 9
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 3
+      choiceCount: 6
+      nameSH: 244
+      labelSH: 245
+      templateNameSH: 213
+      helpSH: 212
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 2
+      floatValuesIndex: 16
+      stringValuesIndex: 0
+      choiceIndex: 12
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 16
+    _name: keeppos
+    _labelName: Keep Position When Parenting
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 16
+      parentId: 4
+      childIndex: 9
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 202
+      labelSH: 203
+      templateNameSH: 249
+      helpSH: 248
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 3
+      floatValuesIndex: 16
+      stringValuesIndex: 0
+      choiceIndex: 18
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 17
+    _name: childcomp
+    _labelName: Child Compensation
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 17
+      parentId: 4
+      childIndex: 10
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 269
+      labelSH: 270
+      templateNameSH: 268
+      helpSH: 267
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 4
+      floatValuesIndex: 16
+      stringValuesIndex: 0
+      choiceIndex: 20
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 18
+    _name: constraints_on
+    _labelName: Enable Constraints
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 18
+      parentId: 4
+      childIndex: 11
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 154
+      labelSH: 155
+      templateNameSH: 221
+      helpSH: 220
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 5
+      floatValuesIndex: 16
+      stringValuesIndex: 0
+      choiceIndex: 22
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 19
+    _name: shop_materialpath
+    _labelName: Material
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 30
+      parentId: 5
+      childIndex: 0
+      type: 10
+      scriptType: 22
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 2
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 103
+      labelSH: 104
+      templateNameSH: 169
+      helpSH: 168
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 8
+      floatValuesIndex: 22
+      stringValuesIndex: 5
+      choiceIndex: 31
+      inputNodeType: 0
+      inputNodeFlag: 0
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 565582031}
+    _hasAssetPathTag: 0
+  - _unityIndex: 20
+    _name: tdisplay
+    _labelName: Display
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 32
+      parentId: 5
+      childIndex: 2
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 180
+      labelSH: 181
+      templateNameSH: 179
+      helpSH: 178
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 1
+      labelNone: 1
+      intValuesIndex: 9
+      floatValuesIndex: 22
+      stringValuesIndex: 6
+      choiceIndex: 37
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 21
+    _name: display
+    _labelName: Display
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 01000000
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 33
+      parentId: 5
+      childIndex: 3
+      type: 0
+      scriptType: 0
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 241
+      labelSH: 226
+      templateNameSH: 240
+      helpSH: 239
+      hasMin: 1
+      hasMax: 1
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 1
+      UIMin: 0
+      UIMax: 1
+      invisible: 0
+      disabled: 1
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 10
+      floatValuesIndex: 22
+      stringValuesIndex: 6
+      choiceIndex: 39
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 22
+    _name: use_dcolor
+    _labelName: Set Wireframe Color
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 34
+      parentId: 6
+      childIndex: 0
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 139
+      labelSH: 140
+      templateNameSH: 142
+      helpSH: 141
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 11
+      floatValuesIndex: 22
+      stringValuesIndex: 6
+      choiceIndex: 39
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 23
+    _name: dcolor
+    _labelName: Wireframe Color
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 1, g: 1, b: 1, a: 1}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 35
+      parentId: 6
+      childIndex: 1
+      type: 5
+      scriptType: 19
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 176
+      labelSH: 177
+      templateNameSH: 175
+      helpSH: 174
+      hasMin: 1
+      hasMax: 1
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 1
+      UIMin: 0
+      UIMax: 1
+      invisible: 0
+      disabled: 1
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 12
+      floatValuesIndex: 22
+      stringValuesIndex: 6
+      choiceIndex: 41
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 24
+    _name: picking
+    _labelName: Viewport Selecting Enabled
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 1
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 36
+      parentId: 6
+      childIndex: 2
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 117
+      labelSH: 118
+      templateNameSH: 116
+      helpSH: 115
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 12
+      floatValuesIndex: 25
+      stringValuesIndex: 6
+      choiceIndex: 41
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 25
+    _name: pickscript
+    _labelName: Select Script
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues:
+    - 
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 37
+      parentId: 6
+      childIndex: 3
+      type: 7
+      scriptType: 4
+      typeInfoSH: 105
+      permissions: 2
+      tagCount: 1
+      size: 1
+      choiceListType: 3
+      choiceCount: 0
+      nameSH: 107
+      labelSH: 108
+      templateNameSH: 153
+      helpSH: 152
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 13
+      floatValuesIndex: 25
+      stringValuesIndex: 6
+      choiceIndex: 43
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 26
+    _name: caching
+    _labelName: Cache Object Transform
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 1
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 38
+      parentId: 6
+      childIndex: 4
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 124
+      labelSH: 125
+      templateNameSH: 127
+      helpSH: 126
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 13
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 43
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 27
+    _name: vport_shadeopen
+    _labelName: Shade Open Curves In Viewport
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 39
+      parentId: 6
+      childIndex: 5
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 132
+      labelSH: 133
+      templateNameSH: 65
+      helpSH: 134
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 14
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 45
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 28
+    _name: vport_onionskin
+    _labelName: Onion Skinning
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 00000000
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels:
+    - m_Text: Off
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Transform only
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    - m_Text: Full Deformation
+      m_Image: {fileID: 0}
+      m_Tooltip: 
+    _choiceStringValues: []
+    _choiceIntValues: 000000000100000002000000
+    _parmInfo:
+      id: 41
+      parentId: 6
+      childIndex: 7
+      type: 0
+      scriptType: 32
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 3
+      nameSH: 50
+      labelSH: 43
+      templateNameSH: 45
+      helpSH: 44
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 16
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 49
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 29
+    _name: road_settings
+    _labelName: 
+    _help: 
+    _childParameterIDs: 1e000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 42
+      parentId: 2
+      childIndex: 0
+      type: 11
+      scriptType: 0
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 122
+      labelSH: 0
+      templateNameSH: 135
+      helpSH: 0
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 52
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 1
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 30
+    _name: road_settings_0
+    _labelName: Road
+    _help: 
+    _childParameterIDs: 1f0000002000000021000000220000002300000024000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 43
+      parentId: 2
+      childIndex: 1
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 6
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 56
+      labelSH: 57
+      templateNameSH: 53
+      helpSH: 58
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 52
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 31
+    _name: unity_curve_input
+    _labelName: Unity Curve Input
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 44
+      parentId: 43
+      childIndex: 0
+      type: 10
+      scriptType: 22
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 1
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 106
+      labelSH: 119
+      templateNameSH: 110
+      helpSH: 109
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 25
+      stringValuesIndex: 7
+      choiceIndex: 52
+      inputNodeType: -1
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 1604479193}
+    _hasAssetPathTag: 0
+  - _unityIndex: 32
+    _name: road_width
+    _labelName: Road Width
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 6
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 45
+      parentId: 43
+      childIndex: 1
+      type: 4
+      scriptType: 1
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 120
+      labelSH: 121
+      templateNameSH: 95
+      helpSH: 46
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0.5
+      max: 20
+      UIMin: 0.5
+      UIMax: 20
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 25
+      stringValuesIndex: 8
+      choiceIndex: 52
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 33
+    _name: sample_spacing
+    _labelName: Sample Spacing
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 1.5
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 46
+      parentId: 43
+      childIndex: 2
+      type: 4
+      scriptType: 1
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 96
+      labelSH: 97
+      templateNameSH: 83
+      helpSH: 98
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0.25
+      max: 10
+      UIMin: 0.25
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 26
+      stringValuesIndex: 8
+      choiceIndex: 52
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 34
+    _name: reverse_curve
+    _labelName: Reverse Curve Direction
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 47
+      parentId: 43
+      childIndex: 3
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 80
+      labelSH: 81
+      templateNameSH: 67
+      helpSH: 82
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 17
+      floatValuesIndex: 27
+      stringValuesIndex: 8
+      choiceIndex: 52
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 35
+    _name: flip_surface
+    _labelName: Flip Surface For Unity
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 1
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 48
+      parentId: 43
+      childIndex: 4
+      type: 2
+      scriptType: 8
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 1
+      choiceCount: 2
+      nameSH: 72
+      labelSH: 73
+      templateNameSH: 75
+      helpSH: 74
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 18
+      floatValuesIndex: 27
+      stringValuesIndex: 8
+      choiceIndex: 54
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 0
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 36
+    _name: fallback_points
+    _labelName: 
+    _help: 
+    _childParameterIDs: 25000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 49
+      parentId: 43
+      childIndex: 5
+      type: 11
+      scriptType: 0
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 1
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 356
+      labelSH: 0
+      templateNameSH: 182
+      helpSH: 0
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 27
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 1
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 37
+    _name: fallback_points_0
+    _labelName: Fallback Points
+    _help: 
+    _childParameterIDs: 260000002700000028000000290000002a0000002b000000
+    _choiceValue: 0
+    _intValues: 
+    _floatValues: []
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 50
+      parentId: 43
+      childIndex: 6
+      type: 13
+      scriptType: 1003
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 6
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 84
+      labelSH: 85
+      templateNameSH: 91
+      helpSH: 90
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 0
+      hasUIMax: 0
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 27
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 38
+    _name: curve_point_0
+    _labelName: Curve Point 0
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - -18
+    - 0
+    - -14
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 51
+      parentId: 50
+      childIndex: 0
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 88
+      labelSH: 89
+      templateNameSH: 77
+      helpSH: 76
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 27
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 39
+    _name: curve_point_1
+    _labelName: Curve Point 1
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - -9
+    - 0
+    - -4
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 52
+      parentId: 50
+      childIndex: 1
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 78
+      labelSH: 39
+      templateNameSH: 41
+      helpSH: 40
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 30
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 40
+    _name: curve_point_2
+    _labelName: Curve Point 2
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - -1
+    - 0.4
+    - 2
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 53
+      parentId: 50
+      childIndex: 2
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 42
+      labelSH: 35
+      templateNameSH: 37
+      helpSH: 36
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 33
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 41
+    _name: curve_point_3
+    _labelName: Curve Point 3
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 8
+    - 0.2
+    - 6.5
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 54
+      parentId: 50
+      childIndex: 3
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 38
+      labelSH: 31
+      templateNameSH: 33
+      helpSH: 32
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 36
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 42
+    _name: curve_point_4
+    _labelName: Curve Point 4
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 15
+    - 0
+    - 1.5
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 55
+      parentId: 50
+      childIndex: 4
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 34
+      labelSH: 17
+      templateNameSH: 25
+      helpSH: 18
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 39
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  - _unityIndex: 43
+    _name: curve_point_5
+    _labelName: Curve Point 5
+    _help: 
+    _childParameterIDs: 
+    _choiceValue: 0
+    _intValues: 
+    _floatValues:
+    - 22
+    - 0
+    - -8
+    _stringValues: []
+    _toggle: 0
+    _color: {r: 0, g: 0, b: 0, a: 0}
+    _gradient:
+      serializedVersion: 2
+      key0: {r: 1, g: 1, b: 1, a: 1}
+      key1: {r: 1, g: 1, b: 1, a: 1}
+      key2: {r: 0, g: 0, b: 0, a: 0}
+      key3: {r: 0, g: 0, b: 0, a: 0}
+      key4: {r: 0, g: 0, b: 0, a: 0}
+      key5: {r: 0, g: 0, b: 0, a: 0}
+      key6: {r: 0, g: 0, b: 0, a: 0}
+      key7: {r: 0, g: 0, b: 0, a: 0}
+      ctime0: 0
+      ctime1: 65535
+      ctime2: 0
+      ctime3: 0
+      ctime4: 0
+      ctime5: 0
+      ctime6: 0
+      ctime7: 0
+      atime0: 0
+      atime1: 65535
+      atime2: 0
+      atime3: 0
+      atime4: 0
+      atime5: 0
+      atime6: 0
+      atime7: 0
+      m_Mode: 0
+      m_ColorSpace: -1
+      m_NumColorKeys: 2
+      m_NumAlphaKeys: 2
+    _animCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    _choiceLabels: []
+    _choiceStringValues: []
+    _choiceIntValues: 
+    _parmInfo:
+      id: 56
+      parentId: 50
+      childIndex: 5
+      type: 4
+      scriptType: 11
+      typeInfoSH: 0
+      permissions: 0
+      tagCount: 0
+      size: 3
+      choiceListType: 0
+      choiceCount: 0
+      nameSH: 26
+      labelSH: 27
+      templateNameSH: 21
+      helpSH: 28
+      hasMin: 0
+      hasMax: 0
+      hasUIMin: 1
+      hasUIMax: 1
+      min: 0
+      max: 10
+      UIMin: 0
+      UIMax: 10
+      invisible: 0
+      disabled: 0
+      spare: 0
+      joinNext: 0
+      labelNone: 0
+      intValuesIndex: 19
+      floatValuesIndex: 42
+      stringValuesIndex: 8
+      choiceIndex: 56
+      inputNodeType: 0
+      inputNodeFlag: -1
+      isChildOfMultiParm: 0
+      instanceNum: -1
+      instanceLength: 0
+      instanceCount: 0
+      instanceStartOffset: -1
+      rampType: -1
+      visibilityConditionSH: 0
+      disabledConditionSH: 0
+      useMenuItemTokenAsValue: 1
+    _showChildren: 0
+    _fileTypeInfo: 
+    _folderListChildrenProcessed: 0
+    _tabSelectedIndex: 0
+    _paramInputNode: {fileID: 0}
+    _hasAssetPathTag: 0
+  _parameterModifiers: []
+  _regenerateParameters: 0
+  _presetData: 235053495f5052455345540a76657273696f6e20322e30610a6f7076616c7565730a7b0a76657273696f6e20302e380a7374647377697463686572095b2030096c6f636b733d30205d092809300930093009290a784f7264095b2030096c6f636b733d30205d092809227372742209290a724f7264095b2030096c6f636b733d30205d0928092278797a2209290a74095b2030096c6f636b733d30205d092809300930093009290a72095b2030096c6f636b733d30205d09280930092d30093009290a73095b2030096c6f636b733d30205d092809310931093109290a70095b2030096c6f636b733d30205d092809300930093009290a7072095b2030096c6f636b733d30205d092809300930093009290a7363616c65095b2030096c6f636b733d30205d0928093109290a7072655f78666f726d095b2030096c6f636b733d30205d0928093009290a6b656570706f73095b2030096c6f636b733d30205d092809226f66662209290a6368696c64636f6d70095b2030096c6f636b733d30205d092809226f66662209290a636f6e73747261696e74735f6f6e095b2030096c6f636b733d30205d092809226f66662209290a636f6e73747261696e74735f70617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b617470617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b75706f626a70617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b7570095b2030096c6f636b733d30205d0928096f6e09290a706174686f626a70617468095b2030096c6f636b733d30205d092809222209290a726f6c6c095b2030096c6f636b733d30205d0928093009290a706f73095b2030096c6f636b733d30205d0928093009290a757061726d74797065095b2030096c6f636b733d30205d092809226172632209290a706174686f7269656e74095b2030096c6f636b733d30205d0928093109290a7570095b2030096c6f636b733d30205d092809300931093009290a62616e6b095b2030096c6f636b733d30205d0928093009290a73686f705f6d6174657269616c70617468095b2030096c6f636b733d30205d0928092f6f626a2f6d65726765312f6d657267653109290a73686f705f6d6174657269616c6f707473095b2030096c6f636b733d30205d0928093009290a74646973706c6179095b2030096c6f636b733d30205d092809226f66662209290a646973706c6179095b2030096c6f636b733d30205d0928093109290a7573655f64636f6c6f72095b2030096c6f636b733d30205d092809226f66662209290a64636f6c6f72095b2030096c6f636b733d30205d092809310931093109290a7069636b696e67095b2030096c6f636b733d30205d092809226f6e2209290a7069636b736372697074095b2030096c6f636b733d30205d092809222209290a63616368696e67095b2030096c6f636b733d30205d092809226f6e2209290a76706f72745f73686164656f70656e095b2030096c6f636b733d30205d092809226f66662209290a76706f72745f646973706c61796173737562646976095b2030096c6f636b733d30205d092809226f66662209290a76706f72745f6f6e696f6e736b696e095b2030096c6f636b733d30205d092809226f66662209290a72656e64657261626c65095b2030096c6f636b733d30205d092809226f6e2209290a7374616e64617264666f6c646572095b2030096c6f636b733d30205d09280930093009290a737464737769746368657234095b2030096c6f636b733d30205d092809300930093009290a726f61645f73657474696e6773095b2030096c6f636b733d30205d0928093009290a756e6974795f63757276655f696e707574095b2030096c6f636b733d30205d092809222209290a726f61645f7769647468095b2030096c6f636b733d30205d0928093609290a73616d706c655f73706163696e67095b2030096c6f636b733d30205d092809312e3509290a726576657273655f6375727665095b2030096c6f636b733d30205d092809226f66662209290a666c69705f73757266616365095b2030096c6f636b733d30205d092809226f6e2209290a66616c6c6261636b5f706f696e7473095b2030096c6f636b733d30205d0928093009290a63757276655f706f696e745f30095b2030096c6f636b733d30205d0928092d31380930092d313409290a63757276655f706f696e745f31095b2030096c6f636b733d30205d0928092d390930092d3409290a63757276655f706f696e745f32095b2030096c6f636b733d30205d0928092d3109302e34093209290a63757276655f706f696e745f33095b2030096c6f636b733d30205d0928093809302e3209362e3509290a63757276655f706f696e745f34095b2030096c6f636b733d30205d0928093135093009312e3509290a63757276655f706f696e745f35095b2030096c6f636b733d30205d09280932320930092d3809290a7d0a
+  _defaultPresetData: 235053495f5052455345540a76657273696f6e20322e30610a6f7076616c7565730a7b0a76657273696f6e20302e380a7374647377697463686572095b2030096c6f636b733d30205d092809300930093009290a784f7264095b2030096c6f636b733d30205d092809227372742209290a724f7264095b2030096c6f636b733d30205d0928092278797a2209290a74095b2030096c6f636b733d30205d092809300930093009290a72095b2030096c6f636b733d30205d092809300930093009290a73095b2030096c6f636b733d30205d092809310931093109290a70095b2030096c6f636b733d30205d092809300930093009290a7072095b2030096c6f636b733d30205d092809300930093009290a7363616c65095b2030096c6f636b733d30205d0928093109290a7072655f78666f726d095b2030096c6f636b733d30205d0928093009290a6b656570706f73095b2030096c6f636b733d30205d092809226f66662209290a6368696c64636f6d70095b2030096c6f636b733d30205d092809226f66662209290a636f6e73747261696e74735f6f6e095b2030096c6f636b733d30205d092809226f66662209290a636f6e73747261696e74735f70617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b617470617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b75706f626a70617468095b2030096c6f636b733d30205d092809222209290a6c6f6f6b7570095b2030096c6f636b733d30205d0928096f6e09290a706174686f626a70617468095b2030096c6f636b733d30205d092809222209290a726f6c6c095b2030096c6f636b733d30205d0928093009290a706f73095b2030096c6f636b733d30205d0928093009290a757061726d74797065095b2030096c6f636b733d30205d092809226172632209290a706174686f7269656e74095b2030096c6f636b733d30205d0928093109290a7570095b2030096c6f636b733d30205d092809300931093009290a62616e6b095b2030096c6f636b733d30205d0928093009290a73686f705f6d6174657269616c70617468095b2030096c6f636b733d30205d092809222209290a73686f705f6d6174657269616c6f707473095b2030096c6f636b733d30205d0928093009290a74646973706c6179095b2030096c6f636b733d30205d092809226f66662209290a646973706c6179095b2030096c6f636b733d30205d0928093109290a7573655f64636f6c6f72095b2030096c6f636b733d30205d092809226f66662209290a64636f6c6f72095b2030096c6f636b733d30205d092809310931093109290a7069636b696e67095b2030096c6f636b733d30205d092809226f6e2209290a7069636b736372697074095b2030096c6f636b733d30205d092809222209290a63616368696e67095b2030096c6f636b733d30205d092809226f6e2209290a76706f72745f73686164656f70656e095b2030096c6f636b733d30205d092809226f66662209290a76706f72745f646973706c61796173737562646976095b2030096c6f636b733d30205d092809226f66662209290a76706f72745f6f6e696f6e736b696e095b2030096c6f636b733d30205d092809226f66662209290a72656e64657261626c65095b2030096c6f636b733d30205d092809226f6e2209290a7374616e64617264666f6c646572095b2030096c6f636b733d30205d09280930093009290a737464737769746368657234095b2030096c6f636b733d30205d092809300930093009290a726f61645f73657474696e6773095b2030096c6f636b733d30205d0928093009290a756e6974795f63757276655f696e707574095b2030096c6f636b733d30205d092809222209290a726f61645f7769647468095b2030096c6f636b733d30205d0928093609290a73616d706c655f73706163696e67095b2030096c6f636b733d30205d092809312e3509290a726576657273655f6375727665095b2030096c6f636b733d30205d092809226f66662209290a666c69705f73757266616365095b2030096c6f636b733d30205d092809226f6e2209290a66616c6c6261636b5f706f696e7473095b2030096c6f636b733d30205d0928093009290a63757276655f706f696e745f30095b2030096c6f636b733d30205d0928092d31380930092d313409290a63757276655f706f696e745f31095b2030096c6f636b733d30205d0928092d390930092d3409290a63757276655f706f696e745f32095b2030096c6f636b733d30205d0928092d3109302e34093209290a63757276655f706f696e745f33095b2030096c6f636b733d30205d0928093809302e3209362e3509290a63757276655f706f696e745f34095b2030096c6f636b733d30205d0928093135093009312e3509290a63757276655f706f696e745f35095b2030096c6f636b733d30205d09280932320930092d3809290a7d0a
+  _validParameters: 1
+  _showParameters: 1
+  _parentAsset: {fileID: 387833318}
+--- !u!1 &832575517
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 832575519}
+  - component: {fileID: 832575518}
+  m_Layer: 0
+  m_Name: Global Volume
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &832575518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 832575517}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 1
+  sharedProfile: {fileID: 11400000, guid: a6560a915ef98420e9faacc1c7438823, type: 2}
+--- !u!4 &832575519
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 832575517}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1087875223
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f149f98b4ada1f047b5a0c3d65f45dd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showInstanceInputs: 1
+  _numInputsToShowUI: 5
+  _inputsPageIndexUI: 0
+--- !u!1 &1378191859
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1378191861}
+  - component: {fileID: 1378191860}
+  m_Layer: 0
+  m_Name: Spline
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1378191860
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378191859}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dab5c7d4c32e743048dfca98e2d5914f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Spline:
+    m_EditModeType: 1
+    m_Knots: []
+    m_MetaData: []
+    m_Closed: 0
+    m_IntData:
+      m_Data: []
+    m_FloatData:
+      m_Data: []
+    m_Float4Data:
+      m_Data: []
+    m_ObjectData:
+      m_Data: []
+  m_Splines:
+  - m_EditModeType: 1
+    m_Knots:
+    - Position:
+        x: 0
+        y: 0
+        z: 0
+      TangentIn:
+        x: -0
+        y: -0
+        z: -18.738424
+      TangentOut:
+        x: 0
+        y: 0
+        z: 16.96012
+      Rotation:
+        value:
+          x: 0
+          y: 0.2163554
+          z: 0
+          w: 0.97631466
+    - Position:
+        x: 5.143276
+        y: 0
+        z: 51.0748
+      TangentIn:
+        x: -0
+        y: -0
+        z: -16.372658
+      TangentOut:
+        x: 0
+        y: 0
+        z: 19.995798
+      Rotation:
+        value:
+          x: 0
+          y: -0.20596893
+          z: -0
+          w: 0.97855854
+    - Position:
+        x: -56.2418
+        y: 0
+        z: 96.83773
+      TangentIn:
+        x: -0
+        y: -0
+        z: -28.17827
+      TangentOut:
+        x: 0
+        y: 0
+        z: 36.778835
+      Rotation:
+        value:
+          x: 0
+          y: -0.34572917
+          z: -0
+          w: 0.9383344
+    - Position:
+        x: -116.69335
+        y: 0
+        z: 212.42175
+      TangentIn:
+        x: -0
+        y: -0
+        z: -28.14819
+      TangentOut:
+        x: 0
+        y: 0
+        z: 19.07696
+      Rotation:
+        value:
+          x: 0
+          y: 0.07962803
+          z: 0
+          w: 0.9968246
+    - Position:
+        x: -73.6837
+        y: 0
+        z: 254.13196
+      TangentIn:
+        x: -0
+        y: -0
+        z: -16.30464
+      TangentOut:
+        x: 0
+        y: 0
+        z: 24.031994
+      Rotation:
+        value:
+          x: 0
+          y: -0.007619911
+          z: -0
+          w: 0.999971
+    - Position:
+        x: -169.83969
+        y: 0
+        z: 341.8572
+      TangentIn:
+        x: -0
+        y: -0
+        z: -31.362228
+      TangentOut:
+        x: 0
+        y: 0
+        z: 39.954567
+      Rotation:
+        value:
+          x: 0
+          y: 0.75155157
+          z: 0
+          w: -0.65967447
+    - Position:
+        x: -284.04407
+        y: 0
+        z: 164.13812
+      TangentIn:
+        x: -0
+        y: -0
+        z: -54.768486
+      TangentOut:
+        x: 0
+        y: 0
+        z: 35.51865
+      Rotation:
+        value:
+          x: 0
+          y: 0.9780705
+          z: 0
+          w: -0.20827429
+    - Position:
+        x: -307.578
+        y: 0
+        z: 78.46333
+      TangentIn:
+        x: -0
+        y: -0
+        z: -28.13157
+      TangentOut:
+        x: 0
+        y: 0
+        z: 38.830067
+      Rotation:
+        value:
+          x: 0
+          y: 0.98532826
+          z: 0
+          w: 0.17066997
+    - Position:
+        x: -169.48158
+        y: 0
+        z: -19.434566
+      TangentIn:
+        x: -0
+        y: -0
+        z: -51.387688
+      TangentOut:
+        x: 0
+        y: 0
+        z: 44.741974
+      Rotation:
+        value:
+          x: 0
+          y: 0.83575815
+          z: 0
+          w: 0.54909766
+    - Position:
+        x: -43.70935
+        y: 0
+        z: -44.90043
+      TangentIn:
+        x: -0
+        y: -0
+        z: -30.894293
+      TangentOut:
+        x: 0
+        y: 0
+        z: 21.588701
+      Rotation:
+        value:
+          x: 0
+          y: 0.59368634
+          z: 0
+          w: 0.80469656
+    m_MetaData:
+    - Mode: 4
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    - Mode: 0
+      Tension: 0.5
+    m_Closed: 1
+    m_IntData:
+      m_Data: []
+    m_FloatData:
+      m_Data: []
+    m_Float4Data:
+      m_Data: []
+    m_ObjectData:
+      m_Data: []
+  m_Knots:
+    m_KnotsLink: []
+--- !u!4 &1378191861
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378191859}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 16.793839, y: 0, z: -18.214653}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &1537465310
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: HEU_DEFAULT_MATERIAL_3_0
+  m_Shader: {fileID: -6465566751694194690, guid: 3c5882c1500901f4ebee92525f78c456,
+    type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SmoothnessMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Metallic: 0
+    - _Occlusion: 1
+    - _QueueControl: -1
+    - _QueueOffset: 0
+    - _Smoothness: 0.5
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
+  m_BuildTextureStacks: []
+--- !u!114 &1604479193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8512ec9bb36e55e4dab2691b35626896, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _inputNodeType: 2
+  _inputObjectType: 1
+  _pendingInputObjectType: 1
+  _inputObjects: []
+  _inputObjectsConnectedAssetIDs: 
+  _inputAsset: {fileID: 0}
+  _connectedInputAsset: {fileID: 0}
+  _inputAssetInfos: []
+  _nodeID: 0
+  _inputIndex: 0
+  _requiresCook: 1
+  _requiresUpload: 0
+  _inputName: unity_curve_input
+  _labelName: Unity Curve Input
+  _paramName: unity_curve_input
+  _connectedNodeID: -1
+  _keepWorldTransform: 1
+  _packGeometryBeforeMerging: 0
+  _parentAsset: {fileID: 387833318}
+  _meshSettings:
+    _exportColliders: 0
+  _tilemapSettings:
+    _createGroupsForTiles: 1
+    _exportUnusedTiles: 1
+    _applyTileColor: 1
+    _applyTilemapOrientation: 1
+  _splineSettings:
+    _samplingResolution: 25
+  _usingSelectFromHierarchy: 0
+--- !u!114 &1642273754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2f09e5b9c866364c97e693a0426cc18, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _material: {fileID: 1537465310}
+  _materialSource: 0
+  _materialKey: -2101994429
+--- !u!114 &1879181129
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d064048945a579428d136799401f238, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _objName: curve_road_surface_test1
+  _parentAsset: {fileID: 387833318}
+  _objectInfo:
+    nameSH: 367
+    objectInstancePathSH: 0
+    hasTransformChanged: 0
+    haveGeosChanged: 1
+    isVisible: 1
+    isInstancer: 0
+    isInstanced: 0
+    geoCount: 0
+    nodeId: 0
+    objectToInstanceId: -1
+  _geoNodes:
+  - {fileID: 233609934}
+  _objectTransform:
+    position:
+    - 0
+    - 0
+    - 0
+    rotationQuaternion:
+    - 0
+    - 0
+    - 0
+    - 1
+    scale:
+    - 1
+    - 1
+    - 1
+    shear:
+    - 0
+    - 0
+    - 0
+    rstOrder: 5
+--- !u!114 &1990386778
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad87cca29eec2004bbb96fc6c0b82da6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _softDeleted: 0
+--- !u!114 &2046827123
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51ce3a7cc3f38404592fdd27226cb0a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _partID: 0
+  _partName: OUT_ROAD_MESH_0
+  _objectNodeID: 0
+  _geoID: 3
+  _partType: 0
+  _geoNode: {fileID: 233609934}
+  _isAttribInstancer: 0
+  _isPartInstanced: 0
+  _partPointCount: 68
+  _isObjectInstancer: 0
+  _objectInstancesGenerated: 0
+  _objectInstanceInfos: []
+  _terrainOffsetPosition: {x: 0, y: 0, z: 0}
+  _assetDBTerrainData: {fileID: 0}
+  _isPartEditable: 0
+  _partOutputType: 1
+  _curve: {fileID: 0}
+  _attributesStore: {fileID: 0}
+  _haveInstancesBeenGenerated: 0
+  _meshVertexCount: 198
+  _generatedOutput:
+    _outputData:
+      _gameObject: {fileID: 340135081}
+      _renderMaterials:
+      - {fileID: 1537465310}
+      _colliders: []
+    _childOutputs: []
+    isInstancer: 0
+  _volumeLayerName: 
+--- !u!1660057539 &9223372036854775807
+SceneRoots:
+  m_ObjectHideFlags: 0
+  m_Roots:
+  - {fileID: 330585546}
+  - {fileID: 410087041}
+  - {fileID: 832575519}
+  - {fileID: 1378191861}
+  - {fileID: 209773545}

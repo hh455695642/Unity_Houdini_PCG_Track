@@ -104,3 +104,19 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local Codex / MCP generated workspace skills
+/.agents/
+
+# Houdini Engine local cache and machine settings
+heu_settings.ini
+/[Aa]ssets/[Hh]oudini[Ee]ngine[Aa]sset[Cc]ache/
+/[Aa]ssets/[Hh]oudini[Ee]ngine[Aa]sset[Cc]ache.meta
+
+# Houdini/Python generated scratch files
+__pycache__/
+*.pyc
+/[Hh]oudini[Pp]roject/**/[Bb]ackups/
+/[Hh]oudini[Pp]roject/**/backup/
+*.hip~
+*.bak
