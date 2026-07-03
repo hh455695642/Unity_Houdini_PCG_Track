@@ -89,6 +89,23 @@ Agent 后续工作必须主动使用 MCP 获取真实状态和执行验证，不
 - 可采用的临时降级方案
 - 后续恢复 MCP 后需要补做的验证
 
+#### Houdini MCP 开发前 Preflight
+
+当任务涉及 Houdini、HDA、`.hip`、SOP 网络、Cook、Bake 或 Houdini 到 Unity 数据链路时，Agent 在开始实质性开发前必须先运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-HoudiniMcp.ps1
+```
+
+该 preflight 必须确认：
+
+- Houdini GUI 已启动，且 `18811` RPC 可通过 `hrpyc` 连接。
+- `http://127.0.0.1:3055/health` 返回 healthy。
+- Codex 用户配置包含 `[mcp_servers.houdini]`，URL 为 `http://127.0.0.1:3055`。
+- 当前会话能发现 Houdini MCP 工具；若 Codex 未热加载新 MCP，说明需要重启 Codex 后复验。
+
+若 preflight 失败，Agent 不得假设 Houdini 状态正确；必须说明失败点、当前不可验证范围，以及恢复后需要补做的检查。
+
 ## Unity / URP 架构约束
 
 - 使用 Unity URP，不使用 Built-in Render Pipeline。
