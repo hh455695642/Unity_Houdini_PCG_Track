@@ -61,6 +61,20 @@ Houdini 侧功能开发必须优先考虑可视化节点网络，而不是把生
 - 面向用户解释 Houdini 节点方案时，默认按 Houdini 初学者可学习的粒度编写：提供必要中文注释、操作路径、维护提示和容易踩坑的位置，但不写低质量入门废话。
 - 若使用 Python 创建或修改节点，也必须尽量生成清晰的节点结构、中文注释和可编辑参数，而不是只留下难以理解的脚本结果。
 
+### HDA 事实源与协作方式
+
+为了避免 Agent 通过 Python builder 重建 HDA 时覆盖用户在 Houdini 编辑器中手工维护的节点、参数、连线和 Type Properties，Track HDA 及后续核心 HDA 默认以当前 Houdini/HDA 节点网络作为主事实源。
+
+规则：
+
+- 不得默认运行会整包重建 HDA 的 builder 脚本覆盖当前 HDA，除非用户明确要求“重新生成整套 HDA”。
+- 修改 HDA 时，Agent 应优先直接操作当前 Houdini session 里的节点网络、参数模板、节点连线、注释、Network Box 和 Type Properties，并保存回对应 `.hda`。
+- Python 脚本只作为 bootstrap、迁移、验证、导入导出或批处理工具；若必须用 Python 修改 HDA，必须采用小范围增量 patch，不得无提示重建整个网络。
+- 在修改 HDA 前，Agent 必须先读取当前 Houdini 现场状态，包括目标 HDA 路径、节点树、关键节点连接、参数 label/default/expression 和已保存定义，避免覆盖用户刚做的手工改动。
+- 涉及公共参数接口时，禁止擅自修改已有参数的 name、label、default、menu、range、folder 归类和可见性；确需修改时必须先说明原因并获得用户明确同意。
+- 验证脚本只负责检查 HDA 合约和 Cook 结果，不应反向成为重建 HDA 的唯一事实源。
+- 每次 HDA 修改输出时，应说明具体改了哪些节点或参数、保存到了哪个 `.hda`，以及哪些内容仍然保留为用户可在 Houdini 中继续编辑维护。
+
 ## MCP 主动调用规则
 
 Agent 后续工作必须主动使用 MCP 获取真实状态和执行验证，不应把可自动确认的步骤交给用户手动完成。
