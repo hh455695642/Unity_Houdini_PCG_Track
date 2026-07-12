@@ -1,7 +1,8 @@
 param(
     [string]$McpRepo = 'E:\HoudiniProject\oculairmedia_houdini_mcp',
     [string]$HythonPath = 'D:\Software\Side Effects Software\Houdini 21.0.440\bin\hython.exe',
-    [string]$HoudiniStartupScript = 'C:\Users\ruze\Documents\houdini21.0\scripts\123.py',
+    [string]$HoudiniStartupScript = '',
+    [string]$CodexConfigPath = (Join-Path $HOME '.codex\config.toml'),
     [string]$HoudiniHost = '127.0.0.1',
     [int]$HoudiniPort = 18811,
     [int]$McpPort = 3055,
@@ -18,6 +19,63 @@ function Write-Step {
     )
 
     Write-Host ("[{0}] {1}" -f $Status, $Message)
+}
+
+function Resolve-HoudiniStartupScriptPath {
+    param(
+        [string]$ExplicitPath,
+        [string]$PythonPath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath)) {
+        return [System.IO.Path]::GetFullPath($ExplicitPath)
+    }
+
+    if (-not (Test-Path -LiteralPath $PythonPath)) {
+        throw "Missing hython executable: $PythonPath"
+    }
+
+    # Query Houdini itself instead of assuming the Windows Documents folder.
+    # This correctly handles OneDrive and custom HOUDINI_USER_PREF_DIR locations.
+    $code = "import hou; print(hou.getenv('HOUDINI_USER_PREF_DIR') or '')"
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Hython can emit background-thread diagnostics on stderr while still
+        # returning a successful result. Capture them without terminating.
+        $ErrorActionPreference = 'Continue'
+        $output = & $PythonPath -c $code 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
+        throw "Failed to resolve HOUDINI_USER_PREF_DIR via hython: $($output -join "`n")"
+    }
+
+    $userPrefDir = $output |
+        ForEach-Object { ([string]$_).Trim() } |
+        Where-Object {
+            if ([string]::IsNullOrWhiteSpace($_)) {
+                return $false
+            }
+
+            try {
+                return [System.IO.Path]::IsPathRooted($_) -and
+                    (Test-Path -LiteralPath $_ -PathType Container)
+            }
+            catch {
+                return $false
+            }
+        } |
+        Select-Object -First 1
+
+    if ([string]::IsNullOrWhiteSpace($userPrefDir)) {
+        throw 'Hython returned an empty HOUDINI_USER_PREF_DIR.'
+    }
+
+    return Join-Path -Path $userPrefDir.Trim() -ChildPath 'scripts\123.py'
 }
 
 function Test-TcpListen {
@@ -51,23 +109,20 @@ function Install-HoudiniRpcStartupHook {
 
     $markerStart = '# <HoudiniMcpStart>'
     $markerEnd = '# <HoudiniMcpEnd>'
-    $rpcStartLine = if ($Port -eq 18811) {
-        '    hrpyc.start_server(port=18811)'
-    }
-    else {
-        "    hrpyc.start_server(port=$Port)"
-    }
-
     $hook = @"
 
 $markerStart
 # Auto-start Houdini RPC for oculairmedia/houdini-mcp.
 try:
-    import hrpyc
-$rpcStartLine
-except OSError:
-    # Usually means the RPC port is already active.
-    pass
+    import hou
+    if hou.isUIAvailable():
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.settimeout(0.2)
+            listener_is_active = probe.connect_ex(("127.0.0.1", $Port)) == 0
+        if not listener_is_active:
+            import hrpyc
+            hrpyc.start_server(port=$Port)
 except Exception as exc:
     print("[Houdini MCP] Failed to start hrpyc on ${Port}: {}".format(exc))
 $markerEnd
@@ -81,7 +136,23 @@ $markerEnd
     if (Test-Path -LiteralPath $Path) {
         $existing = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
         if ($existing.Contains($markerStart)) {
-            Write-Step 'OK' "Houdini RPC startup hook already present: $Path"
+            $startIndex = $existing.IndexOf($markerStart, [System.StringComparison]::Ordinal)
+            $endIndex = $existing.IndexOf($markerEnd, $startIndex, [System.StringComparison]::Ordinal)
+            if ($endIndex -lt 0) {
+                throw "Houdini RPC startup hook has a start marker but no end marker: $Path"
+            }
+
+            $endIndex += $markerEnd.Length
+            $currentBlock = $existing.Substring($startIndex, $endIndex - $startIndex).Trim()
+            $newBlock = $hook.Trim()
+            if ($currentBlock -eq $newBlock) {
+                Write-Step 'OK' "Houdini RPC startup hook already present: $Path"
+                return
+            }
+
+            $updated = $existing.Substring(0, $startIndex) + $newBlock + $existing.Substring($endIndex)
+            [System.IO.File]::WriteAllText($Path, $updated, [System.Text.UTF8Encoding]::new($false))
+            Write-Step 'UPDATED' "Refreshed Houdini RPC startup hook: $Path"
             return
         }
 
@@ -115,8 +186,15 @@ function Test-HoudiniRpc {
     }
 
     $code = "import hrpyc; conn,hou=hrpyc.import_remote_module('$RpcHost',$Port,'hou'); print(hou.applicationVersionString()); print(hou.hipFile.path())"
-    $output = & $PythonPath -c $code 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = & $PythonPath -c $code 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 
     if ($exitCode -ne 0) {
         return [PSCustomObject]@{
@@ -127,10 +205,25 @@ function Test-HoudiniRpc {
         }
     }
 
+    $outputLines = $output |
+        ForEach-Object { ([string]$_).Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    $version = $outputLines | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Select-Object -First 1
+    $hipPath = $outputLines | Where-Object { $_ -match '\.hip(?:lc|nc)?$' } | Select-Object -First 1
+
+    if ([string]::IsNullOrWhiteSpace($version) -or [string]::IsNullOrWhiteSpace($hipPath)) {
+        return [PSCustomObject]@{
+            Connected = $false
+            Version   = $null
+            HipPath   = $null
+            Message   = "RPC probe did not return a version and hip path: $($output -join "`n")"
+        }
+    }
+
     return [PSCustomObject]@{
         Connected = $true
-        Version   = [string]$output[0]
-        HipPath   = [string]$output[1]
+        Version   = [string]$version
+        HipPath   = [string]$hipPath
         Message   = 'Connected'
     }
 }
@@ -163,6 +256,42 @@ function Test-McpHealth {
             Error   = $_.Exception.Message
         }
     }
+}
+
+function Test-CodexHoudiniMcpConfig {
+    param(
+        [string]$Path,
+        [int]$Port
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Missing Codex config: $Path"
+    }
+
+    $content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
+    $section = [regex]::Match(
+        $content,
+        '(?ms)^\[mcp_servers\.houdini\]\s*(?<body>.*?)(?=^\[|\z)'
+    )
+    if (-not $section.Success) {
+        throw "Codex config is missing [mcp_servers.houdini]: $Path"
+    }
+
+    $urlMatch = [regex]::Match(
+        $section.Groups['body'].Value,
+        '(?m)^\s*url\s*=\s*["''](?<url>[^"'']+)["'']'
+    )
+    if (-not $urlMatch.Success) {
+        throw "Codex Houdini MCP config is missing a URL: $Path"
+    }
+
+    $expectedUrl = "http://127.0.0.1:$Port/mcp"
+    $actualUrl = $urlMatch.Groups['url'].Value.TrimEnd('/')
+    if ($actualUrl -ne $expectedUrl) {
+        throw "Codex Houdini MCP URL must be $expectedUrl, but found $actualUrl in $Path"
+    }
+
+    return $expectedUrl
 }
 
 function Start-HoudiniMcpServer {
@@ -235,7 +364,11 @@ function Start-HoudiniMcpServer {
     throw "Houdini MCP Server did not become healthy at http://127.0.0.1:$Port/health within $TimeoutSeconds seconds."
 }
 
-Install-HoudiniRpcStartupHook -Path $HoudiniStartupScript -Port $HoudiniPort
+$resolvedHoudiniStartupScript = Resolve-HoudiniStartupScriptPath `
+    -ExplicitPath $HoudiniStartupScript `
+    -PythonPath $HythonPath
+
+Install-HoudiniRpcStartupHook -Path $resolvedHoudiniStartupScript -Port $HoudiniPort
 
 $houdiniProcess = Get-Process -Name 'houdini' -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $houdiniProcess) {
@@ -259,12 +392,17 @@ if (-not $health.Healthy) {
 $mcpListener = Get-ListenerInfo -Port $McpPort
 Write-Step 'OK' "Houdini MCP Server healthy: $($health.Uri), listener=$($mcpListener.ProcessName) PID $($mcpListener.PID)"
 
+$mcpEndpoint = Test-CodexHoudiniMcpConfig -Path $CodexConfigPath -Port $McpPort
+Write-Step 'OK' "Codex Houdini MCP endpoint configured: $mcpEndpoint"
+
 [PSCustomObject]@{
     HoudiniProcessId = $houdiniProcess.Id
     RpcPort          = $HoudiniPort
     RpcVersion       = $rpc.Version
     HipPath          = $rpc.HipPath
+    StartupScript    = $resolvedHoudiniStartupScript
     McpPort          = $McpPort
     McpHealth        = $health.Status
     McpService       = $health.Service
+    McpEndpoint      = $mcpEndpoint
 }

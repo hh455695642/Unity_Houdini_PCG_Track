@@ -823,7 +823,7 @@ PlayerSettings:
     QNX: UNITY_MCP_READY
     Server: UNITY_MCP_READY
     Stadia: UNITY_MCP_READY
-    Standalone: UNITY_MCP_READY;UNITY_PIPELINE_URP
+    Standalone: UNITY_PIPELINE_URP;UNITY_MCP_READY
     VisionOS: UNITY_MCP_READY
     WebGL: UNITY_MCP_READY
     Windows Store Apps: UNITY_MCP_READY

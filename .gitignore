@@ -112,6 +112,7 @@ InitTestScene*.unity*
 
 # Houdini Engine local cache and machine settings
 heu_settings.ini
+heu_session.txt
 /[Aa]ssets/[Hh]oudini[Ee]ngine[Aa]sset[Cc]ache/
 /[Aa]ssets/[Hh]oudini[Ee]ngine[Aa]sset[Cc]ache.meta
 
@@ -124,3 +125,9 @@ __pycache__/
 *.bak
 
 /[Aa]ssets/Plugins/NuGet
+Assets/PCG/HDA/backup/
+.idea/
+
+/UserSettings/
+
+HoudiniProject/PCG_Track_21.0.440/recovery/

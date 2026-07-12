@@ -23,14 +23,14 @@
 - 当前根目录已经是 Unity 工程，Unity Editor 版本为 `2022.3.62f2`。
 - 当前 URP 版本为 `com.unity.render-pipelines.universal@14.0.12`，项目仍以移动端 URP 为目标。
 - 当前主验证场景为 `Assets/PCG/Scenes/PCG.unity`。
-- 当前主 Track HDA 为 `Assets/PCG/Generated/Road/Track.hda`，HDA 类型为 `pcgbike::Track::1.0`。
+- 当前主 Track HDA 为 `Assets/PCG/HDA/Track.hda`，HDA 类型为 `pcgbike::Track::1.0`。
 - 当前 Houdini 主工程为 `HoudiniProject/PCG_Track_21.0.440/PCG_Bike_Track.hip`。
 - Houdini Engine 当前匹配 Houdini `21.0.440`，相关设置见 `heu_settings.ini`。
 
 ## 目录与资产事实源
 
 - PCG 项目资产默认放在 `Assets/PCG/` 下。
-- 生成类 Road 资产默认位于 `Assets/PCG/Generated/Road/`。
+- 生成类 Road Bake 资产默认位于 `Assets/PCG/Generated/Road/`；Track HDA 定义本体固定放在 `Assets/PCG/HDA/Track.hda`。
 - Shader 放在 `Assets/PCG/Shaders/`。
 - Material 放在 `Assets/PCG/Materials/`。
 - Texture 放在 `Assets/PCG/Texture/`。
@@ -101,16 +101,16 @@ Houdini 侧功能开发必须优先考虑可视化节点网络，而不是把生
 - 修改前必须读取并记录现场状态：当前 `.hip` 路径、目标节点路径、节点类型、definition `libraryFilePath()`、关键子节点树、节点连接、参数 name/label/default/expression、当前 cook error/warning。
 - 修改时只允许对目标模块做小范围增量 patch，例如增加节点、改连接、改参数模板、改注释、补 Network Box 或 Sticky Note；不得默认运行 `build_curve_road_test.py` 这类整包重建脚本。
 - `build_curve_road_test.py` 仅作为 bootstrap、迁移或“重新生成整套 HDA”的显式 fallback；除非用户明确要求重建，否则禁止用它覆盖当前 Houdini 现场和 `Track.hda`。
-- 保存时默认用当前已编辑的 HDA 实例更新对应 definition，并保存回 `Assets/PCG/Generated/Road/Track.hda`；若 definition 指向其他 `.hda`，必须先说明差异并获得用户确认。
+- 保存时默认用当前已编辑的 HDA 实例更新对应 definition，并保存回 `Assets/PCG/HDA/Track.hda`；若 definition 指向其他 `.hda`，必须先说明差异并获得用户确认。
 - 完成后必须 force cook 目标输出，检查 cook error/warning，并报告：修改了哪些节点/参数、是否执行 `allowEditingOfContents()`、保存到哪个 `.hda`、当前 `.hip` 是否保存、Cook 验证结果。
 - 若 `http://127.0.0.1:3055/health` healthy 但 Codex 当前会话发现不到 Houdini MCP tools，应明确说明“连接层已通但 Codex 未热加载工具”，并要求重启 Codex 后重新运行 preflight；不得假装已通过 MCP 操作场景。
 
 ### HDA 备份与重建规则
 
-- `Assets/PCG/Generated/Road/backup/Track_bak*.hda` 是历史 HDA 备份，不得批量清理，除非用户明确要求。
+- `Assets/PCG/HDA/backup/Track_bak*.hda` 是历史 HDA 备份，不得批量清理，除非用户明确要求。
 - `build_curve_road_test.py` 内含 `hou.hipFile.clear()`、删除 HDA、清理 backup 的风险逻辑，默认禁止运行。
-- 若用户明确要求全量重建 HDA，Agent 必须先保存当前 `.hip`、备份 `Assets/PCG/Generated/Road/Track.hda`，并说明会覆盖哪些文件。
-- 全量重建后必须重新验证 `Assets/PCG/Scenes/PCG.unity` 中的 HDA 引用仍指向 `Assets/PCG/Generated/Road/Track.hda`。
+- 若用户明确要求全量重建 HDA，Agent 必须先保存当前 `.hip`、备份 `Assets/PCG/HDA/Track.hda`，并说明会覆盖哪些文件。
+- 全量重建后必须重新验证 `Assets/PCG/Scenes/PCG.unity` 中的 HDA 引用仍指向 `Assets/PCG/HDA/Track.hda`。
 
 ## MCP 主动调用规则
 
@@ -175,7 +175,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-Houdi
 
 - Houdini 侧修改后必须验证目标节点 cook、节点 error/warning、输出 geometry 统计和关键 metadata。
 - Unity 侧修改后必须通过 Unity MCP 检查 Editor 状态、Console、相关场景对象、HDA 引用和材质引用。
-- 涉及 `Assets/PCG/Generated/Road/Track.hda` 时，必须确认 `Assets/PCG/Scenes/PCG.unity` 中的 HDA path 仍指向该文件。
+- 涉及 `Assets/PCG/HDA/Track.hda` 时，必须确认 `Assets/PCG/Scenes/PCG.unity` 中的 HDA path 仍指向该文件。
 - Houdini 到 Unity 的验证结果必须说明：当前 `.hip`、当前 `.hda`、Unity 场景路径、Cook/Console 状态。
 
 ## Unity / URP 架构约束
