@@ -49,7 +49,7 @@ Material:
     - _NoiseContrast: 0.1
     - _NoiseScale: 12
     - _NoiseStrength: 0.468
-    - _UseLowDistortionUV: 1
+    - _UseLowDistortionUV: 0
     m_Colors:
     - _BaseTint: {r: 1, g: 1, b: 1, a: 1}
     - _MaskBTint: {r: 1, g: 1, b: 1, a: 1}

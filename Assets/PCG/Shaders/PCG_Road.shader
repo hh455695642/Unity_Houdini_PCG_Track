@@ -17,7 +17,7 @@ Shader "PCG_Track/Road"
         _NoiseStrength ("Noise Strength", Range(0, 1)) = 0.75
         _BlendFeather ("Blend Feather", Range(0.001, 0.5)) = 0.12
         _NoiseContrast ("Noise Contrast", Range(0.1, 4)) = 1.35
-        _UseLowDistortionUV ("Use Low Distortion Surface UV", Range(0, 1)) = 1
+        _UseLowDistortionUV ("Use World-Planar UV (Non-Directional Layers)", Range(0, 1)) = 0
     }
 
     SubShader
@@ -158,15 +158,19 @@ Shader "PCG_Track/Road"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
 
-                // Runtime uniform toggle: no keyword and therefore no new Shader Variant.
-                // Keep float precision because V can accumulate over multi-kilometre tracks.
-                float2 surfaceUV = lerp(input.uv, input.surfaceUV, saturate(_UseLowDistortionUV));
-                half4 weights = BuildBaseMaskWeights(ApplyNoiseErosionToMasks(input.color.rgb, surfaceUV));
+                // UV0 is authoritative for directional road markings: keep the centre line
+                // centred and continuous along the track, accepting mild bend stretching.
+                float2 directionalUV = input.uv;
 
-                half3 baseLayer = SAMPLE_TEXTURE2D(_BaseTex, sampler_BaseTex, TRANSFORM_TEX(surfaceUV, _BaseTex)).rgb * _BaseTint.rgb;
-                half3 maskRLayer = SAMPLE_TEXTURE2D(_MaskRTex, sampler_MaskRTex, TRANSFORM_TEX(surfaceUV, _MaskRTex)).rgb * _MaskRTint.rgb;
-                half3 maskGLayer = SAMPLE_TEXTURE2D(_MaskGTex, sampler_MaskGTex, TRANSFORM_TEX(surfaceUV, _MaskGTex)).rgb * _MaskGTint.rgb;
-                half3 maskBLayer = SAMPLE_TEXTURE2D(_MaskBTex, sampler_MaskBTex, TRANSFORM_TEX(surfaceUV, _MaskBTex)).rgb * _MaskBTint.rgb;
+                // Runtime uniform toggle for non-directional layers only. This adds no keyword
+                // or Shader Variant. Keep float precision for long-track accumulated UVs.
+                float2 layerUV = lerp(directionalUV, input.surfaceUV, saturate(_UseLowDistortionUV));
+                half4 weights = BuildBaseMaskWeights(ApplyNoiseErosionToMasks(input.color.rgb, layerUV));
+
+                half3 baseLayer = SAMPLE_TEXTURE2D(_BaseTex, sampler_BaseTex, TRANSFORM_TEX(directionalUV, _BaseTex)).rgb * _BaseTint.rgb;
+                half3 maskRLayer = SAMPLE_TEXTURE2D(_MaskRTex, sampler_MaskRTex, TRANSFORM_TEX(layerUV, _MaskRTex)).rgb * _MaskRTint.rgb;
+                half3 maskGLayer = SAMPLE_TEXTURE2D(_MaskGTex, sampler_MaskGTex, TRANSFORM_TEX(layerUV, _MaskGTex)).rgb * _MaskGTint.rgb;
+                half3 maskBLayer = SAMPLE_TEXTURE2D(_MaskBTex, sampler_MaskBTex, TRANSFORM_TEX(layerUV, _MaskBTex)).rgb * _MaskBTint.rgb;
 
                 half3 albedo = baseLayer * weights.r + maskRLayer * weights.g + maskGLayer * weights.b + maskBLayer * weights.a;
 
