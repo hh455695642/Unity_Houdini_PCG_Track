@@ -209,11 +209,9 @@ setdetailattrib(0, "road_surface_column_lengths", column_lengths, "set");
 
 float max_turn_angle = 0.0;
 float min_turn_radius = 1e18;
-int tight_turn_count = 0;
 for (int ring = 0; ring < ring_count; ring++)
 {
     int has_neighbours = closed_loop || (ring > 0 && ring < ring_count - 1);
-    int tight = 0;
     if (has_neighbours)
     {
         int previous_ring = (ring - 1 + ring_count) % ring_count;
@@ -236,22 +234,14 @@ for (int ring = 0; ring < ring_count; ring++)
             {
                 float radius = incoming_length * outgoing_length * chord_length / (2.0 * twice_area);
                 min_turn_radius = min(min_turn_radius, radius);
-                tight = radius < total_half_width;
             }
         }
     }
-    if (tight)
-        tight_turn_count++;
-    for (int section = 0; section < cross_section_count; section++)
-        setpointattrib(0, "road_tight_turn", ring * cross_section_count + section, tight, "set");
 }
 if (min_turn_radius > 1e17)
     min_turn_radius = 0.0;
 setdetailattrib(0, "road_max_ring_turn_angle_deg", max_turn_angle, "set");
 setdetailattrib(0, "road_min_turn_radius", min_turn_radius, "set");
-setdetailattrib(0, "road_tight_turn_count", tight_turn_count, "set");
-if (tight_turn_count > 0)
-    warning("Road contains %d ring(s) whose curvature radius is smaller than the generated half width; the artist curve was preserved.", tight_turn_count);
 
 vector start_forward = ring_count > 1 ? centers[1] - centers[0] : {1.0, 0.0, 0.0};
 if (length(start_forward) <= 1e-5)
@@ -299,10 +289,6 @@ setprimgroup(0, "lane", @primnum, band == 1, "set");
 setprimgroup(0, "shoulder_r", @primnum, band == 2, "set");
 setprimgroup(0, "skirt_l", @primnum, 0, "set");
 setprimgroup(0, "skirt_r", @primnum, 0, "set");
-int tight = 0;
-foreach (int point_id; primpoints(0, @primnum))
-    tight = max(tight, point(0, "road_tight_turn", point_id));
-setprimgroup(0, "road_tight_turn", @primnum, tight, "set");
 '''
 
 
@@ -389,7 +375,6 @@ for (int primitive_index = original_primitive_count - 1; primitive_index >= 0; p
     int in_lane = inprimgroup(0, "lane", primitive_index);
     int in_left_shoulder = inprimgroup(0, "shoulder_l", primitive_index);
     int in_right_shoulder = inprimgroup(0, "shoulder_r", primitive_index);
-    int in_tight_turn = inprimgroup(0, "road_tight_turn", primitive_index);
     int source_quad = primitive_index;
     removeprim(0, primitive_index, 0);
 
@@ -410,7 +395,6 @@ for (int primitive_index = original_primitive_count - 1; primitive_index >= 0; p
         setprimgroup(0, "lane", triangle, in_lane, "set");
         setprimgroup(0, "shoulder_l", triangle, in_left_shoulder, "set");
         setprimgroup(0, "shoulder_r", triangle, in_right_shoulder, "set");
-        setprimgroup(0, "road_tight_turn", triangle, in_tight_turn, "set");
     }
 }
 setdetailattrib(0, "road_uv_stretch_max_ratio", maximum_ratio, "set");
@@ -586,7 +570,6 @@ def apply_patch() -> dict:
         "road_sample_count": geometry.intAttribValue("road_sample_count"),
         "road_max_ring_turn_angle_deg": geometry.floatAttribValue("road_max_ring_turn_angle_deg"),
         "road_min_turn_radius": geometry.floatAttribValue("road_min_turn_radius"),
-        "road_tight_turn_count": geometry.intAttribValue("road_tight_turn_count"),
         "road_uv_stretch_max_ratio": geometry.floatAttribValue("road_uv_stretch_max_ratio"),
         "errors": list(output.errors()),
         "warnings": list(output.warnings()),

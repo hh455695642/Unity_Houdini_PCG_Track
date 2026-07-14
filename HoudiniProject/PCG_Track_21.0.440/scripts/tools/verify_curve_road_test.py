@@ -33,31 +33,10 @@ def uv_area(a, b, c) -> float:
     return 0.5 * abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]))
 
 
-def boundary_intersections(geo: hou.Geometry, section: int) -> int:
-    cross_section_count = geo.intAttribValue("road_cross_section_count")
-    ring_count = geo.intAttribValue("road_sample_count")
-    points = [
-        hou.Vector3(geo.iterPoints()[ring * cross_section_count + section].position())
-        for ring in range(ring_count)
-    ]
-
-    def side(a, b, c):
-        return (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0])
-
-    count = 0
-    for first in range(len(points) - 1):
-        for second in range(first + 2, len(points) - 1):
-            a, b = points[first], points[first + 1]
-            c, d = points[second], points[second + 1]
-            ab_c, ab_d = side(a, b, c), side(a, b, d)
-            cd_a, cd_b = side(c, d, a), side(c, d, b)
-            if ((ab_c > 1e-6 and ab_d < -1e-6) or (ab_c < -1e-6 and ab_d > 1e-6)) and \
-               ((cd_a > 1e-6 and cd_b < -1e-6) or (cd_a < -1e-6 and cd_b > 1e-6)):
-                count += 1
-    return count
-
-
 def validate_geometry(geo: hou.Geometry, label: str) -> int:
+    if geo.findGlobalAttrib("road_material_boundary_sample_count") is not None:
+        return fail("%s_retired_material_boundary_sample_contract_present" % label)
+
     uv = geo.findVertexAttrib("uv")
     uv3 = geo.findVertexAttrib("uv3")
     source_quad = geo.findPrimAttrib("road_source_quad")
@@ -135,12 +114,7 @@ def validate_geometry(geo: hou.Geometry, label: str) -> int:
         "road_input_max_segment_length",
         "road_max_ring_turn_angle_deg",
         "road_min_turn_radius",
-        "road_tight_turn_count",
         "road_generated_min_turn_radius",
-        "road_min_inner_radius_after_guard",
-        "road_tight_turn_guard_count",
-        "road_tight_turn_residual_count",
-        "road_max_outward_shift",
         "road_surface_uv_mode",
         "road_uv_stretch_max_ratio",
         "road_banking_enabled",
@@ -209,8 +183,7 @@ def validate_geometry(geo: hou.Geometry, label: str) -> int:
         return fail("%s_recorded_ratio_%f_actual_%f" % (label, recorded_ratio, maximum_ratio))
     print(
         "%s points=%d triangles=%d samples=%d lane_ratio=%.6f shoulder_ratio=%.6f "
-        "max_turn=%.6f min_radius=%.6f generated_radius=%.6f tight=%d guard=%d residual=%d "
-        "shift=%.6f bank=%.6f grade=%.6f"
+        "max_turn=%.6f min_radius=%.6f generated_radius=%.6f bank=%.6f grade=%.6f"
         % (
             label,
             len(geo.points()),
@@ -221,10 +194,6 @@ def validate_geometry(geo: hou.Geometry, label: str) -> int:
             geo.floatAttribValue("road_max_ring_turn_angle_deg"),
             geo.floatAttribValue("road_min_turn_radius"),
             geo.floatAttribValue("road_generated_min_turn_radius"),
-            geo.intAttribValue("road_tight_turn_count"),
-            geo.intAttribValue("road_tight_turn_guard_count"),
-            geo.intAttribValue("road_tight_turn_residual_count"),
-            geo.floatAttribValue("road_max_outward_shift"),
             geo.floatAttribValue("road_max_abs_bank_deg"),
             geo.floatAttribValue("road_max_abs_grade_deg"),
         )
@@ -405,16 +374,6 @@ for point in points:
     return source
 
 
-def set_zero_manual_ramp(asset: hou.Node) -> None:
-    asset.parm("bank_manual_offset_ramp").set(
-        hou.Ramp(
-            (hou.rampBasis.Linear, hou.rampBasis.Linear),
-            (0.0, 1.0),
-            (0.0, 0.0),
-        )
-    )
-
-
 def ring_points(geo: hou.Geometry, ring: int):
     cross_section_count = geo.intAttribValue("road_cross_section_count")
     points = geo.points()
@@ -461,6 +420,92 @@ def road_output(asset: hou.Node) -> hou.Node:
     return output
 
 
+def validate_profile_contract(asset: hou.Node, label: str) -> int:
+    road = asset.node("Road")
+    expected_nodes = {
+        "PROFILE_compute_dimensions": "attribwrangle",
+        "PROFILE_clear_centerline": "blast",
+        "PROFILE_build_polyline": "add",
+        "PROFILE_assign_attributes": "attribwrangle",
+        "PROFILE_cross_section": "null",
+    }
+    for node_name, node_type in expected_nodes.items():
+        node = road.node(node_name)
+        if node is None or node.type().name() != node_type:
+            return fail("%s_profile_node_%s_not_%s" % (label, node_name, node_type))
+    if road.node("CENTERLINE_material_segment_samples") is not None:
+        return fail("%s_retired_material_sample_node_present" % label)
+
+    resample = road.node("CENTERLINE_resample")
+    polyframe = road.node("CENTERLINE_polyframe")
+    profile = road.node("PROFILE_cross_section")
+    profile.cook(force=True)
+    resample_geo = resample.geometry()
+    polyframe_geo = polyframe.geometry()
+    profile_geo = profile.geometry()
+    if len(resample_geo.points()) != len(polyframe_geo.points()):
+        return fail("%s_centerline_sample_count_changed" % label)
+    if profile_geo.findGlobalAttrib("road_material_boundary_sample_count") is not None:
+        return fail("%s_profile_retired_sample_contract_present" % label)
+    if len(profile_geo.points()) != 4 or len(profile_geo.prims()) != 1:
+        return fail("%s_profile_topology_%d_%d" % (
+            label, len(profile_geo.points()), len(profile_geo.prims())
+        ))
+    if profile_geo.prims()[0].isClosed():
+        return fail("%s_profile_must_be_open" % label)
+
+    road_width = max(asset.parm("road_width").eval(), 0.1)
+    shoulder_width_param = (
+        max(asset.parm("shoulder_width").eval(), 0.0)
+        if asset.parm("enable_shoulders").eval() else 0.0
+    )
+    shoulder_width = shoulder_width_param
+    closed_loop = profile_geo.intAttribValue("road_closed_loop")
+    if closed_loop and road_width > 6.0:
+        shoulder_width *= max(min(asset.parm("min_shoulder_scale").eval(), 1.0), 0.0)
+    shoulder_drop = max(asset.parm("shoulder_drop").eval(), 0.0) if shoulder_width > 1e-5 else 0.0
+    total_width = max(road_width + shoulder_width * 2.0, 0.1)
+    expected_positions = (
+        (-total_width * 0.5, -shoulder_drop, 0.0),
+        (-road_width * 0.5, 0.0, 0.0),
+        (road_width * 0.5, 0.0, 0.0),
+        (total_width * 0.5, -shoulder_drop, 0.0),
+    )
+    expected_bands = (1, 0, 0, 1)
+    expected_lateral_t = (
+        0.0,
+        shoulder_width / total_width,
+        (shoulder_width + road_width) / total_width,
+        1.0,
+    )
+    for index, point in enumerate(profile_geo.points()):
+        if (point.position() - hou.Vector3(expected_positions[index])).length() > 1e-5:
+            return fail("%s_profile_position_%d_%s" % (label, index, tuple(point.position())))
+        if point.attribValue("profile_section") != index:
+            return fail("%s_profile_section_%d" % (label, index))
+        if point.attribValue("road_band") != expected_bands[index]:
+            return fail("%s_profile_band_%d" % (label, index))
+        if abs(point.attribValue("road_lateral_t") - expected_lateral_t[index]) > 1e-5:
+            return fail("%s_profile_lateral_t_%d" % (label, index))
+
+    expected_detail = {
+        "road_total_width": total_width,
+        "road_cross_section_count": 4,
+        "road_band_count": 3,
+        "road_has_shoulders": int(shoulder_width > 1e-5),
+        "road_min_visible_shoulder_width": shoulder_width,
+        "road_min_lateral_scale": (
+            max(min(shoulder_width / shoulder_width_param, 1.0), 0.0)
+            if shoulder_width_param > 1e-5 else 1.0
+        ),
+    }
+    for name, expected in expected_detail.items():
+        actual = profile_geo.attribValue(name)
+        if abs(float(actual) - float(expected)) > 1e-5:
+            return fail("%s_profile_detail_%s_%s" % (label, name, actual))
+    return 0
+
+
 def main() -> int:
     if not os.path.isfile(HDA_PATH):
         return fail("missing_hda_%s" % HDA_PATH)
@@ -468,6 +513,15 @@ def main() -> int:
     obj = hou.node("/obj")
 
     fallback = obj.createNode(ASSET_TYPE, "VERIFY_track_fallback")
+    removed_guard_parameters = (
+        "tight_turn_guard_enable",
+        "tight_turn_min_inner_radius",
+        "tight_turn_transition_length",
+        "tight_turn_max_offset",
+    )
+    for parameter_name in removed_guard_parameters:
+        if fallback.parm(parameter_name) is not None:
+            return fail("fallback_deprecated_guard_parameter_%s" % parameter_name)
     if fallback.parm("enable_road_banking") is None:
         return fail("fallback_missing_banking_parameters")
     if fallback.parm("enable_road_banking").eval() != 0:
@@ -476,11 +530,30 @@ def main() -> int:
         return fail("fallback_missing_spline_knot_roll_toggle")
     if fallback.parm("bank_use_spline_knot_roll").eval() != 1:
         return fail("fallback_spline_knot_roll_default_not_enabled")
-    default_ramp = fallback.parm("bank_manual_offset_ramp").eval()
-    if any(abs(value) > 1e-6 for value in default_ramp.values()):
-        return fail("fallback_manual_ramp_default_not_zero")
+    if fallback.parm("bank_manual_offset_ramp") is not None:
+        return fail("fallback_manual_ramp_parameter_still_present")
     fallback.parm("road_width").set(6.0)
     fallback.parm("sample_spacing").set(1.5)
+    open_profile_cases = (
+        ("open_shoulders", 6.0, 1, 1.0, 0.08, 0.45),
+        ("open_shoulders_disabled", 6.0, 0, 2.0, 0.20, 0.45),
+        ("open_zero_shoulder", 6.0, 1, 0.0, 0.15, 0.45),
+        ("open_wide_drop", 10.0, 1, 1.5, 0.30, 0.45),
+    )
+    for label, width, enabled, shoulder_width, shoulder_drop, minimum_scale in open_profile_cases:
+        fallback.parm("road_width").set(width)
+        fallback.parm("enable_shoulders").set(enabled)
+        fallback.parm("shoulder_width").set(shoulder_width)
+        fallback.parm("shoulder_drop").set(shoulder_drop)
+        fallback.parm("min_shoulder_scale").set(minimum_scale)
+        result = validate_profile_contract(fallback, label)
+        if result:
+            return result
+    fallback.parm("road_width").set(6.0)
+    fallback.parm("enable_shoulders").set(1)
+    fallback.parm("shoulder_width").set(1.0)
+    fallback.parm("shoulder_drop").set(0.08)
+    fallback.parm("min_shoulder_scale").set(0.45)
     fallback_geo = road_output(fallback).geometry()
     result = validate_geometry(fallback_geo, "fallback")
     if result:
@@ -503,32 +576,28 @@ def main() -> int:
         return fail("stress_input_spacing_%f" % stress_geo.floatAttribValue("road_input_max_segment_length"))
     if stress_geo.floatAttribValue("road_max_ring_turn_angle_deg") > 7.5 + 1e-3:
         return fail("stress_turn_angle_%f" % stress_geo.floatAttribValue("road_max_ring_turn_angle_deg"))
-    if stress_geo.intAttribValue("road_tight_turn_count") != 0:
-        return fail("stress_unexpected_tight_turns")
-
     hairpin_source = make_hairpin_curve(obj)
     hairpin = obj.createNode(ASSET_TYPE, "VERIFY_track_wide_hairpin")
     hairpin.parm("unity_curve_input").set(hairpin_source.path())
-    hairpin.parm("road_width").set(23.0)
+    # Keep the wide-hairpin case as a centerline/UV/banking regression test.
+    hairpin.parm("road_width").set(28.0)
     hairpin.parm("sample_spacing").set(1.5)
-    hairpin.parm("tight_turn_guard_enable").set(1)
-    hairpin.parm("tight_turn_min_inner_radius").set(2.0)
-    hairpin.parm("tight_turn_transition_length").set(24.0)
-    hairpin.parm("tight_turn_max_offset").set(30.0)
     hairpin_geo = road_output(hairpin).geometry()
     result = validate_geometry(hairpin_geo, "wide_hairpin")
     if result:
         return result
-    if hairpin_geo.intAttribValue("road_tight_turn_count") <= 0:
-        return fail("wide_hairpin_guard_not_triggered")
-    if hairpin_geo.intAttribValue("road_tight_turn_guard_count") <= 0:
-        return fail("wide_hairpin_no_guard_zone")
-    if hairpin_geo.floatAttribValue("road_max_outward_shift") <= 0.1:
-        return fail("wide_hairpin_no_outward_shift")
-    left_crossings = boundary_intersections(hairpin_geo, 0)
-    right_crossings = boundary_intersections(hairpin_geo, 3)
-    if left_crossings or right_crossings:
-        return fail("wide_hairpin_boundary_crossings_%d_%d" % (left_crossings, right_crossings))
+    if abs(hairpin_geo.floatAttribValue("road_generated_length") - hairpin_geo.floatAttribValue("road_length")) > 1e-5:
+        return fail("wide_hairpin_generated_length_changed")
+    if abs(hairpin_geo.floatAttribValue("road_generated_min_turn_radius") - hairpin_geo.floatAttribValue("road_min_turn_radius")) > 1e-5:
+        return fail("wide_hairpin_generated_radius_changed")
+    original_center = hairpin_geo.findPointAttrib("road_original_center")
+    generated_center = hairpin_geo.findPointAttrib("road_generated_center")
+    if original_center is None or generated_center is None:
+        return fail("wide_hairpin_missing_centerline_contract")
+    for point in hairpin_geo.points():
+        delta = hou.Vector3(point.attribValue(generated_center)) - hou.Vector3(point.attribValue(original_center))
+        if delta.length() > 1e-5:
+            return fail("wide_hairpin_centerline_shift_%d_%f" % (point.number(), delta.length()))
     if hairpin_geo.stringAttribValue("road_surface_uv_mode") != "world_xz_meters":
         return fail("wide_hairpin_wrong_uv_mode")
 
@@ -540,7 +609,6 @@ def main() -> int:
     grade.parm("enable_road_banking").set(1)
     grade.parm("bank_auto_strength").set(0.0)
     grade.parm("bank_transition_length_m").set(24.0)
-    set_zero_manual_ramp(grade)
     grade_geo = road_output(grade).geometry()
     result = validate_geometry(grade_geo, "grade_only")
     if result:
@@ -564,7 +632,6 @@ def main() -> int:
     spline_roll.parm("bank_auto_strength").set(0.0)
     spline_roll.parm("bank_max_angle_deg").set(8.0)
     spline_roll.parm("bank_transition_length_m").set(0.0)
-    set_zero_manual_ramp(spline_roll)
     spline_roll_geo = road_output(spline_roll).geometry()
     result = validate_geometry(spline_roll_geo, "spline_roll_clamped")
     if result:
@@ -589,33 +656,6 @@ def main() -> int:
     if spline_roll_disabled_geo.floatAttribValue("road_max_abs_bank_deg") > 1e-4:
         return fail("disabled_spline_roll_still_applied")
 
-    additive_source = make_spline_roll_curve(obj, 3.0)
-    additive = obj.createNode(ASSET_TYPE, "VERIFY_track_additive_spline_roll")
-    additive.parm("unity_curve_input").set(additive_source.path())
-    additive.parm("road_width").set(6.0)
-    additive.parm("sample_spacing").set(2.0)
-    additive.parm("enable_road_banking").set(1)
-    additive.parm("bank_use_spline_knot_roll").set(1)
-    additive.parm("bank_auto_strength").set(0.0)
-    additive.parm("bank_max_angle_deg").set(8.0)
-    additive.parm("bank_transition_length_m").set(0.0)
-    additive.parm("bank_manual_offset_ramp").set(
-        hou.Ramp(
-            (hou.rampBasis.Linear, hou.rampBasis.Linear),
-            (0.0, 1.0),
-            (2.0, 2.0),
-        )
-    )
-    additive_geo = road_output(additive).geometry()
-    result = validate_geometry(additive_geo, "spline_roll_additive")
-    if result:
-        return result
-    additive_middle = ring_points(
-        additive_geo, additive_geo.intAttribValue("road_sample_count") // 2
-    )[0]
-    if abs(additive_middle.attribValue("road_bank_deg") - 5.0) > 0.05:
-        return fail("spline_roll_not_additive_%f" % additive_middle.attribValue("road_bank_deg"))
-
     arc_source = make_arc_curve(obj)
     arc = obj.createNode(ASSET_TYPE, "VERIFY_track_constant_radius_bank")
     arc.parm("unity_curve_input").set(arc_source.path())
@@ -626,7 +666,6 @@ def main() -> int:
     arc.parm("bank_auto_strength").set(1.0)
     arc.parm("bank_max_angle_deg").set(8.0)
     arc.parm("bank_transition_length_m").set(0.0)
-    set_zero_manual_ramp(arc)
     arc_geo = road_output(arc).geometry()
     result = validate_geometry(arc_geo, "constant_radius_bank")
     if result:
@@ -645,29 +684,6 @@ def main() -> int:
     if lane_height_delta * actual_bank <= 0.0:
         return fail("constant_radius_outside_not_raised")
 
-    manual = obj.createNode(ASSET_TYPE, "VERIFY_track_manual_bank")
-    manual.parm("unity_curve_input").set(grade_source.path())
-    manual.parm("road_width").set(6.0)
-    manual.parm("sample_spacing").set(2.0)
-    manual.parm("enable_road_banking").set(1)
-    manual.parm("bank_auto_strength").set(0.0)
-    manual.parm("bank_max_angle_deg").set(8.0)
-    manual.parm("bank_transition_length_m").set(0.0)
-    manual.parm("bank_manual_offset_ramp").set(
-        hou.Ramp(
-            (hou.rampBasis.Linear, hou.rampBasis.Linear, hou.rampBasis.Linear),
-            (0.0, 0.5, 1.0),
-            (0.0, 4.0, 0.0),
-        )
-    )
-    manual_geo = road_output(manual).geometry()
-    result = validate_geometry(manual_geo, "manual_bank")
-    if result:
-        return result
-    manual_peak = max(point.attribValue("road_bank_deg") for point in manual_geo.points())
-    if manual_peak < 3.8 or manual_peak > 4.01:
-        return fail("manual_bank_peak_%f" % manual_peak)
-
     bank_stress = obj.createNode(ASSET_TYPE, "VERIFY_track_bank_s_curve")
     bank_stress.parm("unity_curve_input").set(source.path())
     bank_stress.parm("road_width").set(6.0)
@@ -677,7 +693,6 @@ def main() -> int:
     bank_stress.parm("bank_auto_strength").set(1.0)
     bank_stress.parm("bank_max_angle_deg").set(8.0)
     bank_stress.parm("bank_transition_length_m").set(24.0)
-    set_zero_manual_ramp(bank_stress)
     bank_stress_geo = road_output(bank_stress).geometry()
     result = validate_geometry(bank_stress_geo, "bank_s_curve")
     if result:
@@ -699,7 +714,6 @@ def main() -> int:
     circle.parm("bank_auto_strength").set(1.0)
     circle.parm("bank_max_angle_deg").set(8.0)
     circle.parm("bank_transition_length_m").set(24.0)
-    set_zero_manual_ramp(circle)
     circle_geo = road_output(circle).geometry()
     result = validate_geometry(circle_geo, "closed_bank")
     if result:
@@ -707,6 +721,15 @@ def main() -> int:
     if circle_geo.intAttribValue("road_closed_loop") != 1:
         return fail("closed_bank_not_closed")
     result = validate_bank_rate(circle_geo, "closed_bank", 8.0, 24.0)
+    if result:
+        return result
+
+    circle.parm("road_width").set(20.0)
+    circle.parm("enable_shoulders").set(1)
+    circle.parm("shoulder_width").set(2.0)
+    circle.parm("shoulder_drop").set(0.12)
+    circle.parm("min_shoulder_scale").set(0.45)
+    result = validate_profile_contract(circle, "closed_wide_profile")
     if result:
         return result
 

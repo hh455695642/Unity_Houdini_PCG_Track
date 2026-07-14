@@ -2,6 +2,8 @@
 
 This script patches the currently-open /obj/Track1 instance.  It deliberately
 does not clear the HIP, rebuild the asset, or delete historical backups.
+Material boundaries do not alter centerline topology; blend distances are
+evaluated on the uniformly resampled rings produced by CENTERLINE_resample.
 Run it inside the current Houdini GUI session through Houdini MCP.
 """
 
@@ -23,173 +25,6 @@ TRACK_HDA_PATH = os.path.join(PROJECT_ROOT, "Assets", "PCG", "HDA", "Track.hda")
 TRACK_BACKUP_DIR = os.path.join(PROJECT_ROOT, "Assets", "PCG", "HDA", "backup")
 TRACK_NODE_PATH = "/obj/Track1"
 TRACK_TYPE_NAME = "pcgbike::Track::1.0"
-
-
-LOCAL_SAMPLE_VEX = r'''
-// Material Segment 边界局部采样。
-// 性能关键点：只在每个边界的 -D / 0 / +D 位置插点，不提高整条赛道采样密度。
-
-function void append_unique(export float values[]; float value; float tolerance)
-{
-    foreach (float existing; values)
-    {
-        if (abs(existing - value) <= tolerance)
-            return;
-    }
-    append(values, value);
-}
-
-function float wrap_distance(float distance; float total_length)
-{
-    if (total_length <= 1e-5)
-        return 0.0;
-    return distance - floor(distance / total_length) * total_length;
-}
-
-function vector sample_position(
-    vector source_positions[];
-    float cumulative_distances[];
-    float target_distance;
-    float total_length;
-    int closed_loop)
-{
-    int point_count = len(source_positions);
-    if (point_count <= 0)
-        return {0.0, 0.0, 0.0};
-    if (point_count == 1 || target_distance <= 1e-6)
-        return source_positions[0];
-
-    for (int index = 1; index < point_count; index++)
-    {
-        if (target_distance <= cumulative_distances[index] + 1e-6)
-        {
-            float start_distance = cumulative_distances[index - 1];
-            float span = max(cumulative_distances[index] - start_distance, 1e-6);
-            float local_t = clamp((target_distance - start_distance) / span, 0.0, 1.0);
-            return lerp(source_positions[index - 1], source_positions[index], local_t);
-        }
-    }
-
-    if (closed_loop)
-    {
-        float start_distance = cumulative_distances[point_count - 1];
-        float span = max(total_length - start_distance, 1e-6);
-        float local_t = clamp((target_distance - start_distance) / span, 0.0, 1.0);
-        return lerp(source_positions[point_count - 1], source_positions[0], local_t);
-    }
-    return source_positions[point_count - 1];
-}
-
-if (nprimitives(0) <= 0)
-    return;
-
-int vertex_count = primvertexcount(0, 0);
-if (vertex_count < 2)
-    return;
-
-int closed_loop = int(primintrinsic(0, "closed", 0));
-vector source_positions[];
-float cumulative_distances[];
-float distance_along = 0.0;
-for (int vertex_index = 0; vertex_index < vertex_count; vertex_index++)
-{
-    int vertex_id = primvertex(0, 0, vertex_index);
-    int point_id = vertexpoint(0, vertex_id);
-    vector position = point(0, "P", point_id);
-    if (vertex_index > 0)
-        distance_along += length(position - source_positions[vertex_index - 1]);
-    append(source_positions, position);
-    append(cumulative_distances, distance_along);
-}
-
-float total_length = distance_along;
-if (closed_loop)
-    total_length += length(source_positions[0] - source_positions[vertex_count - 1]);
-if (total_length <= 1e-5)
-    return;
-
-float target_distances[] = cumulative_distances;
-float dedupe_tolerance = max(total_length * 1e-7, 1e-5);
-float hard_edge_distance = min(0.01, max(total_length * 1e-5, 0.0001));
-int segment_count = chi("../../material_segments");
-
-for (int index = 1; index <= segment_count; index++)
-{
-    float start_t = clamp(ch(sprintf("../../material_segment_start_%d", index)), 0.0, 1.0);
-    float end_t = clamp(ch(sprintf("../../material_segment_end_%d", index)), 0.0, 1.0);
-    float start_blend_m = max(ch(sprintf("../../material_segment_start_blend_distance_m_%d", index)), 0.0);
-    float end_blend_m = max(ch(sprintf("../../material_segment_end_blend_distance_m_%d", index)), 0.0);
-
-    if (end_t < start_t)
-    {
-        float swap_t = start_t;
-        start_t = end_t;
-        end_t = swap_t;
-        float swap_blend = start_blend_m;
-        start_blend_m = end_blend_m;
-        end_blend_m = swap_blend;
-    }
-
-    float segment_length_t = end_t - start_t;
-    if (segment_length_t <= 1e-6)
-        continue;
-
-    // 0-1 完整覆盖没有外部边界，不在闭环接缝插入无意义淡入淡出点。
-    if (start_t <= 1e-6 && end_t >= 1.0 - 1e-6)
-        continue;
-
-    float start_width_t = start_blend_m / total_length;
-    float end_width_t = end_blend_m / total_length;
-    float width_sum = start_width_t + end_width_t;
-    if (width_sum > segment_length_t && width_sum > 1e-6)
-    {
-        float scale = segment_length_t / width_sum;
-        start_width_t *= scale;
-        end_width_t *= scale;
-    }
-
-    float start_sample_m = start_width_t > 1e-6 ? start_width_t * total_length : hard_edge_distance;
-    float end_sample_m = end_width_t > 1e-6 ? end_width_t * total_length : hard_edge_distance;
-    float boundaries[] = array(start_t * total_length, end_t * total_length);
-    float sample_widths[] = array(start_sample_m, end_sample_m);
-
-    for (int boundary_index = 0; boundary_index < 2; boundary_index++)
-    {
-        float boundary = boundaries[boundary_index];
-        float sample_width = sample_widths[boundary_index];
-        for (int offset_index = -1; offset_index <= 1; offset_index++)
-        {
-            float target = boundary + float(offset_index) * sample_width;
-            target = closed_loop ? wrap_distance(target, total_length) : clamp(target, 0.0, total_length);
-            append_unique(target_distances, target, dedupe_tolerance);
-        }
-    }
-}
-
-target_distances = sort(target_distances);
-float sorted_distances[];
-foreach (float target; target_distances)
-    append_unique(sorted_distances, target, dedupe_tolerance);
-
-vector rebuilt_positions[];
-foreach (float target; sorted_distances)
-    append(rebuilt_positions, sample_position(source_positions, cumulative_distances, target, total_length, closed_loop));
-
-for (int primitive_index = nprimitives(0) - 1; primitive_index >= 0; primitive_index--)
-    removeprim(0, primitive_index, 0);
-for (int point_index = npoints(0) - 1; point_index >= 0; point_index--)
-    removepoint(0, point_index);
-
-int rebuilt_points[];
-foreach (vector position; rebuilt_positions)
-    append(rebuilt_points, addpoint(0, position));
-
-int primitive_id = addprim(0, closed_loop ? "poly" : "polyline");
-foreach (int point_id; rebuilt_points)
-    addvertex(0, primitive_id, point_id);
-
-setdetailattrib(0, "road_material_boundary_sample_count", max(len(rebuilt_points) - vertex_count, 0), "set");
-'''
 
 
 MASK_VEX = r'''
@@ -449,19 +284,9 @@ def _patch_nodes(track_node: hou.Node) -> None:
     if resample is None or polyframe is None:
         raise RuntimeError("Missing centerline resample/polyframe nodes")
 
-    local_samples = road.node("CENTERLINE_material_segment_samples")
-    if local_samples is None:
-        local_samples = road.createNode("attribwrangle", "CENTERLINE_material_segment_samples")
-    local_samples.setInput(0, resample)
-    local_samples.parm("class").set(0)  # Detail (only once)
-    local_samples.parm("snippet").set(LOCAL_SAMPLE_VEX)
-    local_samples.setComment(
-        "材质段边界局部采样：只增加 Start/End ± Blend Distance 所需 Ring，避免全局加密。"
-    )
-    local_samples.setGenericFlag(hou.nodeFlag.DisplayComment, True)
-    local_samples.setColor(hou.Color((0.32, 0.62, 0.92)))
-    local_samples.setPosition((resample.position() + polyframe.position()) * 0.5)
-    polyframe.setInput(0, local_samples)
+    # Sample Spacing is the only centerline topology control. Material blends
+    # snap to existing rings instead of inserting boundary-local samples.
+    polyframe.setInput(0, resample)
 
     reproject = road.node("SURFACE_reproject_layout")
     mask = road.node("MASK_material_segments")
@@ -549,8 +374,8 @@ def apply_patch() -> dict:
         raise RuntimeError("Obsolete segment_blend_distance_m still present")
     if template_group.find("segment_blend_width") is not None:
         raise RuntimeError("Obsolete segment_blend_width still present")
-    if track.node("Road/CENTERLINE_material_segment_samples") is None:
-        raise RuntimeError("Saved definition missing local sample node")
+    if track.node("Road/CENTERLINE_material_segment_samples") is not None:
+        raise RuntimeError("Saved definition still contains retired local sample node")
 
     output = track.node("Road/OUT_ROAD_MESH")
     output.cook(force=True)
@@ -564,7 +389,6 @@ def apply_patch() -> dict:
             removed_embedded = True
 
     track.matchCurrentDefinition()
-    hou.hipFile.save()
 
     return {
         "track": track.path(),
