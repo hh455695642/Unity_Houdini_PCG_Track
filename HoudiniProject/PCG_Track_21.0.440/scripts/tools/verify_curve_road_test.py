@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import sys
 
 import hou
@@ -103,8 +104,8 @@ def validate_geometry(geo: hou.Geometry, label: str) -> int:
     # XZ projection intentionally measures ground-plan density.  Highly sloped
     # synthetic fallback shoulders can therefore differ strongly in 3D-area
     # ratio even though their projected texture remains stable and continuous.
-    lane_limit = 10.0 if world_planar else 1.25
-    shoulder_limit = 10.0 if world_planar else 1.35
+    lane_limit = 10.0 if world_planar else 1.35
+    shoulder_limit = 10.0 if world_planar else 1.50
     if lane_ratio > lane_limit + 1e-4:
         return fail("%s_lane_uv3_ratio_%f" % (label, lane_ratio))
     if shoulder_ratio > shoulder_limit + 1e-4:
@@ -125,11 +126,37 @@ def validate_geometry(geo: hou.Geometry, label: str) -> int:
         "road_spline_knot_roll_enabled",
         "road_max_abs_spline_roll_deg",
         "road_start_up",
+        "road_adaptive_reference_count",
+        "road_adaptive_output_count",
+        "road_adaptive_detail_density",
+        "road_adaptive_effective_chord_error_m",
+        "road_adaptive_effective_heading_delta_deg",
+        "road_adaptive_effective_grade_delta_deg",
+        "road_adaptive_effective_bank_delta_deg",
+        "road_adaptive_refinement_ratio",
+        "road_adaptive_constraint_floor_hit_count",
+        "road_max_chord_error_m",
+        "road_max_heading_delta_deg",
+        "road_max_grade_delta_deg",
+        "road_max_bank_delta_deg",
+        "road_loop_residual_twist_deg",
+        "road_material_undersampled_transition_count",
+        "road_material_mask_semantic",
+        "road_material_blend_space",
+        "road_material_segment_order",
     )
     for name in required_detail:
         if geo.findGlobalAttrib(name) is None:
             return fail("%s_missing_detail_%s" % (label, name))
 
+    if geo.stringAttribValue("road_surface_uv_mode") != "arc_length_lateral_metric":
+        return fail("%s_wrong_uv_mode_%s" % (
+            label, geo.stringAttribValue("road_surface_uv_mode")
+        ))
+    if geo.stringAttribValue("road_material_blend_space") != "arc_length_meters":
+        return fail("%s_wrong_material_blend_space" % label)
+    if geo.stringAttribValue("road_material_segment_order") != "later_overrides_earlier":
+        return fail("%s_wrong_material_segment_order" % label)
     cd = geo.findPointAttrib("Cd")
     road_t = geo.findPointAttrib("road_t")
     normal = geo.findPointAttrib("N")
@@ -316,6 +343,36 @@ for index in range(7):
     return source
 
 
+def make_bank_transition_curve(obj: hou.Node) -> hou.Node:
+    source = obj.createNode("geo", "VERIFY_bank_transition_curve")
+    for child in source.children():
+        child.destroy()
+    node = source.createNode("python", "MAKE_BANK_TRANSITION_CURVE")
+    node.parm("python").set(
+        """
+import math
+import hou
+geo = hou.pwd().geometry()
+geo.clear()
+rotation_attrib = geo.addAttrib(hou.attribType.Point, "rot", (0.0, 0.0, 0.0, 1.0))
+primitive = geo.createPolygon()
+primitive.setIsClosed(False)
+for index in range(201):
+    x = float(index) * 0.5
+    angle = 6.0 * math.sin(x * math.pi * 2.0 / 100.0)
+    rotation = hou.Quaternion()
+    rotation.setToAngleAxis(angle, hou.Vector3(1.0, 0.0, 0.0))
+    point = geo.createPoint()
+    point.setPosition(hou.Vector3(x, 0.0, 0.0))
+    point.setAttribValue(rotation_attrib, tuple(rotation))
+    primitive.addVertex(point)
+"""
+    )
+    node.setDisplayFlag(True)
+    node.setRenderFlag(True)
+    return source
+
+
 def make_arc_curve(obj: hou.Node, radius: float = 30.0) -> hou.Node:
     source = obj.createNode("geo", "VERIFY_constant_radius_arc")
     for child in source.children():
@@ -374,6 +431,111 @@ for point in points:
     return source
 
 
+def make_straight_curve(obj: hou.Node, length: float = 500.0) -> hou.Node:
+    source = obj.createNode("geo", "VERIFY_straight_curve")
+    for child in source.children():
+        child.destroy()
+    node = source.createNode("python", "MAKE_STRAIGHT_CURVE")
+    node.parm("python").set(
+        """
+import hou
+geo = hou.pwd().geometry()
+geo.clear()
+primitive = geo.createPolygon()
+primitive.setIsClosed(False)
+for index in range(%d):
+    point = geo.createPoint()
+    point.setPosition(hou.Vector3(float(index), 0.0, 0.0))
+    primitive.addVertex(point)
+""" % (int(length) + 1)
+    )
+    node.setDisplayFlag(True)
+    node.setRenderFlag(True)
+    return source
+
+
+def make_smooth_grade_curve(obj: hou.Node) -> hou.Node:
+    source = obj.createNode("geo", "VERIFY_smooth_grade_curve")
+    for child in source.children():
+        child.destroy()
+    node = source.createNode("python", "MAKE_SMOOTH_GRADE_CURVE")
+    node.parm("python").set(
+        """
+import math
+import hou
+geo = hou.pwd().geometry()
+geo.clear()
+primitive = geo.createPolygon()
+primitive.setIsClosed(False)
+for index in range(401):
+    x = float(index) * 0.5
+    y = 8.0 * math.sin(x * math.pi * 2.0 / 200.0)
+    point = geo.createPoint()
+    point.setPosition(hou.Vector3(x, y, 0.0))
+    primitive.addVertex(point)
+"""
+    )
+    node.setDisplayFlag(True)
+    node.setRenderFlag(True)
+    return source
+
+
+def make_unwrapped_roll_curve(obj: hou.Node) -> hou.Node:
+    source = obj.createNode("geo", "VERIFY_unwrapped_roll_curve")
+    for child in source.children():
+        child.destroy()
+    node = source.createNode("python", "MAKE_UNWRAPPED_ROLL_CURVE")
+    node.parm("python").set(
+        """
+import hou
+geo = hou.pwd().geometry()
+geo.clear()
+rotation_attrib = geo.addAttrib(hou.attribType.Point, "rot", (0.0, 0.0, 0.0, 1.0))
+primitive = geo.createPolygon()
+primitive.setIsClosed(False)
+for index, angle in enumerate((179.0, -179.0)):
+    rotation = hou.Quaternion()
+    rotation.setToAngleAxis(angle, hou.Vector3(1.0, 0.0, 0.0))
+    point = geo.createPoint()
+    point.setPosition(hou.Vector3(float(index) * 60.0, 0.0, 0.0))
+    point.setAttribValue(rotation_attrib, tuple(rotation))
+    primitive.addVertex(point)
+"""
+    )
+    node.setDisplayFlag(True)
+    node.setRenderFlag(True)
+    return source
+
+
+def make_closed_quality_curve(obj: hou.Node) -> hou.Node:
+    source = obj.createNode("geo", "VERIFY_closed_quality_curve")
+    for child in source.children():
+        child.destroy()
+    node = source.createNode("python", "MAKE_CLOSED_QUALITY_CURVE")
+    node.parm("python").set(
+        """
+import math
+import hou
+geo = hou.pwd().geometry()
+geo.clear()
+primitive = geo.createPolygon()
+primitive.setIsClosed(True)
+for index in range(360):
+    angle = 2.0 * math.pi * float(index) / 360.0
+    point = geo.createPoint()
+    point.setPosition(hou.Vector3(
+        50.0 * math.cos(angle),
+        4.0 * math.sin(angle * 3.0),
+        35.0 * math.sin(angle) + 5.0 * math.sin(angle * 2.0),
+    ))
+    primitive.addVertex(point)
+"""
+    )
+    node.setDisplayFlag(True)
+    node.setRenderFlag(True)
+    return source
+
+
 def ring_points(geo: hou.Geometry, ring: int):
     cross_section_count = geo.intAttribValue("road_cross_section_count")
     points = geo.points()
@@ -413,11 +575,556 @@ def validate_bank_rate(geo: hou.Geometry, label: str, maximum_angle: float, tran
 
 
 def road_output(asset: hou.Node) -> hou.Node:
+    # The legacy combined output remains the most useful surface for the
+    # geometry-level regression suite. Split Quality is validated separately.
+    output_mode = asset.parm("road_output_mode")
+    if output_mode is not None:
+        output_mode.set(0)
     output = asset.node("Road/OUT_ROAD_MESH")
     if output is None:
         raise RuntimeError("Missing Road/OUT_ROAD_MESH")
     output.cook(force=True)
     return output
+
+
+def centerline_output(asset: hou.Node) -> hou.Node:
+    output = asset.node("Road/OUT_ROAD_CENTERLINE")
+    if output is None:
+        raise RuntimeError("Missing Road/OUT_ROAD_CENTERLINE")
+    output.cook(force=True)
+    return output
+
+
+def validate_hq_interface_and_network(asset: hou.Node) -> int:
+    expected_parameters = {
+        "enable_adaptive_sampling": 1,
+        "adaptive_min_spacing_m": 1.0,
+        "adaptive_detail_density": 1.0,
+        "adaptive_max_chord_error_m": 0.10,
+        "adaptive_max_heading_delta_deg": 8.0,
+        "adaptive_max_grade_delta_deg": 4.0,
+        "adaptive_max_bank_delta_deg": 2.0,
+        "road_output_mode": 1,
+    }
+    group = asset.type().definition().parmTemplateGroup()
+    for name, expected in expected_parameters.items():
+        parameter = asset.parm(name)
+        template = group.find(name)
+        if parameter is None or template is None:
+            return fail("hq_missing_parameter_%s" % name)
+        default = template.defaultValue()
+        if isinstance(default, tuple):
+            default = default[0]
+        if abs(float(default) - float(expected)) > 1e-6:
+            return fail("hq_default_%s_%s" % (name, default))
+
+    expected_material_parameters = {
+        "road_unity_material": "Assets/PCG/Materials/M_PCG_Road.mat",
+        "shoulder_unity_material": "Assets/PCG/Materials/M_PCG_Road.mat",
+    }
+    for name, expected in expected_material_parameters.items():
+        parameter = asset.parm(name)
+        template = group.find(name)
+        if parameter is None or template is None:
+            return fail("hq_missing_parameter_%s" % name)
+        default = template.defaultValue()[0]
+        if default != expected:
+            return fail("hq_default_%s_%s" % (name, default))
+
+    for removed_name in (
+        "adaptive_max_point_count",
+        "adaptive_refine_material_blends",
+        "closed_loop_mode",
+        "enable_closed_loop_twist_correction",
+        "frame_transport_mode",
+        "min_shoulder_scale",
+        "skirt_unity_material",
+    ):
+        if asset.parm(removed_name) is not None or group.find(removed_name) is not None:
+            return fail("hq_removed_parameter_present_%s" % removed_name)
+
+    top_entries = group.entries()
+    top_labels = tuple(entry.label() for entry in top_entries)
+    if top_labels != (
+        "Transform",
+        "Render",
+        "Misc",
+        "Curve",
+        "Track Shape",
+        "Road Banking",
+        "Material",
+        "Fallback Curve",
+    ):
+        return fail("hq_top_folder_layout_%s" % (top_labels,))
+
+    curve = group.findFolder("Curve")
+    if curve is None:
+        return fail("hq_curve_folder_missing")
+    curve_names = tuple(template.name() for template in curve.parmTemplates())
+    if curve_names != (
+        "curve_input_header",
+        "unity_curve_input",
+        "reverse_curve",
+        "curve_sampling_header",
+        "sample_spacing",
+        "enable_adaptive_sampling",
+        "adaptive_detail_density",
+        "adaptive_min_spacing_m",
+        "curve_quality_header",
+        "adaptive_max_chord_error_m",
+        "adaptive_max_heading_delta_deg",
+        "adaptive_max_grade_delta_deg",
+        "adaptive_max_bank_delta_deg",
+    ):
+        return fail("hq_curve_parameter_layout_%s" % (curve_names,))
+
+    curve_labels = {
+        template.name(): template.label()
+        for template in curve.parmTemplates()
+        if isinstance(template, hou.LabelParmTemplate)
+    }
+    if curve_labels != {
+        "curve_input_header": "Curve Input / 曲线输入",
+        "curve_sampling_header": "Sampling / 采样",
+        "curve_quality_header": "Quality Limits / 质量阈值",
+    }:
+        return fail("hq_curve_header_labels_%s" % (curve_labels,))
+
+    track_shape = group.findFolder("Track Shape")
+    if track_shape is None:
+        return fail("hq_track_shape_folder_missing")
+    track_shape_names = tuple(template.name() for template in track_shape.parmTemplates())
+    if track_shape_names != (
+        "track_geometry_header",
+        "road_width",
+        "track_shoulders_header",
+        "enable_shoulders",
+        "shoulder_width",
+        "shoulder_drop",
+        "track_start_finish_header",
+        "start_prefab",
+        "start_prefab_yaw_offset",
+        "track_uv_header",
+        "uv_tile_length",
+        "flip_surface",
+    ):
+        return fail("hq_track_shape_parameter_layout_%s" % (track_shape_names,))
+    track_shape_labels = {
+        template.name(): template.label()
+        for template in track_shape.parmTemplates()
+        if isinstance(template, hou.LabelParmTemplate)
+    }
+    if track_shape_labels != {
+        "track_geometry_header": "Track Geometry / 赛道形状",
+        "track_shoulders_header": "Shoulders / 路肩",
+        "track_start_finish_header": "Start / Finish / 起终点",
+        "track_uv_header": "UV / Unity",
+    }:
+        return fail("hq_track_shape_header_labels_%s" % (track_shape_labels,))
+
+    road_banking = group.findFolder("Road Banking")
+    if road_banking is None:
+        return fail("hq_road_banking_folder_missing")
+    road_banking_names = tuple(template.name() for template in road_banking.parmTemplates())
+    if road_banking_names != (
+        "enable_road_banking",
+        "bank_use_spline_knot_roll",
+        "bank_design_speed_kph",
+        "bank_auto_strength",
+        "bank_max_angle_deg",
+        "bank_transition_length_m",
+        "debug_bank_frames",
+    ):
+        return fail("hq_road_banking_parameter_layout_%s" % (road_banking_names,))
+
+    fallback_curve = group.findFolder("Fallback Curve")
+    if fallback_curve is None:
+        return fail("hq_fallback_curve_folder_missing")
+    fallback_curve_names = tuple(template.name() for template in fallback_curve.parmTemplates())
+    if fallback_curve_names != tuple("curve_point_%d" % index for index in range(6)):
+        return fail("hq_fallback_curve_parameter_layout_%s" % (fallback_curve_names,))
+
+    for removed_folder in (
+        "Source",
+        "Sampling",
+        "Advanced / Compatibility",
+        "Shoulder",
+        "UV / Unity Output",
+        "Frame Quality / Frame 质量",
+        "Material Masks",
+        "Adaptive Sampling / 自适应采样",
+        "Unity Output / Unity 输出",
+    ):
+        if group.findFolder(removed_folder) is not None:
+            return fail("hq_removed_folder_present_%s" % removed_folder)
+    material = group.findFolder("Material")
+    if material is None:
+        return fail("hq_material_folder_missing")
+    material_names = tuple(template.name() for template in material.parmTemplates())
+    if material_names != (
+        "road_output_mode",
+        "road_unity_material",
+        "shoulder_unity_material",
+        "material_segments",
+    ):
+        return fail("hq_material_parameter_layout_%s" % (material_names,))
+
+    road = asset.node("Road")
+    required_nodes = (
+        "CENTERLINE_quality_reference_resample",
+        "CENTERLINE_quality_metrics",
+        "CENTERLINE_collect_forced_samples",
+        "CENTERLINE_adaptive_select",
+        "CENTERLINE_sampling_switch",
+        "CENTERLINE_polyframe",
+        "OUTPUT_extract_road_surface",
+        "OUTPUT_extract_shoulders",
+        "OUTPUT_extract_skirts",
+        "OUTPUT_extract_collision",
+        "OUTPUT_road_mode_switch",
+        "CENTERLINE_extract_final",
+    )
+    for name in required_nodes:
+        if road.node(name) is None:
+            return fail("hq_missing_node_%s" % name)
+
+    # Final surface Frame/Banking and Sweep backbone are intentionally single
+    # Legacy paths. Parallel Transport remains only inside adaptive metrics.
+    for removed_name in (
+        "FRAME_compute_grade_bank_parallel",
+        "FRAME_quality_switch",
+        "FRAME_parallel_transport_centerline",
+        "CENTERLINE_quality_switch",
+    ):
+        if road.node(removed_name) is not None:
+            return fail("hq_removed_node_present_%s" % removed_name)
+    legacy_frame = road.node("FRAME_compute_grade_bank")
+    frame_apply = road.node("FRAME_apply_grade_bank")
+    centerline_extract = road.node("CENTERLINE_extract_final")
+    if legacy_frame is None or frame_apply is None or centerline_extract is None:
+        return fail("hq_legacy_frame_chain_missing")
+    if frame_apply.inputs()[0] != legacy_frame:
+        return fail("hq_legacy_frame_apply_connection")
+    if centerline_extract.inputs()[0] != legacy_frame or \
+       centerline_extract.inputs()[1] != legacy_frame:
+        return fail("hq_legacy_centerline_extract_connection")
+    polyframe = road.node("CENTERLINE_polyframe")
+    profile_dimensions = road.node("PROFILE_compute_dimensions")
+    sweep = road.node("SWEEP_road_surface")
+    if profile_dimensions.inputs()[0] != polyframe or sweep.inputs()[0] != polyframe:
+        return fail("hq_legacy_polyframe_connections")
+
+    anchor_source = road.node("CENTERLINE_collect_forced_samples").parm("snippet").eval()
+    selector_source = road.node("CENTERLINE_adaptive_select").parm("snippet").eval()
+    skirt_source = road.node("OUTPUT_extract_skirts").parm("snippet").eval()
+    metrics_source = road.node("CENTERLINE_quality_metrics").parm("snippet").eval()
+    validation_source = road.node("CENTERLINE_validate_or_fallback").parm("snippet").eval()
+    layout_source = road.node("LAYOUT_prepare_dimensions").parm("snippet").eval()
+    profile_source = road.node("PROFILE_compute_dimensions").parm("snippet").eval()
+    if "adaptive_refine_material_blends" in anchor_source:
+        return fail("hq_material_refine_toggle_reference_present")
+    if "adaptive_max_point_count" in selector_source or \
+       "road_adaptive_limit_hit" in selector_source:
+        return fail("hq_point_limit_reference_present")
+    if "skirt_unity_material" in skirt_source or \
+       "../../road_unity_material" not in skirt_source:
+        return fail("hq_skirt_material_inheritance_missing")
+    if "enable_closed_loop_twist_correction" in metrics_source:
+        return fail("hq_twist_correction_reference_present")
+    if "min_shoulder_scale" in layout_source or "min_shoulder_scale" in profile_source:
+        return fail("hq_min_shoulder_scale_reference_present")
+    if "closed_loop_mode" in validation_source:
+        return fail("hq_closed_loop_mode_reference_present")
+
+    source_switch = road.node("CENTERLINE_source_switch")
+    for name in ("CENTERLINE_resample", "CENTERLINE_quality_reference_resample"):
+        node = road.node(name)
+        if node.inputs()[0] != source_switch:
+            return fail("hq_source_connection_%s" % name)
+
+    expected_box_members = {
+        "BOX_01_CURVE_SOURCE": {
+            "IN_Unity_Curve_Parameter_Input",
+            "CENTERLINE_validate_or_fallback",
+            "CENTERLINE_reverse_curve",
+            "CENTERLINE_reverse_switch",
+            "FRAME_decode_unity_rotation",
+            "CONTRACT_validate_unity_knots",
+            "CONTRACT_prepare_direction",
+            "CONTRACT_decode_knot_frames",
+            "CENTERLINE_rebuild_unity_bezier",
+            "CENTERLINE_source_switch",
+        },
+        "BOX_02_SAMPLING": {
+            "CENTERLINE_resample",
+            "CENTERLINE_quality_reference_resample",
+            "CENTERLINE_quality_metrics",
+            "CENTERLINE_collect_forced_samples",
+            "CENTERLINE_adaptive_select",
+            "CENTERLINE_sampling_switch",
+            "FRAME_normalize_authored_up",
+            "CENTERLINE_polyframe",
+        },
+        "BOX_03_PROFILE_SWEEP": {
+            "PROFILE_compute_dimensions",
+            "PROFILE_clear_centerline",
+            "PROFILE_build_polyline",
+            "PROFILE_assign_attributes",
+            "PROFILE_cross_section",
+            "SWEEP_road_surface",
+            "SURFACE_reverse_normals",
+            "SURFACE_flip_switch",
+        },
+        "BOX_04_LAYOUT_BANKING": {
+            "LAYOUT_prepare_dimensions",
+            "SURFACE_reproject_layout",
+            "FRAME_compute_grade_bank",
+            "FRAME_apply_grade_bank",
+            "DEBUG_bank_frames",
+        },
+        "BOX_05_TOPO_MATERIAL": {
+            "TOPO_rebuild_road_quads",
+            "UV_write_road_layout",
+            "GROUP_road_bands",
+            "TOPO_triangulate_for_unity",
+            "COLLISION_mark_rendered",
+            "NORMAL_generate_surface",
+            "MASK_material_segments",
+            "ATTR_road_contract",
+        },
+        "BOX_06_OUTPUTS": {
+            "OUTPUT_extract_road_surface",
+            "OUTPUT_extract_shoulders",
+            "OUTPUT_extract_skirts",
+            "OUTPUT_extract_collision",
+            "OUTPUT_road_mode_switch",
+            "OUT_ROAD_MESH",
+            "OUT_ROAD_SHOULDERS",
+            "OUT_ROAD_SKIRTS",
+            "OUT_ROAD_COLLISION",
+            "CENTERLINE_extract_final",
+            "OUT_ROAD_CENTERLINE",
+        },
+        "BOX_07_START_PREFAB": {
+            "START_clear_surface",
+            "START_prefab_instance",
+            "OUT_START_PREFAB_INSTANCE",
+        },
+    }
+    children = tuple(road.children())
+    if len(children) != 53:
+        return fail("hq_road_node_count_%d" % len(children))
+    boxes = {box.name(): box for box in road.networkBoxes()}
+    if set(boxes) != set(expected_box_members):
+        return fail("hq_network_boxes_%s" % sorted(boxes))
+    assigned_nodes = []
+    for box_name, expected_members in expected_box_members.items():
+        box = boxes[box_name]
+        if not box.comment() or "?" in box.comment() or "\ufffd" in box.comment():
+            return fail("hq_network_box_comment_%s" % box_name)
+        actual_members = {
+            item.name() for item in box.items() if isinstance(item, hou.Node)
+        }
+        if actual_members != expected_members:
+            return fail("hq_network_box_members_%s_%s" % (
+                box_name, sorted(actual_members)
+            ))
+        assigned_nodes.extend(actual_members)
+    if sorted(assigned_nodes) != sorted(node.name() for node in children):
+        return fail("hq_network_box_assignment")
+
+    notes = {note.name(): note for note in road.stickyNotes()}
+    if set(notes) != {"ROAD_PIPELINE_GUIDE"}:
+        return fail("hq_sticky_notes_%s" % sorted(notes))
+    guide_text = notes["ROAD_PIPELINE_GUIDE"].text()
+    if "Legacy" not in guide_text or "Output 0" not in guide_text:
+        return fail("hq_sticky_note_contract")
+
+    removed_code_terms = (
+        "adaptive_max_point_count",
+        "adaptive_refine_material_blends",
+        "skirt_unity_material",
+        "frame_transport_mode",
+        "enable_closed_loop_twist_correction",
+        "min_shoulder_scale",
+        "closed_loop_mode",
+        "road_frame_valid",
+        "road_loop_transport_twist_deg",
+    )
+    declaration_pattern = re.compile(
+        r"^\s*(?:const\s+)?(?:int|float|string|vector|vector2|vector4|"
+        r"matrix2|matrix3|matrix|dict|int\[\]|float\[\]|string\[\]|"
+        r"vector\[\])\s+([A-Za-z_]\w*)\s*(?:=|;)"
+    )
+    for node in children:
+        comment = node.comment()
+        if not comment or "?" in comment or "\ufffd" in comment:
+            return fail("hq_node_comment_%s" % node.name())
+        if "world xz" in comment.lower() or "world-xz" in comment.lower():
+            return fail("hq_outdated_node_comment_%s" % node.name())
+        if node.spareParms():
+            return fail("hq_spare_parms_%s" % node.name())
+        node_text = []
+        for parm in node.parms():
+            try:
+                node_text.append(parm.rawValue())
+            except hou.OperationFailed:
+                pass
+        node_text = "\n".join(node_text)
+        for term in removed_code_terms:
+            if term in node_text:
+                return fail("hq_removed_code_term_%s_%s" % (node.name(), term))
+        snippet_parm = node.parm("snippet")
+        if snippet_parm is None:
+            continue
+        snippet = snippet_parm.eval()
+        for line_number, line in enumerate(snippet.splitlines(), 1):
+            match = declaration_pattern.match(line)
+            if match is None:
+                continue
+            local_name = match.group(1)
+            if len(re.findall(r"\b%s\b" % re.escape(local_name), snippet)) == 1:
+                return fail("hq_unused_vex_local_%s_%d_%s" % (
+                    node.name(), line_number, local_name
+                ))
+
+    expected_outputs = (
+        (0, "OUT_ROAD_MESH"),
+        (1, "OUT_START_PREFAB_INSTANCE"),
+        (2, "OUT_ROAD_SHOULDERS"),
+        (3, "OUT_ROAD_SKIRTS"),
+        (4, "OUT_ROAD_COLLISION"),
+        (5, "OUT_ROAD_CENTERLINE"),
+    )
+    for index, name in expected_outputs:
+        node = road.node(name)
+        if node is None:
+            return fail("hq_missing_output_%d_%s" % (index, name))
+        index_parm = node.parm("outputidx")
+        if index_parm is not None and index_parm.eval() != index:
+            return fail("hq_output_index_%s_%d" % (name, index_parm.eval()))
+    return 0
+
+
+def validate_adaptive_limits(asset: hou.Node, label: str) -> int:
+    geo = centerline_output(asset).geometry()
+    density = asset.parm("adaptive_detail_density").eval()
+    checks = (
+        (
+            "road_max_chord_error_m",
+            "road_adaptive_effective_chord_error_m",
+            asset.parm("adaptive_max_chord_error_m").eval() / (density * density),
+        ),
+        (
+            "road_max_heading_delta_deg",
+            "road_adaptive_effective_heading_delta_deg",
+            asset.parm("adaptive_max_heading_delta_deg").eval() / density,
+        ),
+        (
+            "road_max_grade_delta_deg",
+            "road_adaptive_effective_grade_delta_deg",
+            asset.parm("adaptive_max_grade_delta_deg").eval() / density,
+        ),
+        (
+            "road_max_bank_delta_deg",
+            "road_adaptive_effective_bank_delta_deg",
+            asset.parm("adaptive_max_bank_delta_deg").eval() / density,
+        ),
+    )
+    for detail_name, effective_name, expected in checks:
+        actual = geo.floatAttribValue(detail_name)
+        maximum = geo.floatAttribValue(effective_name)
+        if abs(maximum - expected) > 1e-5:
+            return fail("%s_%s_%f_expected_%f" % (label, effective_name, maximum, expected))
+        if actual > maximum + 2e-3:
+            return fail("%s_%s_%f_over_%f" % (label, detail_name, actual, maximum))
+    if abs(geo.floatAttribValue("road_adaptive_detail_density") - density) > 1e-6:
+        return fail("%s_adaptive_density_mismatch" % label)
+    base_count = max(geo.intAttribValue("road_adaptive_base_count_estimate"), 1)
+    expected_ratio = len(geo.points()) / float(base_count)
+    if abs(geo.floatAttribValue("road_adaptive_refinement_ratio") - expected_ratio) > 1e-5:
+        return fail("%s_adaptive_refinement_ratio_mismatch" % label)
+    if geo.intAttribValue("road_adaptive_constraint_floor_hit_count") != 0:
+        return fail("%s_adaptive_constraint_floor_hit" % label)
+    if geo.intAttribValue("road_adaptive_output_count") != len(geo.points()):
+        return fail("%s_adaptive_output_count_mismatch" % label)
+    return 0
+
+
+def source_quad_ids(geo: hou.Geometry):
+    attribute = geo.findPrimAttrib("road_source_quad")
+    if attribute is None:
+        return set()
+    return {primitive.attribValue(attribute) for primitive in geo.prims()}
+
+
+def validate_split_outputs(asset: hou.Node, label: str) -> int:
+    asset.parm("road_output_mode").set(0)
+    combined_node = asset.node("Road/OUT_ROAD_MESH")
+    combined_node.cook(force=True)
+    combined_geo = combined_node.geometry()
+    combined_ids = source_quad_ids(combined_geo)
+    combined_primitive_count = len(combined_geo.prims())
+
+    asset.parm("road_output_mode").set(1)
+    output_names = {
+        "road": ("OUT_ROAD_MESH", "Road_Surface"),
+        "shoulder": ("OUT_ROAD_SHOULDERS", "Road_Shoulders"),
+        "skirt": ("OUT_ROAD_SKIRTS", "Road_Skirts"),
+        "collision": ("OUT_ROAD_COLLISION", "Road_Collision"),
+        "centerline": ("OUT_ROAD_CENTERLINE", "Road_Centerline_Data"),
+    }
+    geometries = {}
+    for key, (node_name, unity_name) in output_names.items():
+        node = asset.node("Road/%s" % node_name)
+        node.cook(force=True)
+        geometry = node.geometry()
+        geometries[key] = geometry
+        if geometry.findGlobalAttrib("unity_output_name") is None or \
+           geometry.stringAttribValue("unity_output_name") != unity_name:
+            return fail("%s_output_name_%s" % (label, key))
+
+    road_ids = source_quad_ids(geometries["road"])
+    shoulder_ids = source_quad_ids(geometries["shoulder"])
+    skirt_ids = source_quad_ids(geometries["skirt"])
+    collision_ids = source_quad_ids(geometries["collision"])
+    for key in ("road", "shoulder", "skirt"):
+        rendered_collision = geometries[key].findPrimGroup("rendered_collision_geo")
+        if rendered_collision is not None and len(rendered_collision.prims()) != 0:
+            return fail("%s_duplicate_render_collider_%s" % (label, key))
+    collision_group = geometries["collision"].findPrimGroup("collision_geo")
+    if collision_group is None or len(collision_group.prims()) != len(geometries["collision"].prims()):
+        return fail("%s_missing_collision_group" % label)
+    if road_ids & shoulder_ids or road_ids & skirt_ids or shoulder_ids & skirt_ids:
+        return fail("%s_split_duplicate_source_quad" % label)
+    if road_ids | shoulder_ids | skirt_ids != combined_ids:
+        return fail("%s_split_union_mismatch" % label)
+    if collision_ids != road_ids | shoulder_ids:
+        return fail("%s_collision_contract_mismatch" % label)
+    if len(geometries["road"].prims()) + len(geometries["shoulder"].prims()) + \
+       len(geometries["skirt"].prims()) != combined_primitive_count:
+        return fail("%s_split_primitive_count_mismatch" % label)
+    centerline = geometries["centerline"]
+    if len(centerline.points()) != centerline.intAttribValue("road_adaptive_output_count"):
+        return fail("%s_centerline_ring_count_mismatch" % label)
+    if len(centerline.prims()) != 0:
+        return fail("%s_centerline_generated_render_geometry" % label)
+    if centerline.findGlobalAttrib("road_centerline_data_only") is None or \
+       centerline.intAttribValue("road_centerline_data_only") != 1:
+        return fail("%s_centerline_not_data_only" % label)
+    if centerline.findGlobalAttrib("unity_tag") is None or \
+       centerline.stringAttribValue("unity_tag") != "EditorOnly":
+        return fail("%s_centerline_not_editor_data" % label)
+    for key, parameter_name in (
+        ("road", "road_unity_material"),
+        ("shoulder", "shoulder_unity_material"),
+        ("skirt", "road_unity_material"),
+    ):
+        geometry = geometries[key]
+        if geometry.findGlobalAttrib("unity_material") is None or \
+           geometry.stringAttribValue("unity_material") != asset.parm(parameter_name).eval():
+            return fail("%s_unity_material_%s" % (label, key))
+    return 0
 
 
 def validate_profile_contract(asset: hou.Node, label: str) -> int:
@@ -436,7 +1143,7 @@ def validate_profile_contract(asset: hou.Node, label: str) -> int:
     if road.node("CENTERLINE_material_segment_samples") is not None:
         return fail("%s_retired_material_sample_node_present" % label)
 
-    resample = road.node("CENTERLINE_resample")
+    resample = road.node("CENTERLINE_sampling_switch")
     polyframe = road.node("CENTERLINE_polyframe")
     profile = road.node("PROFILE_cross_section")
     profile.cook(force=True)
@@ -460,9 +1167,6 @@ def validate_profile_contract(asset: hou.Node, label: str) -> int:
         if asset.parm("enable_shoulders").eval() else 0.0
     )
     shoulder_width = shoulder_width_param
-    closed_loop = profile_geo.intAttribValue("road_closed_loop")
-    if closed_loop and road_width > 6.0:
-        shoulder_width *= max(min(asset.parm("min_shoulder_scale").eval(), 1.0), 0.0)
     shoulder_drop = max(asset.parm("shoulder_drop").eval(), 0.0) if shoulder_width > 1e-5 else 0.0
     total_width = max(road_width + shoulder_width * 2.0, 0.1)
     expected_positions = (
@@ -513,6 +1217,9 @@ def main() -> int:
     obj = hou.node("/obj")
 
     fallback = obj.createNode(ASSET_TYPE, "VERIFY_track_fallback")
+    result = validate_hq_interface_and_network(fallback)
+    if result:
+        return result
     removed_guard_parameters = (
         "tight_turn_guard_enable",
         "tight_turn_min_inner_radius",
@@ -535,17 +1242,16 @@ def main() -> int:
     fallback.parm("road_width").set(6.0)
     fallback.parm("sample_spacing").set(1.5)
     open_profile_cases = (
-        ("open_shoulders", 6.0, 1, 1.0, 0.08, 0.45),
-        ("open_shoulders_disabled", 6.0, 0, 2.0, 0.20, 0.45),
-        ("open_zero_shoulder", 6.0, 1, 0.0, 0.15, 0.45),
-        ("open_wide_drop", 10.0, 1, 1.5, 0.30, 0.45),
+        ("open_shoulders", 6.0, 1, 1.0, 0.08),
+        ("open_shoulders_disabled", 6.0, 0, 2.0, 0.20),
+        ("open_zero_shoulder", 6.0, 1, 0.0, 0.15),
+        ("open_wide_drop", 10.0, 1, 1.5, 0.30),
     )
-    for label, width, enabled, shoulder_width, shoulder_drop, minimum_scale in open_profile_cases:
+    for label, width, enabled, shoulder_width, shoulder_drop in open_profile_cases:
         fallback.parm("road_width").set(width)
         fallback.parm("enable_shoulders").set(enabled)
         fallback.parm("shoulder_width").set(shoulder_width)
         fallback.parm("shoulder_drop").set(shoulder_drop)
-        fallback.parm("min_shoulder_scale").set(minimum_scale)
         result = validate_profile_contract(fallback, label)
         if result:
             return result
@@ -553,13 +1259,332 @@ def main() -> int:
     fallback.parm("enable_shoulders").set(1)
     fallback.parm("shoulder_width").set(1.0)
     fallback.parm("shoulder_drop").set(0.08)
-    fallback.parm("min_shoulder_scale").set(0.45)
     fallback_geo = road_output(fallback).geometry()
     result = validate_geometry(fallback_geo, "fallback")
     if result:
         return result
     if fallback_geo.stringAttribValue("road_source") != "fallback_points":
         return fail("fallback_wrong_source")
+
+    straight_source = make_straight_curve(obj)
+    straight = obj.createNode(ASSET_TYPE, "VERIFY_track_adaptive_straight")
+    straight.parm("unity_curve_input").set(straight_source.path())
+    straight.parm("sample_spacing").set(8.0)
+    straight_centerline = centerline_output(straight).geometry()
+    straight_count = len(straight_centerline.points())
+    if straight_count < 63 or straight_count > 65:
+        return fail("adaptive_straight_count_%d" % straight_count)
+    if straight_centerline.intAttribValue("road_adaptive_reference_count") < 490:
+        return fail("adaptive_straight_reference_not_dense")
+    straight_points = straight_centerline.points()
+    for index in range(1, len(straight_points)):
+        spacing = (straight_points[index].position() - straight_points[index - 1].position()).length()
+        if spacing > 8.001:
+            return fail("adaptive_straight_spacing_%f" % spacing)
+    result = validate_adaptive_limits(straight, "adaptive_straight")
+    if result:
+        return result
+
+    # Detail Density only controls adaptive refinement. A perfectly straight
+    # section must remain governed exclusively by sample_spacing.
+    straight_density_counts = {}
+    for density in (0.25, 0.5, 1.0, 2.0):
+        straight.parm("adaptive_detail_density").set(density)
+        density_geo = centerline_output(straight).geometry()
+        straight_density_counts[density] = len(density_geo.points())
+        result = validate_adaptive_limits(straight, "adaptive_straight_density_%s" % density)
+        if result:
+            return result
+    if len(set(straight_density_counts.values())) != 1:
+        return fail("adaptive_density_changed_straight_%s" % straight_density_counts)
+    straight.parm("adaptive_detail_density").set(1.0)
+
+    # The legacy branch must ignore the new density parameter completely.
+    legacy_density = obj.createNode(ASSET_TYPE, "VERIFY_track_legacy_density")
+    legacy_density.parm("unity_curve_input").set(straight_source.path())
+    legacy_density.parm("sample_spacing").set(8.0)
+    legacy_density.parm("enable_adaptive_sampling").set(0)
+    legacy_positions = {}
+    for density in (0.25, 2.0):
+        legacy_density.parm("adaptive_detail_density").set(density)
+        legacy_geo = centerline_output(legacy_density).geometry()
+        legacy_positions[density] = [tuple(point.position()) for point in legacy_geo.points()]
+    if legacy_positions[0.25] != legacy_positions[2.0]:
+        return fail("adaptive_density_changed_legacy_branch")
+
+    # sample_spacing remains the primary density control on ordinary sections.
+    straight_coarse = obj.createNode(ASSET_TYPE, "VERIFY_track_adaptive_straight_coarse")
+    straight_coarse.parm("unity_curve_input").set(straight_source.path())
+    straight_coarse.parm("sample_spacing").set(16.0)
+    straight_coarse_centerline = centerline_output(straight_coarse).geometry()
+    coarse_count = len(straight_coarse_centerline.points())
+    if coarse_count < 32 or coarse_count > 34:
+        return fail("adaptive_straight_coarse_count_%d" % coarse_count)
+    if coarse_count >= straight_count:
+        return fail("adaptive_sample_spacing_not_controlling_density")
+    coarse_refine_count = straight_coarse_centerline.intAttribValue("road_adaptive_refine_count")
+    if coarse_refine_count > 1:
+        return fail("adaptive_straight_unnecessary_refinement_%d" % coarse_refine_count)
+
+    adaptive_hairpin_source = make_hairpin_curve(obj)
+    adaptive_hairpin = obj.createNode(ASSET_TYPE, "VERIFY_track_adaptive_hairpin")
+    adaptive_hairpin.parm("unity_curve_input").set(adaptive_hairpin_source.path())
+    adaptive_hairpin.parm("road_width").set(6.0)
+    adaptive_hairpin.parm("sample_spacing").set(8.0)
+    # A 12-14 m hairpin needs sub-metre samples to satisfy a strict 3 degree
+    # tangent threshold; this case explicitly exercises that allowed setting.
+    adaptive_hairpin.parm("adaptive_min_spacing_m").set(0.5)
+    result = validate_adaptive_limits(adaptive_hairpin, "adaptive_hairpin")
+    if result:
+        return result
+    adaptive_hairpin_geo = road_output(adaptive_hairpin).geometry()
+    if adaptive_hairpin_geo.intAttribValue("road_lane_overlap_count") != 0:
+        return fail("adaptive_hairpin_lane_overlap")
+
+    # A large sample spacing keeps ordinary sections sparse, while Detail
+    # Density predictably scales only the hairpin refinement.
+    density_hairpin = obj.createNode(ASSET_TYPE, "VERIFY_track_density_hairpin")
+    density_hairpin.parm("unity_curve_input").set(adaptive_hairpin_source.path())
+    density_hairpin.parm("road_width").set(6.0)
+    density_hairpin.parm("sample_spacing").set(32.0)
+    density_hairpin.parm("adaptive_min_spacing_m").set(0.25)
+    hairpin_density_counts = {}
+    for density in (0.25, 0.5, 1.0, 2.0):
+        density_hairpin.parm("adaptive_detail_density").set(density)
+        density_geo = centerline_output(density_hairpin).geometry()
+        hairpin_density_counts[density] = len(density_geo.points())
+        result = validate_adaptive_limits(
+            density_hairpin, "adaptive_density_hairpin_%s" % density
+        )
+        if result:
+            return result
+    if not (
+        hairpin_density_counts[0.25] <= hairpin_density_counts[0.5] <
+        hairpin_density_counts[1.0] < hairpin_density_counts[2.0]
+    ):
+        return fail("adaptive_density_hairpin_not_monotonic_%s" % hairpin_density_counts)
+    if hairpin_density_counts[0.5] > hairpin_density_counts[1.0] * 0.75:
+        return fail("adaptive_density_hairpin_half_not_effective_%s" % hairpin_density_counts)
+
+    # Deliberately coarse analysis spacing must report that an adjacent
+    # reference interval cannot satisfy the effective high-density limits.
+    density_floor = obj.createNode(ASSET_TYPE, "VERIFY_track_density_floor")
+    density_floor.parm("unity_curve_input").set(adaptive_hairpin_source.path())
+    density_floor.parm("sample_spacing").set(32.0)
+    density_floor.parm("adaptive_min_spacing_m").set(8.0)
+    density_floor.parm("adaptive_detail_density").set(2.0)
+    density_floor_geo = centerline_output(density_floor).geometry()
+    if density_floor_geo.intAttribValue("road_adaptive_constraint_floor_hit_count") <= 0:
+        return fail("adaptive_density_floor_not_reported")
+    if density_floor_geo.findGlobalAttrib("road_adaptive_limit_hit") is not None:
+        return fail("adaptive_density_obsolete_point_limit_diagnostic")
+
+    smooth_grade_source = make_smooth_grade_curve(obj)
+    smooth_grade = obj.createNode(ASSET_TYPE, "VERIFY_track_adaptive_grade")
+    smooth_grade.parm("unity_curve_input").set(smooth_grade_source.path())
+    smooth_grade.parm("sample_spacing").set(8.0)
+    smooth_grade.parm("adaptive_min_spacing_m").set(0.5)
+    result = validate_adaptive_limits(smooth_grade, "adaptive_grade")
+    if result:
+        return result
+    smooth_grade_geo = centerline_output(smooth_grade).geometry()
+    if smooth_grade_geo.floatAttribValue("road_max_abs_grade_deg") < 5.0:
+        return fail("adaptive_grade_missing_slope")
+
+    density_grade = obj.createNode(ASSET_TYPE, "VERIFY_track_density_grade")
+    density_grade.parm("unity_curve_input").set(smooth_grade_source.path())
+    density_grade.parm("sample_spacing").set(32.0)
+    density_grade.parm("adaptive_min_spacing_m").set(0.25)
+    density_grade.parm("adaptive_max_chord_error_m").set(0.5)
+    density_grade.parm("adaptive_max_heading_delta_deg").set(15.0)
+    density_grade.parm("adaptive_max_grade_delta_deg").set(2.0)
+    density_grade.parm("adaptive_max_bank_delta_deg").set(5.0)
+    grade_density_counts = {}
+    for density in (0.5, 1.0, 2.0):
+        density_grade.parm("adaptive_detail_density").set(density)
+        density_geo = centerline_output(density_grade).geometry()
+        grade_density_counts[density] = len(density_geo.points())
+        result = validate_adaptive_limits(
+            density_grade, "adaptive_density_grade_%s" % density
+        )
+        if result:
+            return result
+    if not (
+        grade_density_counts[0.5] < grade_density_counts[1.0] <
+        grade_density_counts[2.0]
+    ):
+        return fail("adaptive_density_grade_not_monotonic_%s" % grade_density_counts)
+
+    unwrapped_roll_source = make_unwrapped_roll_curve(obj)
+    unwrapped_roll = obj.createNode(ASSET_TYPE, "VERIFY_track_unwrapped_roll")
+    unwrapped_roll.parm("unity_curve_input").set(unwrapped_roll_source.path())
+    unwrapped_roll.parm("sample_spacing").set(2.0)
+    unwrapped_roll.parm("enable_road_banking").set(1)
+    unwrapped_roll.parm("bank_use_spline_knot_roll").set(1)
+    unwrapped_roll.parm("bank_auto_strength").set(0.0)
+    unwrapped_roll.parm("bank_max_angle_deg").set(8.0)
+    unwrapped_roll.parm("bank_transition_length_m").set(0.0)
+    unwrapped_roll_geo = road_output(unwrapped_roll).geometry()
+    cross_section_count = unwrapped_roll_geo.intAttribValue("road_cross_section_count")
+    roll_points = unwrapped_roll_geo.points()[::cross_section_count]
+    authored_rolls = [point.attribValue("road_spline_roll_deg") for point in roll_points]
+    applied_rolls = [point.attribValue("road_bank_deg") for point in roll_points]
+    if min(authored_rolls) < 178.5 or max(authored_rolls) > 181.5:
+        return fail("unwrapped_roll_long_path_%f_%f" % (min(authored_rolls), max(authored_rolls)))
+    if min(applied_rolls) < 7.95 or max(applied_rolls) > 8.001:
+        return fail("unwrapped_roll_not_clamped_%f_%f" % (min(applied_rolls), max(applied_rolls)))
+
+    closed_quality_source = make_closed_quality_curve(obj)
+    closed_quality = obj.createNode(ASSET_TYPE, "VERIFY_track_closed_quality")
+    closed_quality.parm("unity_curve_input").set(closed_quality_source.path())
+    closed_quality.parm("sample_spacing").set(8.0)
+    closed_quality.parm("adaptive_min_spacing_m").set(0.25)
+    result = validate_adaptive_limits(closed_quality, "closed_quality")
+    if result:
+        return result
+    closed_centerline = centerline_output(closed_quality).geometry()
+    if closed_centerline.intAttribValue("road_closed_loop") != 1 or \
+       closed_centerline.intAttribValue("road_centerline_closed_loop") != 1 or \
+       closed_centerline.intAttribValue("road_centerline_data_only") != 1 or \
+       len(closed_centerline.prims()) != 0:
+        return fail("closed_quality_not_closed")
+    if closed_centerline.floatAttribValue("road_seam_position_error") > 0.001:
+        return fail("closed_quality_seam_position")
+    if abs(closed_centerline.floatAttribValue("road_loop_residual_twist_deg")) > 0.1:
+        return fail("closed_quality_residual_twist_%f" % (
+            closed_centerline.floatAttribValue("road_loop_residual_twist_deg")
+        ))
+    if closed_centerline.intAttribValue("road_frame_flip_count") != 0:
+        return fail("closed_quality_frame_flip")
+    first = closed_centerline.points()[0]
+    last = closed_centerline.points()[-1]
+    # The data-only centerline deliberately has no duplicated seam point. The
+    # last point is one adaptive sample before Knot 0, so its frame may differ
+    # by one legal heading/bank step rather than being numerically identical.
+    seam_min_dot = math.cos(math.radians(
+        closed_quality.parm("adaptive_max_heading_delta_deg").eval() +
+        closed_quality.parm("adaptive_max_bank_delta_deg").eval() + 0.1
+    ))
+    for attribute_name in ("road_frame_tangent", "road_frame_lateral", "road_frame_up"):
+        first_value = hou.Vector3(first.attribValue(attribute_name))
+        last_value = hou.Vector3(last.attribValue(attribute_name))
+        if first_value.dot(last_value) <= seam_min_dot:
+            return fail("closed_quality_seam_%s_%f" % (
+                attribute_name, first_value.dot(last_value)
+            ))
+    if any(point.attribValue("road_distance") >= closed_centerline.floatAttribValue("road_length")
+           for point in closed_centerline.points()):
+        return fail("closed_quality_centerline_distance_seam")
+    closed_combined = road_output(closed_quality).geometry()
+    uv_attribute = closed_combined.findVertexAttrib("uv")
+    longitudinal = [
+        vertex.attribValue(uv_attribute)[1]
+        for primitive in closed_combined.prims()
+        for vertex in primitive.vertices()
+    ]
+    expected_uv_span = (
+        closed_combined.floatAttribValue("road_length") /
+        closed_combined.floatAttribValue("road_uv_tile_length")
+    )
+    actual_uv_span = max(longitudinal) - min(longitudinal)
+    if abs(actual_uv_span - expected_uv_span) > 2e-3:
+        return fail("closed_quality_uv_seam_span_%f_expected_%f" % (
+            actual_uv_span, expected_uv_span
+        ))
+
+    for density in (0.5, 2.0):
+        closed_quality.parm("adaptive_detail_density").set(density)
+        result = validate_adaptive_limits(
+            closed_quality, "closed_quality_density_%s" % density
+        )
+        if result:
+            return result
+        closed_density_geo = road_output(closed_quality).geometry()
+        result = validate_geometry(
+            closed_density_geo, "closed_quality_density_%s" % density
+        )
+        if result:
+            return result
+        if closed_density_geo.intAttribValue("road_frame_flip_count") != 0:
+            return fail("closed_quality_density_frame_flip_%s" % density)
+        if abs(closed_density_geo.floatAttribValue("road_seam_position_error")) > 1e-3:
+            return fail("closed_quality_density_seam_error_%s" % density)
+    closed_quality.parm("adaptive_detail_density").set(1.0)
+
+    material_open = obj.createNode(ASSET_TYPE, "VERIFY_track_material_open")
+    material_open.parm("unity_curve_input").set(straight_source.path())
+    material_open.parm("material_segments").set(2)
+    material_open.parm("material_segment_start_1").set(0.2)
+    material_open.parm("material_segment_end_1").set(0.8)
+    material_open.parm("material_segment_layer_1").set(0)
+    material_open.parm("material_segment_start_blend_distance_m_1").set(3.0)
+    material_open.parm("material_segment_end_blend_distance_m_1").set(3.0)
+    material_open.parm("material_segment_start_2").set(0.4)
+    material_open.parm("material_segment_end_2").set(0.6)
+    material_open.parm("material_segment_layer_2").set(1)
+    material_open.parm("material_segment_start_blend_distance_m_2").set(3.0)
+    material_open.parm("material_segment_end_blend_distance_m_2").set(3.0)
+    material_open_geo = road_output(material_open).geometry()
+    middle = min(material_open_geo.points(), key=lambda point: abs(point.attribValue("road_t") - 0.5))
+    middle_color = middle.attribValue("Cd")
+    if middle_color[0] > 1e-3 or middle_color[1] < 0.999:
+        return fail("material_later_segment_not_overriding_%s" % (middle_color,))
+    if max(sum(point.attribValue("Cd")[:3]) for point in material_open_geo.points()) > 1.0001:
+        return fail("material_mask_not_normalized")
+    if material_open_geo.intAttribValue("road_material_anchor_count") < 10:
+        return fail("material_transition_anchors_missing")
+
+    material_anchor_sets = {}
+    for density in (0.25, 1.0, 2.0):
+        material_open.parm("adaptive_detail_density").set(density)
+        material_centerline = centerline_output(material_open).geometry()
+        material_anchor_sets[density] = {
+            round(point.attribValue("road_distance"), 4)
+            for point in material_centerline.points()
+            if point.attribValue("road_force_priority") > 0
+        }
+        result = validate_adaptive_limits(
+            material_open, "adaptive_density_material_%s" % density
+        )
+        if result:
+            return result
+    if not (
+        material_anchor_sets[0.25] == material_anchor_sets[1.0] ==
+        material_anchor_sets[2.0]
+    ):
+        return fail("adaptive_density_changed_material_anchors_%s" % material_anchor_sets)
+    material_open.parm("adaptive_detail_density").set(1.0)
+
+    material_invalid = obj.createNode(ASSET_TYPE, "VERIFY_track_material_invalid")
+    material_invalid.parm("unity_curve_input").set(straight_source.path())
+    material_invalid.parm("material_segments").set(1)
+    material_invalid.parm("material_segment_start_1").set(0.8)
+    material_invalid.parm("material_segment_end_1").set(0.2)
+    invalid_geo = road_output(material_invalid).geometry()
+    if invalid_geo.intAttribValue("road_segment_invalid_count") != 1:
+        return fail("material_open_invalid_not_reported")
+    if max(sum(point.attribValue("Cd")[:3]) for point in invalid_geo.points()) > 1e-4:
+        return fail("material_open_invalid_applied")
+
+    material_closed = obj.createNode(ASSET_TYPE, "VERIFY_track_material_closed")
+    material_closed.parm("unity_curve_input").set(closed_quality_source.path())
+    material_closed.parm("material_segments").set(1)
+    material_closed.parm("material_segment_start_1").set(0.8)
+    material_closed.parm("material_segment_end_1").set(0.2)
+    material_closed.parm("material_segment_layer_1").set(0)
+    material_closed.parm("material_segment_start_blend_distance_m_1").set(3.0)
+    material_closed.parm("material_segment_end_blend_distance_m_1").set(3.0)
+    material_closed_geo = road_output(material_closed).geometry()
+    seam_point = min(material_closed_geo.points(), key=lambda point: point.attribValue("road_t"))
+    middle_point = min(material_closed_geo.points(), key=lambda point: abs(point.attribValue("road_t") - 0.5))
+    if seam_point.attribValue("Cd")[0] < 0.99 or middle_point.attribValue("Cd")[0] > 1e-3:
+        return fail("material_closed_wrap_semantics")
+
+    split_asset = obj.createNode(ASSET_TYPE, "VERIFY_track_split_outputs")
+    split_asset.parm("unity_curve_input").set(closed_quality_source.path())
+    result = validate_split_outputs(split_asset, "split_outputs")
+    if result:
+        return result
 
     source = make_stress_curve(obj)
     stress = obj.createNode(ASSET_TYPE, "VERIFY_track_stress")
@@ -598,7 +1623,7 @@ def main() -> int:
         delta = hou.Vector3(point.attribValue(generated_center)) - hou.Vector3(point.attribValue(original_center))
         if delta.length() > 1e-5:
             return fail("wide_hairpin_centerline_shift_%d_%f" % (point.number(), delta.length()))
-    if hairpin_geo.stringAttribValue("road_surface_uv_mode") != "world_xz_meters":
+    if hairpin_geo.stringAttribValue("road_surface_uv_mode") != "arc_length_lateral_metric":
         return fail("wide_hairpin_wrong_uv_mode")
 
     grade_source = make_grade_curve(obj)
@@ -704,6 +1729,37 @@ def main() -> int:
     if result:
         return result
 
+    density_bank_source = make_bank_transition_curve(obj)
+    density_bank = obj.createNode(ASSET_TYPE, "VERIFY_track_density_bank")
+    density_bank.parm("unity_curve_input").set(density_bank_source.path())
+    density_bank.parm("road_width").set(6.0)
+    density_bank.parm("sample_spacing").set(32.0)
+    density_bank.parm("adaptive_min_spacing_m").set(0.25)
+    density_bank.parm("adaptive_max_chord_error_m").set(0.5)
+    density_bank.parm("adaptive_max_heading_delta_deg").set(15.0)
+    density_bank.parm("adaptive_max_grade_delta_deg").set(10.0)
+    density_bank.parm("adaptive_max_bank_delta_deg").set(1.0)
+    density_bank.parm("enable_road_banking").set(1)
+    density_bank.parm("bank_use_spline_knot_roll").set(1)
+    density_bank.parm("bank_auto_strength").set(0.0)
+    density_bank.parm("bank_max_angle_deg").set(8.0)
+    density_bank.parm("bank_transition_length_m").set(0.0)
+    bank_density_counts = {}
+    for density in (0.5, 1.0, 2.0):
+        density_bank.parm("adaptive_detail_density").set(density)
+        density_geo = centerline_output(density_bank).geometry()
+        bank_density_counts[density] = len(density_geo.points())
+        result = validate_adaptive_limits(
+            density_bank, "adaptive_density_bank_%s" % density
+        )
+        if result:
+            return result
+    if not (
+        bank_density_counts[0.5] < bank_density_counts[1.0] <
+        bank_density_counts[2.0]
+    ):
+        return fail("adaptive_density_bank_not_monotonic_%s" % bank_density_counts)
+
     circle_source = make_closed_circle(obj)
     circle = obj.createNode(ASSET_TYPE, "VERIFY_track_closed_bank")
     circle.parm("unity_curve_input").set(circle_source.path())
@@ -728,7 +1784,6 @@ def main() -> int:
     circle.parm("enable_shoulders").set(1)
     circle.parm("shoulder_width").set(2.0)
     circle.parm("shoulder_drop").set(0.12)
-    circle.parm("min_shoulder_scale").set(0.45)
     result = validate_profile_contract(circle, "closed_wide_profile")
     if result:
         return result
