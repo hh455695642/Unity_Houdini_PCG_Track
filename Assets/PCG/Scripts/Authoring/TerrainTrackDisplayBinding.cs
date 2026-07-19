@@ -28,11 +28,10 @@ namespace PCGBike.Authoring
         private HEU_HoudiniAsset _subscribedTerrain;
         private double _nextAttempt = -1.0;
         private double _deadline = -1.0;
-        private bool _trackReloadRequested;
         private bool _terrainReloadRequested;
         private bool _binding;
         private bool _warned;
-        private string _status = "????";
+        private string _status = "Idle";
 
         public HEU_HoudiniAssetRoot TrackAssetRoot => _trackAssetRoot;
         public HEU_HoudiniAssetRoot TerrainAssetRoot => _terrainAssetRoot;
@@ -56,7 +55,7 @@ namespace PCGBike.Authoring
             Unsubscribe();
             UnityEditor.EditorApplication.update -= Pump;
             _nextAttempt = _deadline = -1.0;
-            _trackReloadRequested = _terrainReloadRequested = _binding = false;
+            _terrainReloadRequested = _binding = false;
         }
 
         private void OnValidate()
@@ -120,7 +119,6 @@ namespace PCGBike.Authoring
 
         private void OnTrackReloaded(HEU_ReloadEventData data)
         {
-            _trackReloadRequested = false;
             Schedule(0.0, true);
         }
 
@@ -168,7 +166,7 @@ namespace PCGBike.Authoring
                 return;
             }
 
-            TryRequestReloads();
+            TryRequestTerrainReload();
             if (now < _deadline)
             {
                 _nextAttempt = now + RetryInterval;
@@ -201,7 +199,7 @@ namespace PCGBike.Authoring
                 track.AssetID == HEU_Defines.HEU_INVALID_NODE_ID ||
                 terrain.AssetID == HEU_Defines.HEU_INVALID_NODE_ID)
             {
-                _status = "????? Session?Track ? Terrain ??";
+                _status = "Waiting for a valid Houdini session, Track asset, and Terrain asset.";
                 return false;
             }
 
@@ -214,21 +212,21 @@ namespace PCGBike.Authoring
                     out string displayPath) ||
                 string.IsNullOrWhiteSpace(displayPath))
             {
-                _status = "Track Display SOP ????";
+                _status = "Track Display SOP is not available yet.";
                 return false;
             }
 
             if (!TryGetTerrainPath(session, terrain, out string currentPath))
             {
-                _status = "???? Terrain ????";
+                _status = "Unable to read the Terrain Track Display SOP path parameter.";
                 return false;
             }
 
             if (string.Equals(currentPath, displayPath, System.StringComparison.Ordinal))
             {
                 _lastBoundPath = displayPath;
-                _status = "????????????? Cook?";
-                _warned = _trackReloadRequested = _terrainReloadRequested = false;
+                _status = "Track Display SOP is already bound; no Terrain cook requested.";
+                _warned = _terrainReloadRequested = false;
                 return true;
             }
 
@@ -238,7 +236,7 @@ namespace PCGBike.Authoring
                 if (!session.SetParamStringValue(
                         terrain.AssetID, PathParameter, displayPath, 0))
                 {
-                    _status = "?? Terrain ??????";
+                    _status = "Failed to write the Terrain Track Display SOP path.";
                     return false;
                 }
 
@@ -249,13 +247,15 @@ namespace PCGBike.Authoring
                     bUploadParameters: true);
                 if (!accepted)
                 {
-                    _status = "??????? Terrain ?? Cook ??";
+                    _status = "Terrain rejected the binding cook request.";
                     return false;
                 }
 
                 _lastBoundPath = displayPath;
-                _status = _autoCookTerrain ? "?????? Terrain Cook" : "???";
-                _warned = _trackReloadRequested = _terrainReloadRequested = false;
+                _status = _autoCookTerrain
+                    ? "Track path bound; Terrain cook requested."
+                    : "Track path bound; auto-cook disabled.";
+                _warned = _terrainReloadRequested = false;
                 UnityEditor.EditorUtility.SetDirty(this);
                 return true;
             }
@@ -265,15 +265,10 @@ namespace PCGBike.Authoring
             }
         }
 
-        private void TryRequestReloads()
+        private void TryRequestTerrainReload()
         {
-            HEU_HoudiniAsset track = _trackAssetRoot != null ? _trackAssetRoot.HoudiniAsset : null;
             HEU_HoudiniAsset terrain = _terrainAssetRoot != null ? _terrainAssetRoot.HoudiniAsset : null;
             HEU_SessionBase session = HEU_SessionManager.GetDefaultSession();
-
-            if (!_trackReloadRequested && track != null &&
-                track.AssetID == HEU_Defines.HEU_INVALID_NODE_ID)
-                _trackReloadRequested = track.RequestReload(bAsync: true);
 
             int hiddenParmId;
             bool terrainNeedsReload = terrain != null &&
@@ -292,7 +287,7 @@ namespace PCGBike.Authoring
                 terrain.AssetID == HEU_Defines.HEU_INVALID_NODE_ID)
             {
                 _lastBoundPath = string.Empty;
-                _status = "?????Terrain ?????";
+                _status = "Waiting for a valid Terrain asset and Houdini session.";
                 return;
             }
 
@@ -300,7 +295,7 @@ namespace PCGBike.Authoring
                 string.IsNullOrEmpty(current))
             {
                 _lastBoundPath = string.Empty;
-                _status = "???????????";
+                _status = "Terrain Track Display SOP path is already empty.";
                 return;
             }
 
@@ -309,7 +304,7 @@ namespace PCGBike.Authoring
                 return;
 
             _lastBoundPath = string.Empty;
-            _status = "????????????";
+            _status = "Cleared the stale Terrain Track Display SOP path.";
             UnityEditor.EditorUtility.SetDirty(this);
             if (_autoCookTerrain)
             {
@@ -325,7 +320,7 @@ namespace PCGBike.Authoring
         {
             UnityEditor.EditorApplication.update -= Pump;
             _nextAttempt = _deadline = -1.0;
-            _trackReloadRequested = _terrainReloadRequested = false;
+            _terrainReloadRequested = false;
         }
 
         private static bool TryGetTerrainPath(
