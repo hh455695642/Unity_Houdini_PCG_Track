@@ -1,26 +1,29 @@
 using HoudiniEngineUnity;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.Splines;
 
-namespace PCGBike.Authoring
+namespace PCGBike.Track.Authoring
 {
     /// <summary>
     /// Editor-only authoring bridge that re-uploads a bound Unity Spline after knot edits.
     /// It has no Update loop and performs no Houdini work in player builds.
     /// </summary>
+    [MovedFrom(true, "PCGBike.Authoring", "Assembly-CSharp", "TrackSplineHoudiniSync")]
     [ExecuteAlways]
     [DisallowMultipleComponent]
-    public sealed class TrackSplineHoudiniSync : MonoBehaviour
+    [AddComponentMenu("PCG Bike/Track/Houdini Cook Sync")]
+    public sealed class TrackSplineHoudiniCookSync : MonoBehaviour
     {
         private const string CurveInputParameter = "unity_curve_input";
         private const double ReloadTimeoutSeconds = 15.0;
 
+#if UNITY_EDITOR
         [SerializeField] private SplineContainer _splineContainer;
         [SerializeField] private HEU_HoudiniAssetRoot _trackAssetRoot;
         [SerializeField] private bool _autoCookOnSplineChanged = true;
         [SerializeField, Min(0.05f)] private float _cookDebounceSeconds = 0.35f;
 
-#if UNITY_EDITOR
         private double _scheduledCookTime = -1.0;
         private double _reloadDeadline = -1.0;
         private bool _reloadRequested;
@@ -162,10 +165,10 @@ namespace PCGBike.Authoring
 
         private void ValidateSplineInputMode()
         {
-            TrackSplineHoudiniInputSettings inputSettings =
-                _splineContainer.GetComponent<TrackSplineHoudiniInputSettings>();
+            TrackSplineHoudiniInputAuthoring inputAuthoring =
+                _splineContainer.GetComponent<TrackSplineHoudiniInputAuthoring>();
             bool usesCustomInterface =
-                inputSettings != null && inputSettings.UsesCustomInterface;
+                inputAuthoring != null && inputAuthoring.UsesCustomInterface;
             if (usesCustomInterface)
             {
                 _warnedOfficialFallback = false;
@@ -178,7 +181,7 @@ namespace PCGBike.Authoring
             _warnedOfficialFallback = true;
             Debug.LogWarning(
                 "The bound Track Spline does not have an enabled " +
-                "TrackSplineHoudiniInputSettings marker. Houdini Engine will use " +
+                "TrackSplineHoudiniInputAuthoring marker. Houdini Engine will use " +
                 "its official fallback interface and authored Knot Rotation will not " +
                 "be uploaded by the PCG Track interface.",
                 _splineContainer);

@@ -1,11 +1,11 @@
-using PCGBike.Authoring;
+using PCGBike.Track.Authoring;
 using UnityEditor;
 
-namespace PCGBike.AuthoringEditor
+namespace PCGBike.Editor.Houdini.TrackSplineInput
 {
-    [CustomEditor(typeof(TrackSplineHoudiniInputSettings))]
+    [CustomEditor(typeof(TrackSplineHoudiniInputAuthoring))]
     [CanEditMultipleObjects]
-    internal sealed class TrackSplineHoudiniInputSettingsEditor : UnityEditor.Editor
+    internal sealed class TrackSplineHoudiniInputAuthoringEditor : UnityEditor.Editor
     {
         private SerializedProperty _enableKnotDataUpload;
 
@@ -26,7 +26,7 @@ namespace PCGBike.AuthoringEditor
                 return;
             }
 
-            TrackSplineHoudiniInputSettings settings = (TrackSplineHoudiniInputSettings)target;
+            TrackSplineHoudiniInputAuthoring settings = (TrackSplineHoudiniInputAuthoring)target;
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Upload Mode", settings.UploadMode);
 

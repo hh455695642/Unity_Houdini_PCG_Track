@@ -1,21 +1,24 @@
 using HoudiniEngineUnity;
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 
-namespace PCGBike.Authoring
+namespace PCGBike.Terrain.Authoring
 {
     /// <summary>
     /// Editor-only bridge from a Track HDA Display SOP to the Terrain HDA.
     /// Player builds have no polling, Houdini cook, or runtime cost.
     /// </summary>
+    [MovedFrom(true, "PCGBike.Authoring", "Assembly-CSharp", "TerrainTrackDisplayBinding")]
     [ExecuteAlways]
     [DisallowMultipleComponent]
-    [AddComponentMenu("PCG Bike/Terrain Track Display Binding")]
-    public sealed class TerrainTrackDisplayBinding : MonoBehaviour
+    [AddComponentMenu("PCG Bike/Terrain/Track Display SOP Binding")]
+    public sealed class TerrainTrackDisplaySopBinding : MonoBehaviour
     {
         private const string PathParameter = "track_display_sop_path";
         private const double RetryTimeout = 15.0;
         private const double RetryInterval = 0.25;
 
+#if UNITY_EDITOR
         [Header("Houdini Assets")]
         [SerializeField] private HEU_HoudiniAssetRoot _trackAssetRoot;
         [SerializeField] private HEU_HoudiniAssetRoot _terrainAssetRoot;
@@ -23,7 +26,6 @@ namespace PCGBike.Authoring
         [SerializeField] private bool _autoCookTerrain = true;
         [SerializeField, HideInInspector] private string _lastBoundPath = string.Empty;
 
-#if UNITY_EDITOR
         private HEU_HoudiniAsset _subscribedTrack;
         private HEU_HoudiniAsset _subscribedTerrain;
         private double _nextAttempt = -1.0;

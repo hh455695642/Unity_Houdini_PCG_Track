@@ -1,27 +1,29 @@
 using UnityEngine;
+using UnityEngine.Scripting.APIUpdating;
 using UnityEngine.Serialization;
 using UnityEngine.Splines;
 
-namespace PCGBike.Authoring
+namespace PCGBike.Track.Authoring
 {
     /// <summary>
     /// Marks a Unity SplineContainer for the PCG Track Houdini input interface.
     /// This component stores editor-authoring data only and has no per-frame work.
     /// </summary>
+    [MovedFrom(true, "PCGBike.Authoring", "Assembly-CSharp", "TrackSplineHoudiniInputSettings")]
     [DisallowMultipleComponent]
-    [AddComponentMenu("PCG Bike/Track Spline Houdini Input Settings")]
-    public sealed class TrackSplineHoudiniInputSettings : MonoBehaviour
+    [AddComponentMenu("PCG Bike/Track/Houdini Input Authoring")]
+    public sealed class TrackSplineHoudiniInputAuthoring : MonoBehaviour
     {
         [FormerlySerializedAs("_enableRotationUpload")]
         public bool EnableKnotDataUpload = true;
 
+#if UNITY_EDITOR
         // Migration-only data. It is intentionally not consumed by Knot Contract V1;
         // sample_spacing on the Track HDA is now the only production sampling control.
         [FormerlySerializedAs("_samplingResolution")]
         [SerializeField, HideInInspector]
         private float _legacySamplingResolution = 25.0f;
 
-#if UNITY_EDITOR
         [SerializeField, HideInInspector] private int _lastUploadedSplineCount;
         [SerializeField, HideInInspector] private int _lastUploadedKnotCount;
         [SerializeField, HideInInspector] private string _lastUploadedClosedState = "Not uploaded";
@@ -29,9 +31,9 @@ namespace PCGBike.Authoring
 #endif
 
         /// <summary>
-        /// When false, Houdini Engine falls back to its official Spline input interface.
+        /// True when this object uses PCG Knot Contract V1. When false, Houdini Engine
+        /// falls back to its official Spline input interface.
         /// </summary>
-        /// <summary>True when this object uses PCG Knot Contract V1.</summary>
         public bool UsesCustomInterface =>
             isActiveAndEnabled &&
             EnableKnotDataUpload &&

@@ -1,0 +1,21 @@
+{
+  "name": "PCGBike.Editor",
+  "rootNamespace": "PCGBike.Editor",
+  "references": [
+    "PCGBike.Authoring",
+    "HoudiniEngineUnity",
+    "Unity.Splines",
+    "Unity.Mathematics"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
