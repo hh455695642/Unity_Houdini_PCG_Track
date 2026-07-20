@@ -49,7 +49,8 @@ Material:
     - _NoiseContrast: 0.88
     - _NoiseScale: 0.71
     - _NoiseStrength: 0.461
-    - _UseLowDistortionUV: 0.672
+    - _UseLowDistortionUV: 1
+    - _WorldUVTileSize: 4
     m_Colors:
     - _BaseTint: {r: 1, g: 1, b: 1, a: 1}
     - _MaskBTint: {r: 1, g: 1, b: 1, a: 1}

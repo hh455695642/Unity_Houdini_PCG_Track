@@ -18,6 +18,7 @@ Shader "PCG_Track/Road"
         _BlendFeather ("Blend Feather", Range(0.001, 0.5)) = 0.12
         _NoiseContrast ("Noise Contrast", Range(0.1, 4)) = 1.35
         _UseLowDistortionUV ("Use World-Planar UV (Non-Directional Layers)", Range(0, 1)) = 0
+        _WorldUVTileSize ("World UV Tile Size (Meters)", Float) = 4
     }
 
     SubShader
@@ -68,6 +69,7 @@ Shader "PCG_Track/Road"
                 half _BlendFeather;
                 half _NoiseContrast;
                 half _UseLowDistortionUV;
+                float _WorldUVTileSize;
             CBUFFER_END
 
             struct Attributes
@@ -88,6 +90,7 @@ Shader "PCG_Track/Road"
                 half3 normalWS : TEXCOORD0;
                 float2 uv : TEXCOORD1;
                 float2 surfaceUV : TEXCOORD2;
+                float3 positionWS : TEXCOORD3;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
@@ -104,6 +107,7 @@ Shader "PCG_Track/Road"
                 VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
 
                 output.positionCS = positionInputs.positionCS;
+                output.positionWS = positionInputs.positionWS;
                 output.normalWS = normalInputs.normalWS;
                 output.uv = input.uv;
                 output.surfaceUV = input.surfaceUV;
@@ -162,9 +166,13 @@ Shader "PCG_Track/Road"
                 // centred and continuous along the track, accepting mild bend stretching.
                 float2 directionalUV = input.uv;
 
-                // Runtime uniform toggle for non-directional layers only. This adds no keyword
-                // or Shader Variant. Keep float precision for long-track accumulated UVs.
-                float2 layerUV = lerp(directionalUV, input.surfaceUV, saturate(_UseLowDistortionUV));
+                // True world-planar UV for gravel / stone / grass. Treat the material value
+                // as a toggle so unrelated parameterizations are never fractionally blended.
+                // Keep float precision because this track spans roughly one kilometre.
+                float inverseWorldTileSize = rcp(max(_WorldUVTileSize, 0.01));
+                float2 worldPlanarUV = input.positionWS.xz * inverseWorldTileSize;
+                half useWorldPlanarUV = step(half(0.5), saturate(_UseLowDistortionUV));
+                float2 layerUV = lerp(directionalUV, worldPlanarUV, useWorldPlanarUV);
                 half4 weights = BuildBaseMaskWeights(ApplyNoiseErosionToMasks(input.color.rgb, layerUV));
 
                 half3 baseLayer = SAMPLE_TEXTURE2D(_BaseTex, sampler_BaseTex, TRANSFORM_TEX(directionalUV, _BaseTex)).rgb * _BaseTint.rgb;
