@@ -1,4 +1,4 @@
-# Phase 2 开发日志：道路 Banking 与 Unity Spline Knot Contract
+# Phase 2 开发日志：赛道横倾与 Unity Spline Knot Contract
 
 > 文档类型：Phase 2 增量开发日志
 >
@@ -27,12 +27,12 @@
 
 | 版本 | 提交 | 本次增量 |
 |---|---|---|
-| 2.1 | `9abb625` | 新增道路 Grade/Curvature/Banking Frame、Spline Knot Roll、Banking Debug、最终道路碰撞分组；调整道路 Shader 的方向性/非方向性 UV 分工 |
-| 2.2 | `9404214` | 新增 Unity Knot Contract V1、Spline 自动 Recook、HDA Bezier 重建与 authored-up 传播；重构 Profile；移除自动急弯改线、材质边界补样和手工 Banking Ramp；整理 Road SOP 网络 |
+| 2.1 | `9abb625` | 新增道路 Grade/Curvature/横倾 Frame、Spline Knot Tilt、横倾 Debug、最终道路碰撞分组；调整道路 Shader 的方向性/非方向性 UV 分工 |
+| 2.2 | `9404214` | 新增 Unity Knot Contract V1、Spline 自动 Recook、HDA Bezier 重建与 authored-up 传播；重构 Profile；移除自动急弯改线、材质边界补样和手工横倾 Ramp；整理 Road SOP 网络 |
 
 ## 3. 2.1 开发内容
 
-### 3.1 道路 Grade、Curvature 与 Banking
+### 3.1 道路 Grade、Curvature 与赛道横倾
 
 **状态：[已验证]**
 
@@ -45,25 +45,25 @@ FRAME_decode_unity_rotation
   -> TOPO_rebuild_road_quads
 ```
 
-- `FRAME_decode_unity_rotation`：从输入点 `rot` 解码 authored-up 与 Knot Roll。
-- `FRAME_compute_grade_bank`：计算三维切线、纵坡、曲率、目标倾角和平滑后的最终 Frame。
-- `FRAME_apply_grade_bank`：只按最终 tangent/lateral/up 重建横截面，不承担倾角策略计算。
+- `FRAME_decode_unity_rotation`：从输入点 `rot` 解码 authored-up 与控制点横倾。
+- `FRAME_compute_grade_bank`：计算三维切线、纵坡、曲率、目标横倾角和平滑后的最终 Frame。
+- `FRAME_apply_grade_bank`：只按最终 tangent/lateral/up 重建横截面，不承担横倾策略计算。
 - `DEBUG_bank_frames`：可选显示 tangent、lateral、up，默认关闭。
-- 起点 Prefab 朝向改为使用 `road_start_forward + road_start_up`，支持纵坡和 Banking。
+- 起点 Prefab 朝向改为使用 `road_start_forward + road_start_up`，支持纵坡和赛道横倾。
 
 新增 HDA 参数：
 
 | 参数 | 默认/当前接口 | 职责 |
 |---|---:|---|
-| `enable_road_banking` | Off | Banking 总开关 |
-| `bank_design_speed_kph` | 25 | 自动倾角设计速度 |
-| `bank_auto_strength` | 1 | 自动 Banking 强度 |
-| `bank_max_angle_deg` | 8° | 最大绝对倾角 |
-| `bank_transition_length_m` | 24 m | 倾角过渡距离 |
-| `bank_use_spline_knot_roll` | On | 使用 Unity Knot Roll |
-| `debug_bank_frames` | Off | 调试 Frame 输出 |
+| `enable_track_lateral_tilt` | Off | 赛道横倾总开关 |
+| `lateral_tilt_design_speed_kph` | 25 | 自动横倾设计速度 |
+| `lateral_tilt_auto_strength` | 1 | 自动横倾强度 |
+| `lateral_tilt_max_angle_deg` | 8° | 最大绝对横倾角 |
+| `lateral_tilt_transition_length_m` | 24 m | 横倾过渡距离 |
+| `lateral_tilt_use_spline_knot_tilt` | On | 使用 Unity 样条控制点横倾 |
+| `debug_lateral_tilt_frames` | Off | 调试 Frame 输出 |
 
-自动 Banking 根据设计速度和曲率生成目标角度，经过最大角度 Clamp 与按道路距离限制的过渡平滑后应用。关闭总开关时不改变道路顶点。
+自动横倾根据设计速度和曲率生成目标角度，经过最大角度 Clamp 与按道路距离限制的过渡平滑后应用。关闭总开关时不改变道路顶点。
 
 新增主要数据契约：
 
@@ -138,12 +138,12 @@ CONTRACT_validate_unity_knots
   -> CENTERLINE_rebuild_unity_bezier
   -> CENTERLINE_source_switch
   -> CENTERLINE_resample
-  -> FRAME_normalize_authored_up
 ```
 
 - 校验 Knot Contract 版本、有效标记、Spline/Knot 索引和闭环状态。
 - 使用 `P + TangentIn + TangentOut` 在 Houdini 中重建 Cubic Bezier。
-- 解码 Knot Rotation，向后续 Banking 传播 authored-up/roll。
+- 解码 Knot Rotation，向后续横倾 Frame 传播 authored-up/roll。
+- sampled authored-up 的切线正交化由 `FRAME_compute_grade_bank` 在最终 Frame 计算时完成，避免额外 SOP Pass。
 - `CENTERLINE_source_switch` 保留官方输入/fallback 兼容路径。
 - `sample_spacing` 成为唯一生产采样控制；Unity 的 `_legacySamplingResolution` 只用于旧序列化数据迁移。
 
@@ -210,12 +210,12 @@ PROFILE_compute_dimensions
 
 需要更细的材质过渡时，由用户显式减小 `sample_spacing`。
 
-### 4.7 删除手工 Banking Ramp
+### 4.7 删除手工横倾 Ramp
 
 **状态：[已移除]**
 
 - 2.1 曾加入 `bank_manual_offset_ramp`，2.2 已删除。
-- 当前 Banking 来源只保留自动曲率 Banking 与可开关的 Unity Knot Roll。
+- 当前横倾来源只保留自动曲率横倾与可开关的 Unity Knot Tilt。
 - 验证脚本同步删除 Manual Ramp 和 additive ramp 用例，并检查旧参数不再存在。
 
 ### 4.8 Road SOP 网络整理
@@ -227,7 +227,7 @@ PROFILE_compute_dimensions
 ```text
 01 Centerline / Contract
   -> 02 Profile / Sweep
-  -> 03 Layout / Banking
+  -> 03 Layout / Lateral Tilt
   -> 04 Unity Output
   -> 05 Start Prefab
 ```
@@ -239,7 +239,7 @@ PROFILE_compute_dimensions
 - 整理后强制 Cook；若 geometry signature 变化则失败。
 - 保存回 `Assets/PCG/HDA/Track.hda`，不调用全量 builder。
 
-新增 `patch_track_road_banking.py` 作为 Banking 的 Live Scene 增量 Patch，采用同样的备份、recovery、Cook 与 definition 保存流程。
+新增 `patch_track_road_banking.py` 作为赛道横倾的 Live Scene 增量 Patch，采用同样的备份、recovery、Cook 与 definition 保存流程。
 
 ## 5. 相对 Phase 1 的变更清单
 
@@ -247,12 +247,12 @@ PROFILE_compute_dimensions
 |---|---|---|
 | 曲线主要携带位置与基础 `rot` | 新增 Knot Contract V1 | 上传原始 Knot、Handle、Rotation、闭环和索引 |
 | Houdini 直接消费输入曲线 | HDA 内重建 Unity Cubic Bezier | `sample_spacing` 成为唯一生产采样入口 |
-| 无完整 Banking 主链 | 2.1 新增 Frame/Grade/Curvature/Banking | 2.2 保留 Auto Bank + Knot Roll |
+| 无完整横倾主链 | 2.1 新增 Frame/Grade/Curvature/横倾 | 2.2 保留自动横倾 + Knot Tilt |
 | Tight Turn Guard 自动外移道路 | 2.2 删除 | 保持用户中心线，不再静默改线 |
 | 材质边界局部增加 Ring | 2.2 删除 | 材质参数不改变拓扑 |
 | 集中式 Profile 生成 | 2.2 拆为原生 SOP 链 | 4 点开放截面契约更可读 |
 | 低畸变 UV 可影响所有路面层 | 2.1 拆分 UV 职责 | Base 固定 UV0，非方向层可选 UV3 |
-| 手工 Banking Ramp | 2.1 新增、2.2 删除 | 当前接口不再包含 Ramp |
+| 手工横倾 Ramp | 2.1 新增、2.2 删除 | 当前接口不再包含 Ramp |
 | Spline 修改后手动处理 Cook | 2.2 新增事件同步 | Editor Debounce Recook，Feature 默认关闭 |
 
 ## 6. 本阶段验证记录
@@ -270,8 +270,8 @@ PROFILE_compute_dimensions
 - `/obj/Track1` 扫描 60 个节点，Error 0，Warning 0。
 - Road 当前包含 38 个直接子节点。
 - `OUT_ROAD_MESH`：32 Points、42 Primitives、126 Vertices。
-- 当前输出包含 Banking/Frame 属性与 `rendered_collision_geo` group。
-- 当前 `enable_road_banking = Off`，即接口存在但现场输出未启用自动倾斜。
+- 当前输出包含横倾/Frame 属性与 `rendered_collision_geo` group。
+- 当前 `enable_track_lateral_tilt = Off`，即接口存在但现场输出未启用自动倾斜。
 
 ### 6.2 Unity
 
@@ -299,11 +299,11 @@ PROFILE_compute_dimensions
 
 `verify_curve_road_test.py` 在本阶段新增或调整：
 
-- Grade-only 道路不应产生横向 Banking。
-- Knot Roll 解码、开关和最大倾角 Clamp。
-- 常半径弯道自动 Banking 公式和外侧抬高方向。
-- S 弯正负 Banking 与 Transition Length 变化率。
-- 闭环 Banking 接缝。
+- Grade-only 道路不应产生赛道横倾。
+- Knot Tilt 解码、开关和最大横倾角 Clamp。
+- 常半径弯道自动横倾公式和外侧抬高方向。
+- S 弯正负横倾与 Transition Length 变化率。
+- 闭环横倾接缝。
 - Frame 单位长度、正交性、左右手性与有限数值。
 - Profile 4 点开放截面及肩部组合。
 - 宽发卡弯不改变美术中心线。
@@ -319,7 +319,7 @@ PROFILE_compute_dimensions
 |---|---|---|
 | 原始 Knot 上传 | HAPI 数据量与美术 Knot 数相关，避免 Unity 预采样点膨胀 | 无 |
 | HDA Bezier 重建 | 增加编辑器 Cook 计算 | Bake 后无运行时成本 |
-| Banking | 随道路 Ring 数近似线性增加 Cook 成本 | 只改变 Bake Mesh 顶点/法线，无逐帧变形 |
+| 赛道横倾 | 随道路 Ring 数近似线性增加 Cook 成本 | 只改变 Bake Mesh 顶点/法线，无逐帧变形 |
 | Spline 自动 Recook | Debounce 后触发异步编辑器 Cook | Player 中不执行 |
 | 删除材质边界补样 | 拓扑数量更稳定，减少隐式 Cook/顶点增长 | Mesh 带宽更可预测 |
 | Shader UV 调整 | 无额外 CPU 工作 | 无新增采样、Pass、RT 或 Variant |
@@ -340,7 +340,7 @@ PROFILE_compute_dimensions
 
 Phase 2 的核心交付是两条增量链路：
 
-1. 2.1 建立道路 Grade/Curvature/Banking Frame，并调整方向性与非方向性路面纹理的 UV 职责。
+1. 2.1 建立道路 Grade/Curvature/横倾 Frame，并调整方向性与非方向性路面纹理的 UV 职责。
 2. 2.2 建立 Unity Knot Contract V1 与 HDA Bezier 重建，使原始 Knot、Handle、Rotation 和闭环语义可稳定进入道路生成链。
 
-同时，2.2 删除自动急弯改线、材质边界隐式补样和手工 Banking Ramp，使地编中心线、道路拓扑和 Banking 来源更可控。当前 HDA 强制 Cook 无 error/warning；Unity Dirty 现场已完成一次 73 Knot 闭环上传，但正式提交默认仍关闭相关 Feature，干净 Session 联调与 Bake 验证尚未完成。
+同时，2.2 删除自动急弯改线、材质边界隐式补样和手工横倾 Ramp，使地编中心线、道路拓扑和横倾来源更可控。当前 HDA 强制 Cook 无 error/warning；Unity Dirty 现场已完成一次 73 Knot 闭环上传，但正式提交默认仍关闭相关 Feature，干净 Session 联调与 Bake 验证尚未完成。

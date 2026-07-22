@@ -34,7 +34,7 @@ FRAME_DECODE_VEX = r'''
 i@road_has_spline_roll = 0;
 v@road_authored_up = {0.0, 1.0, 0.0};
 
-if (!chi("../../bank_use_spline_knot_roll") || !haspointattrib(0, "rot"))
+if (!chi("../../lateral_tilt_use_spline_knot_tilt") || !haspointattrib(0, "rot"))
     return;
 
 vector4 rotation = p@rot;
@@ -76,12 +76,12 @@ if (ring_count <= 0)
     return;
 
 int closed_loop = detail(0, "road_closed_loop", 0);
-int banking_enabled = chi("../../enable_road_banking");
-int spline_roll_enabled = banking_enabled && chi("../../bank_use_spline_knot_roll");
-float design_speed_kph = max(ch("../../bank_design_speed_kph"), 0.0);
-float auto_strength = max(ch("../../bank_auto_strength"), 0.0);
-float maximum_angle = max(ch("../../bank_max_angle_deg"), 0.0);
-float transition_length = max(ch("../../bank_transition_length_m"), 0.0);
+int banking_enabled = chi("../../enable_track_lateral_tilt");
+int spline_roll_enabled = banking_enabled && chi("../../lateral_tilt_use_spline_knot_tilt");
+float design_speed_kph = max(ch("../../lateral_tilt_design_speed_kph"), 0.0);
+float auto_strength = max(ch("../../lateral_tilt_auto_strength"), 0.0);
+float maximum_angle = max(ch("../../lateral_tilt_max_angle_deg"), 0.0);
+float transition_length = max(ch("../../lateral_tilt_transition_length_m"), 0.0);
 float sample_spacing = max(ch("../../sample_spacing"), 0.25);
 float speed_mps = design_speed_kph / 3.6;
 float gravity = 9.80665;
@@ -330,7 +330,7 @@ setdetailattrib(0, "road_start_spline_roll_deg", spline_rolls[0], "set");
 FRAME_APPLY_VEX = r'''
 // Runs once over Detail.  Disabled mode is a strict compatibility path: the
 // incoming vertex positions remain untouched while frame metadata is retained.
-if (!chi("../../enable_road_banking"))
+if (!chi("../../enable_track_lateral_tilt"))
     return;
 
 int cross_section_count = max(int(detail(0, "road_cross_section_count")), 4);
@@ -411,7 +411,7 @@ for (int primitive_index = nprimitives(0) - 1; primitive_index >= 0; primitive_i
     removeprim(0, primitive_index, 0);
 for (int point_index = npoints(0) - 1; point_index >= 0; point_index--)
     removepoint(0, point_index);
-if (!chi("../../debug_bank_frames"))
+if (!chi("../../debug_lateral_tilt_frames"))
     return;
 
 float scale = 1.5;
@@ -541,110 +541,154 @@ def _backup_definition(track) -> str:
     return path
 
 
+LATERAL_TILT_UI = {
+    "enable_track_lateral_tilt": ("Enable Track Lateral Tilt / 启用赛道横倾", "兼容开关。关闭时不修改现有道路顶点位置，但仍输出坡度与赛道 Frame metadata。"),
+    "lateral_tilt_use_spline_knot_tilt": ("Use Spline Knot Tilt / 使用样条控制点横倾", "读取 Unity Spline Knot 绕曲线切线的横滚，换算为赛道横倾并与自动横倾相加。仅影响编辑器 Cook/Bake。"),
+    "lateral_tilt_design_speed_kph": ("Design Speed (km/h) / 设计速度", "自动横倾的目标设计速度；使用 atan(v² / gR) 计算，不参与移动端运行时。"),
+    "lateral_tilt_auto_strength": ("Auto Lateral Tilt Strength / 自动横倾强度", "自动横倾倍率。0 关闭曲率驱动的自动横倾，仅保留 Spline Knot 横倾。"),
+    "lateral_tilt_max_angle_deg": ("Maximum Lateral Tilt Angle (deg) / 最大横倾角", "自动横倾与 Spline Knot 横倾叠加后的绝对横倾角上限；移动端建议保持在 12 度以内。"),
+    "lateral_tilt_transition_length_m": ("Transition Length (m) / 过渡长度", "按道路真实距离平滑，并限制每米横倾角变化率。"),
+    "adaptive_max_lateral_tilt_delta_deg": ("Maximum Lateral Tilt Delta (deg) / 最大横倾变化", "限制相邻自适应采样点之间允许的最大赛道横倾角变化。"),
+}
+
+
+def _ensure_lateral_tilt_ui(definition) -> bool:
+    group = definition.parmTemplateGroup()
+    changed = False
+    folder = next(
+        (
+            template for template in group.entries()
+            if hasattr(template, "parmTemplates")
+            and any(child.name() == "enable_track_lateral_tilt" for child in template.parmTemplates())
+        ),
+        None,
+    )
+    if folder is None:
+        return False
+    if folder.label() != "Track Lateral Tilt / 赛道横倾":
+        folder.setLabel("Track Lateral Tilt / 赛道横倾")
+        folder.setHelp("在编辑器 Cook/Bake 阶段计算曲率驱动与样条控制点驱动的赛道横倾；内部 bank_* 与 road_bank_* 合约保持不变。")
+        group.replace(folder.name(), folder)
+        changed = True
+    for name, (label, help_text) in LATERAL_TILT_UI.items():
+        template = group.find(name)
+        if template is None:
+            continue
+        if template.label() != label or template.help() != help_text:
+            template.setLabel(label)
+            template.setHelp(help_text)
+            group.replace(name, template)
+            changed = True
+    if changed:
+        definition.setParmTemplateGroup(group)
+    return changed
+
+
 def _ensure_parameters(hou, track, definition) -> bool:
     group = definition.parmTemplateGroup()
     legacy_required = (
-        "enable_road_banking",
-        "bank_design_speed_kph",
-        "bank_auto_strength",
-        "bank_max_angle_deg",
-        "bank_transition_length_m",
-        "debug_bank_frames",
+        "enable_track_lateral_tilt",
+        "lateral_tilt_design_speed_kph",
+        "lateral_tilt_auto_strength",
+        "lateral_tilt_max_angle_deg",
+        "lateral_tilt_transition_length_m",
+        "debug_lateral_tilt_frames",
     )
-    disable_when = "{ enable_road_banking == 0 }"
+    disable_when = "{ enable_track_lateral_tilt == 0 }"
     present = [group.find(name) is not None for name in legacy_required]
     if any(present) and not all(present):
         missing = [name for name, exists in zip(legacy_required, present) if not exists]
-        raise RuntimeError("Partial Road Banking interface; missing %s" % ", ".join(missing))
+        raise RuntimeError("Partial Track Lateral Tilt interface; missing %s" % ", ".join(missing))
     if all(present):
-        if group.find("bank_use_spline_knot_roll") is not None:
-            return False
+        if group.find("lateral_tilt_use_spline_knot_tilt") is not None:
+            return _ensure_lateral_tilt_ui(definition)
 
         folder = next(
             (
                 template for template in group.entries()
                 if template.type() == hou.parmTemplateType.Folder
-                and any(child.name() == "enable_road_banking" for child in template.parmTemplates())
+                and any(child.name() == "enable_track_lateral_tilt" for child in template.parmTemplates())
             ),
             None,
         )
         if folder is None:
-            raise RuntimeError("Could not locate the existing Road Banking folder")
+            raise RuntimeError("Could not locate the existing Track Lateral Tilt folder")
         use_spline_roll = _hom_construct(hou, "ToggleParmTemplate",
-            "bank_use_spline_knot_roll",
-            "Use Spline Knot Roll",
+            "lateral_tilt_use_spline_knot_tilt",
+            "Use Spline Knot Tilt / 使用样条控制点横倾",
             default_value=True,
-            help="读取 Unity Spline Knot 绕曲线切线的横滚，与自动 Banking 相加。仅影响编辑器 Cook/Bake。",
+            help="读取 Unity Spline Knot 绕曲线切线的横滚，换算为赛道横倾并与自动横倾相加。仅影响编辑器 Cook/Bake。",
         )
         use_spline_roll.setConditional(hou.parmCondType.DisableWhen, disable_when)
         children = list(folder.parmTemplates())
         enable_index = next(
-            (index for index, template in enumerate(children) if template.name() == "enable_road_banking"),
+            (index for index, template in enumerate(children) if template.name() == "enable_track_lateral_tilt"),
             -1,
         )
         children.insert(enable_index + 1, use_spline_roll)
         folder.setParmTemplates(tuple(children))
         group.replace(folder.name(), folder)
         definition.setParmTemplateGroup(group)
-        if track.parm("bank_use_spline_knot_roll") is None:
+        _ensure_lateral_tilt_ui(definition)
+        if track.parm("lateral_tilt_use_spline_knot_tilt") is None:
             raise RuntimeError("Spline knot roll parameter did not reach the live Track instance")
         return True
 
     enable = _hom_construct(hou, "ToggleParmTemplate",
-        "enable_road_banking",
-        "Enable Road Banking",
+        "enable_track_lateral_tilt",
+        "Enable Track Lateral Tilt / 启用赛道横倾",
         default_value=False,
-        help="兼容开关。关闭时不修改现有道路顶点位置，但仍输出坡度与道路 Frame metadata。",
+        help="兼容开关。关闭时不修改现有道路顶点位置，但仍输出坡度与赛道 Frame metadata。",
     )
     use_spline_roll = _hom_construct(hou, "ToggleParmTemplate",
-        "bank_use_spline_knot_roll",
-        "Use Spline Knot Roll",
+        "lateral_tilt_use_spline_knot_tilt",
+        "Use Spline Knot Tilt / 使用样条控制点横倾",
         default_value=True,
-        help="读取 Unity Spline Knot 绕曲线切线的横滚，与自动 Banking 相加。仅影响编辑器 Cook/Bake。",
+        help="读取 Unity Spline Knot 绕曲线切线的横滚，换算为赛道横倾并与自动横倾相加。仅影响编辑器 Cook/Bake。",
     )
     speed = _hom_construct(hou, "FloatParmTemplate",
-        "bank_design_speed_kph",
-        "Design Speed (km/h)",
+        "lateral_tilt_design_speed_kph",
+        "Design Speed (km/h) / 设计速度",
         1,
         default_value=(25.0,),
         min=0.0,
         max=80.0,
         min_is_strict=True,
-        help="自动倾角的目标设计速度；使用 atan(v² / gR) 计算，不参与移动端运行时。",
+        help="自动横倾的目标设计速度；使用 atan(v² / gR) 计算，不参与移动端运行时。",
     )
     strength = _hom_construct(hou, "FloatParmTemplate",
-        "bank_auto_strength",
-        "Auto Bank Strength",
+        "lateral_tilt_auto_strength",
+        "Auto Lateral Tilt Strength / 自动横倾强度",
         1,
         default_value=(1.0,),
         min=0.0,
         max=2.0,
         min_is_strict=True,
-        help="自动倾角倍率。0 关闭曲率驱动的自动倾角，仅保留 Spline Knot Roll。",
+        help="自动横倾倍率。0 关闭曲率驱动的自动横倾，仅保留 Spline Knot 横倾。",
     )
     maximum = _hom_construct(hou, "FloatParmTemplate",
-        "bank_max_angle_deg",
-        "Maximum Bank Angle (deg)",
+        "lateral_tilt_max_angle_deg",
+        "Maximum Lateral Tilt Angle (deg) / 最大横倾角",
         1,
         default_value=(8.0,),
         min=0.0,
         max=20.0,
         min_is_strict=True,
-        help="自动与手动叠加后的绝对倾角上限；移动端建议保持在 12 度以内。",
+        help="自动横倾与 Spline Knot 横倾叠加后的绝对横倾角上限；移动端建议保持在 12 度以内。",
     )
     transition = _hom_construct(hou, "FloatParmTemplate",
-        "bank_transition_length_m",
-        "Transition Length (m)",
+        "lateral_tilt_transition_length_m",
+        "Transition Length (m) / 过渡长度",
         1,
         default_value=(24.0,),
         min=0.0,
         max=100.0,
         min_is_strict=True,
-        help="按道路真实距离平滑，并限制每米倾角变化率。",
+        help="按道路真实距离平滑，并限制每米横倾角变化率。",
     )
     debug = _hom_construct(hou, "ToggleParmTemplate",
-        "debug_bank_frames",
-        "Debug Bank Frames",
+        "debug_lateral_tilt_frames",
+        "Debug Lateral Tilt Frames / 调试横倾 Frame",
         default_value=False,
         help="仅显示 Houdini viewport guide；不会连接到 HDA 输出或进入 Unity Bake。",
     )
@@ -652,32 +696,33 @@ def _ensure_parameters(hou, track, definition) -> bool:
         template.setConditional(hou.parmCondType.DisableWhen, disable_when)
 
     folder = _hom_construct(hou, "FolderParmTemplate",
-        "road_banking_folder",
-        "Road Banking",
+        "track_lateral_tilt_folder",
+        "Track Lateral Tilt / 赛道横倾",
         parm_templates=(enable, use_spline_roll, speed, strength, maximum, transition, debug),
     )
     folder.setHelp(
-        "曲线 Y 控制纵坡；XZ 曲率生成自动横坡；Spline Knot Roll 用于人工横坡控制。所有结果在 HDA Cook/Bake 阶段完成。"
+        "在编辑器 Cook/Bake 阶段计算曲率驱动与样条控制点驱动的赛道横倾；内部 bank_* 与 road_bank_* 合约保持不变。"
     )
     if group.find("stdswitcher5_5") is not None:
         group.insertBefore("stdswitcher5_5", folder)
     else:
         group.append(folder)
     definition.setParmTemplateGroup(group)
-    if track.parm("enable_road_banking") is None:
+    _ensure_lateral_tilt_ui(definition)
+    if track.parm("enable_track_lateral_tilt") is None:
         raise RuntimeError("Definition parameter update did not reach the live Track instance")
     return True
 
 
 def _ensure_network_annotations(hou, road, nodes) -> None:
     network_box = next(
-        (box for box in road.networkBoxes() if box.comment().startswith("03_道路Frame与Banking")),
+        (box for box in road.networkBoxes() if box.comment().startswith(("03_道路Frame与Banking", "03_道路Frame与横倾"))),
         None,
     )
     if network_box is None:
         network_box = road.createNetworkBox()
     network_box.setComment(
-        "03_道路Frame与Banking：基于生成中心线计算三维切线、纵坡、曲率、自动/手动倾角，再重建横截面。"
+        "03_道路Frame与横倾：基于生成中心线计算三维切线、纵坡、曲率、自动/手动横倾，再重建横截面。"
     )
     network_box.setColor(_hom_construct(hou, "Color", (0.22, 0.48, 0.72)))
     for node in nodes:
@@ -690,7 +735,7 @@ def _ensure_network_annotations(hou, road, nodes) -> None:
     note.setText(
         "维护提示：SURFACE_reproject_layout 保持美术中心线并写入距离与只读急弯诊断；"
         "FRAME_compute_grade_bank 只算姿态；FRAME_apply_grade_bank 只改顶点。"
-        "正 bank 抬高正 road_lateral_offset_m 一侧，Debug guide 默认关闭。"
+        "正横倾抬高正 road_lateral_offset_m 一侧，Debug guide 默认关闭。"
     )
     note.setTextSize(0.8)
     note.setPosition(nodes[0].position() + _hom_construct(hou, "Vector2", (0.0, 1.4)))
@@ -735,7 +780,7 @@ def _patch_nodes(hou, track) -> None:
     compute.parm("class").set(0)
     compute.parm("snippet").set(FRAME_COMPUTE_VEX)
     compute.setComment(
-        "计算三维道路 Frame、纵坡、曲率、自动 Banking 与 Ramp 修正；按道路距离平滑，不增加网格采样。"
+        "计算三维道路 Frame、纵坡、曲率、自动横倾与 Ramp 修正；按道路距离平滑，不增加网格采样。"
     )
     compute.setGenericFlag(hou.nodeFlag.DisplayComment, True)
     compute.setColor(_hom_construct(hou, "Color", (0.18, 0.55, 0.85)))
@@ -748,7 +793,7 @@ def _patch_nodes(hou, track) -> None:
     apply.parm("class").set(0)
     apply.parm("snippet").set(FRAME_APPLY_VEX)
     apply.setComment(
-        "用 banked lateral/up 重建横截面；关闭 Banking 时严格保留旧顶点位置。"
+        "用横倾后的 lateral/up 重建横截面；关闭赛道横倾时严格保留旧顶点位置。"
     )
     apply.setGenericFlag(hou.nodeFlag.DisplayComment, True)
     apply.setColor(_hom_construct(hou, "Color", (0.16, 0.72, 0.58)))
@@ -783,7 +828,7 @@ def _patch_nodes(hou, track) -> None:
     normal.setInput(0, collision)
 
     start_prefab.parm("snippet").set(START_PREFAB_VEX)
-    start_prefab.setComment("起点 Prefab 使用 road_start_forward + road_start_up 对齐纵坡与 Banking。")
+    start_prefab.setComment("起点 Prefab 使用 road_start_forward + road_start_up 对齐纵坡与赛道横倾。")
     start_prefab.setGenericFlag(hou.nodeFlag.DisplayComment, True)
     _ensure_network_annotations(hou, road, (decode, compute, apply, debug))
 
@@ -818,13 +863,13 @@ def apply_patch_in_session(hou) -> dict:
         track.allowEditingOfContents()
         used_allow_editing = True
 
-    track.parm("enable_road_banking").set(1)
-    track.parm("bank_use_spline_knot_roll").set(1)
-    track.parm("bank_design_speed_kph").set(25.0)
-    track.parm("bank_auto_strength").set(1.0)
-    track.parm("bank_max_angle_deg").set(8.0)
-    track.parm("bank_transition_length_m").set(24.0)
-    track.parm("debug_bank_frames").set(0)
+    track.parm("enable_track_lateral_tilt").set(1)
+    track.parm("lateral_tilt_use_spline_knot_tilt").set(1)
+    track.parm("lateral_tilt_design_speed_kph").set(25.0)
+    track.parm("lateral_tilt_auto_strength").set(1.0)
+    track.parm("lateral_tilt_max_angle_deg").set(8.0)
+    track.parm("lateral_tilt_transition_length_m").set(24.0)
+    track.parm("debug_lateral_tilt_frames").set(0)
 
     _patch_nodes(hou, track)
     output = track.node("Road/OUT_ROAD_MESH")
@@ -867,8 +912,8 @@ def apply_patch_in_session(hou) -> dict:
     # work.  Re-open the saved contents afterwards to preserve the user's
     # existing Live Scene editing workflow.
     track.matchCurrentDefinition()
-    track.parm("enable_road_banking").set(1)
-    track.parm("bank_use_spline_knot_roll").set(1)
+    track.parm("enable_track_lateral_tilt").set(1)
+    track.parm("lateral_tilt_use_spline_knot_tilt").set(1)
     track.allowEditingOfContents()
     hou.hipFile.save()
 
@@ -885,8 +930,8 @@ def apply_patch_in_session(hou) -> dict:
         "used_allow_editing": used_allow_editing,
         "left_editable": track.isEditable(),
         "parameters_added": parameters_added,
-        "banking_enabled": track.parm("enable_road_banking").eval(),
-        "spline_knot_roll_enabled": track.parm("bank_use_spline_knot_roll").eval(),
+        "banking_enabled": track.parm("enable_track_lateral_tilt").eval(),
+        "spline_knot_roll_enabled": track.parm("lateral_tilt_use_spline_knot_tilt").eval(),
         "points": len(geometry.points()),
         "primitives": len(geometry.prims()),
         "maximum_bank_deg": _detail_value(geometry, "road_max_abs_bank_deg"),

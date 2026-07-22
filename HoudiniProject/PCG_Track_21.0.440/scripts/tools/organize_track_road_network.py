@@ -34,7 +34,7 @@ POSITIONS = {
     "SWEEP_road_surface": (0.0, -5.0),
     "SURFACE_reverse_normals": (4.0, -7.0),
     "SURFACE_flip_switch": (0.0, -9.0),
-    # 03 Layout / Banking
+    # 03 Layout / Lateral Tilt
     "LAYOUT_prepare_dimensions": (0.0, -12.0),
     "SURFACE_reproject_layout": (0.0, -14.0),
     "FRAME_compute_grade_bank": (0.0, -16.0),
@@ -89,7 +89,7 @@ GROUPS = (
     ),
     (
         "BOX_03_LAYOUT_BANKING",
-        "03  Layout 与 Banking｜保持美术中心线，再计算道路 Frame",
+        "03  Layout 与 Lateral Tilt｜保持美术中心线，再计算道路 Frame",
         (0.22, 0.48, 0.72),
         (
             "LAYOUT_prepare_dimensions",
@@ -271,7 +271,7 @@ def organize_in_session(hou):
         road.node(name).setPosition(hou.Vector2(position))
 
     # Route the long centerline authored-up input around the right side instead of
-    # drawing a diagonal wire across Sweep, Layout and Banking nodes.
+    # drawing a diagonal wire across Sweep, Layout and lateral-tilt nodes.
     resample = road.node("CENTERLINE_resample")
     compute = road.node("FRAME_compute_grade_bank")
     route_top = road.createNetworkDot()
@@ -295,13 +295,13 @@ def organize_in_session(hou):
         "统一重算法线并保持平滑道路表面；供 Unity URP MeshRenderer 与 MeshCollider 共用。"
     )
     road.node("SURFACE_reproject_layout").setComment(
-        "保持美术采样中心线不变；重建道路横截面并写入距离、Banking 兼容数据与只读急弯诊断，不执行自动改线。"
+        "保持美术采样中心线不变；重建道路横截面并写入距离、横倾兼容数据与只读急弯诊断，不执行自动改线。"
     )
     road.node("FRAME_compute_grade_bank").setComment(
-        "计算三维切线、纵坡、曲率，并叠加 Auto Bank、Unity Knot Roll 与 Manual Ramp。第二输入是紫色 authored-up 路由。"
+        "计算三维切线、纵坡、曲率，并叠加自动横倾、Unity Knot 横倾与 Manual Ramp。第二输入是 authored-up 采样中心线。"
     )
     road.node("FRAME_apply_grade_bank").setComment(
-        "使用最终 tangent/lateral/up 重建道路横截面；关闭 Banking 时不修改输入顶点。"
+        "使用最终 tangent/lateral/up 重建道路横截面；关闭赛道横倾时不修改输入顶点。"
     )
 
     color_groups = {
@@ -340,7 +340,7 @@ def organize_in_session(hou):
     notes = {note.name(): note for note in road.stickyNotes()}
     learning = notes.get("NOTE_Road_SOP_Learning") or road.createStickyNote("NOTE_Road_SOP_Learning")
     learning.setText(
-        "阅读顺序：01 中心线 → 02 Sweep → 03 Layout/Banking → 04 Unity 输出。\n"
+        "阅读顺序：01 中心线 → 02 Sweep → 03 Layout/Lateral Tilt → 04 Unity 输出。\n"
         "所有 Houdini 计算只发生在编辑器 Cook/Bake；移动端运行时使用 Bake 网格。"
     )
     learning.setPosition(hou.Vector2((-2.0, 17.5)))
@@ -351,7 +351,7 @@ def organize_in_session(hou):
     banking_note = notes.get("NOTE_Road_Banking") or road.createStickyNote("NOTE_Road_Banking")
     banking_note.setText(
         "紫色旁路线：Unity Knot authored up → FRAME_compute_grade_bank 输入 2。\n"
-        "主链顺序：Layout 保持美术中心线，Banking 直接按该中心线计算倾角。\n"
+        "主链顺序：Layout 保持美术中心线，Lateral Tilt 直接按该中心线计算横倾角。\n"
         "DEBUG_bank_frames 仅供 Houdini 查看，不进入 Unity Bake。"
     )
     banking_note.setPosition(hou.Vector2((8.5, -12.0)))

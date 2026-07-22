@@ -12,7 +12,7 @@
 
 ## 1. 日志范围与证据
 
-本文不是项目全量快照。Unity/URP/Houdini 版本、Unity Knot Contract V1、Spline 自动 Recook、道路 Banking、Profile/Sweep、Shader 与移动端通用约束以 Phase 1、Phase 2 日志为准。
+本文不是项目全量快照。Unity/URP/Houdini 版本、Unity Knot Contract V1、Spline 自动 Recook、赛道横倾、Profile/Sweep、Shader 与移动端通用约束以 Phase 1、Phase 2 日志为准。
 
 证据标记：
 
@@ -61,7 +61,6 @@ CENTERLINE_source_switch
   -> CENTERLINE_collect_forced_samples
   -> CENTERLINE_adaptive_select
   -> CENTERLINE_sampling_switch
-  -> FRAME_normalize_authored_up
 ```
 
 - `CENTERLINE_quality_reference_resample`：生成高密度参考曲线，只用于质量评估，不直接作为最终输出。
@@ -69,8 +68,9 @@ CENTERLINE_source_switch
 - `CENTERLINE_collect_forced_samples`：收集 Knot、材质段边界及混合边界等不可被简化的锚点。
 - `CENTERLINE_adaptive_select`：在 `sample_spacing` 基础样本上按质量阈值递归补点，同时尊重最小间距。
 - `CENTERLINE_sampling_switch`：Feature Toggle；关闭自适应采样时回退到 Phase 2 的均匀 `CENTERLINE_resample`。
+- sampled authored-up 直接传给下游；最终切线正交化在 `FRAME_compute_grade_bank` 内完成，避免冗余 Attribute Wrangle Pass。
 
-`sample_spacing` 仍是普通路段的主密度控制。自适应分支只在弯曲、坡度、Bank 或强制锚点要求更高时增加采样，避免为了局部复杂区域全局加密整条赛道。
+`sample_spacing` 仍是普通路段的主密度控制。自适应分支只在弯曲、坡度、横倾或强制锚点要求更高时增加采样，避免为了局部复杂区域全局加密整条赛道。
 
 ### 3.2 HDA 参数
 
@@ -84,9 +84,9 @@ CENTERLINE_source_switch
 | `adaptive_max_chord_error_m` | 0.10 m | 最大弦误差 |
 | `adaptive_max_heading_delta_deg` | 8° | 相邻样本最大方向变化 |
 | `adaptive_max_grade_delta_deg` | 4° | 相邻样本最大坡度变化 |
-| `adaptive_max_bank_delta_deg` | 2° | 相邻样本最大倾角变化 |
+| `adaptive_max_lateral_tilt_delta_deg` | 2° | 相邻样本最大横倾变化 |
 
-细节密度只作用于自适应质量阈值：弦误差按 `density²` 缩放，Heading/Grade/Bank 阈值按 `density` 缩放。完全直线仍由 `sample_spacing` 控制，不会仅因提高细节密度而无意义增点。
+细节密度只作用于自适应质量阈值：弦误差按 `density²` 缩放，Heading/Grade/Lateral Tilt 阈值按 `density` 缩放。完全直线仍由 `sample_spacing` 控制，不会仅因提高细节密度而无意义增点。
 
 本阶段没有保留 `adaptive_max_point_count`。当最小间距阻止质量阈值继续满足时，通过 `road_adaptive_constraint_floor_hit_count` 报告，而不是静默丢弃约束。该设计避免结果依赖任意点数上限，但极端曲线仍可能产生较高的编辑器 Cook 和 Mesh 顶点成本。
 
@@ -154,12 +154,12 @@ Track 顶层当前只保留一个直接子模块：
   -> Road
 ```
 
-`Road` 内有 53 个直接子节点，按职责划分为 7 个 Network Box：
+`Road` 内节点按职责划分为 7 个 Network Box：
 
 1. `BOX_01_CURVE_SOURCE`：Unity Contract、方向和 Bezier 重建。
-2. `BOX_02_SAMPLING`：均匀/自适应采样、质量指标和 Frame 归一化。
+2. `BOX_02_SAMPLING`：均匀/自适应采样、质量指标和采样输出。
 3. `BOX_03_PROFILE_SWEEP`：Profile 与 Sweep。
-4. `BOX_04_LAYOUT_BANKING`：布局、Grade/Banking 和 Debug Frame。
+4. `BOX_04_LAYOUT_BANKING`：布局、Grade/Lateral Tilt 和 Debug Frame。
 5. `BOX_05_TOPO_MATERIAL`：拓扑、UV、分组、法线、材质 Mask 和 metadata。
 6. `BOX_06_OUTPUTS`：分层 Geometry 输出。
 7. `BOX_07_START_PREFAB`：起终点 Prefab 实例输出。
@@ -170,7 +170,7 @@ Track 顶层当前只保留一个直接子模块：
 
 **状态：[已验证]**
 
-HDA 顶层参数整理为 `Curve`、`Track Shape`、`Road Banking`、`Material` 和 `Fallback Curve` 等职责文件夹，并增加中英文采样/质量标签。
+HDA 顶层参数整理为 `Curve`、`Track Shape`、`Track Lateral Tilt / 赛道横倾`、`Material` 和 `Fallback Curve` 等职责文件夹，并增加中英文采样/质量标签。
 
 本阶段移除以下实验性或重复接口：
 
@@ -273,7 +273,7 @@ HDA 顶层参数整理为 `Curve`、`Track Shape`、`Road Banking`、`Material` 
 - 材质强制锚点不随细节密度变化。
 - 开放曲线无效材质段、重叠段后者覆盖、RGB 权重归一化。
 - 闭环材质段跨接缝、闭环 UV 跨度、接缝位置、Frame 连续性和残余 Twist。
-- Unity Knot Roll 跨 ±180° 解包与最大 Bank Clamp。
+- Unity 样条控制点横倾跨 ±180° 解包与最大横倾 Clamp。
 - Legacy 合并输出与 Split Road/Shoulder/Skirt/Collision 的集合一致性。
 - Centerline 必须为无 Primitive、EditorOnly 的数据输出。
 
@@ -341,7 +341,7 @@ HDA 顶层参数整理为 `Curve`、`Track Shape`、`Road Banking`、`Material` 
 4. 为 `OUT_ROAD_SKIRTS` 实现明确的裙边几何生成或移除空输出；当前只能视为输出预留。
 5. 建立 Bake Pipeline，消费 Road、Shoulder、Collision 和 EditorOnly Centerline metadata，并支持局部锁定/覆盖。
 6. 为碰撞输出增加独立简化策略，避免直接复制全部渲染三角形进入移动端 PhysX。
-7. 在长赛道、连续 S 弯、强坡度、极端 Knot Roll 和高细节密度下测量 Cook 时间、点数和内存峰值。
+7. 在长赛道、连续 S 弯、强坡度、极端样条控制点横倾和高细节密度下测量 Cook 时间、点数和内存峰值。
 8. 在 Mali、Adreno、Apple GPU 上比较 Combined 与 Split 输出的 DrawCall、SetPass、剔除收益和材质带宽。
 9. 验证新的 `arc_length_lateral_metric` UV3 在坡道、闭环接缝、宽路肩和实际四层路面纹理上的视觉一致性。
 10. 明确 20 m 默认路宽是否符合正式赛道规格；若不是，应单独调整 HDA 默认值并重新验证场景输出。
