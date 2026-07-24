@@ -200,7 +200,7 @@ Lake 链路先检查闭合状态，再执行重采样、填充、目标高度投
 |---:|---|---|---|
 | 0 | `OUT_TERRAIN_HEIGHTFIELD` | `height` HeightField Volume | Unity Terrain 主输出 |
 | 1 | `OUT_TERRAIN_METADATA` | 8 个 Bounds 角点及 Detail/Point Metadata | Bake 工具、边界、输入与契约信息 |
-| 2 | `OUT_TERRAIN_PREVIEW_MESH` | Debug Preview Mesh | 仅调试；默认关闭，当前为 0 点/0 Primitive |
+| 2 | `OUT_TERRAIN_PREVIEW_MESH` | Debug Preview Mesh | 历史输出；已于 2026-07-23 从当前 Terrain HDA 移除 |
 
 当前 Output 0 的 Geometry 统计：
 
