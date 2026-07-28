@@ -194,8 +194,98 @@ def check_topology(root: hou.Node, source: hou.Node) -> List[str]:
     return messages
 
 
+def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
+    """Protect the authored Terrain panel hierarchy from spare-folder drift."""
+
+    group = root.type().definition().parmTemplateGroup()
+    top_tabs = [
+        entry
+        for entry in group.entries()
+        if entry.type() == hou.parmTemplateType.Folder
+        and entry.folderType() == hou.folderType.Tabs
+        and not entry.isHidden()
+    ]
+    expected_top_labels = [
+        "Overview / 总览",
+        "Terrain Shape / 地形形态",
+        "Advanced / 高级",
+        "Output Mask / 输出 Mask",
+    ]
+    require(
+        [entry.label() for entry in top_tabs] == expected_top_labels,
+        "Terrain top-level parameter tabs changed",
+    )
+
+    overview, _, advanced, output_mask = top_tabs
+    require(
+        [entry.name() for entry in overview.parmTemplates()]
+        == [
+            "input_contract_label",
+            "output_contract_label",
+            "auto_domain",
+            "manual_size",
+            "padding",
+            "tile_resolution",
+        ],
+        "Overview must contain contract, domain, and resolution parameters directly",
+    )
+
+    advanced_tabs = [
+        entry
+        for entry in advanced.parmTemplates()
+        if entry.type() == hou.parmTemplateType.Folder
+    ]
+    require(
+        [entry.label() for entry in advanced_tabs]
+        == [
+            "Track & Earthwork / 赛道与土方",
+            "Guide Mesh / 地形引导",
+            "Island Coast / 海岛海岸",
+            "Lake / 湖泊",
+        ],
+        "Advanced child tabs changed",
+    )
+    island = advanced_tabs[2]
+    require(
+        [
+            entry.label()
+            for entry in island.parmTemplates()
+            if entry.type() == hou.parmTemplateType.Folder
+        ]
+        == ["Profile / 横截面", "Beach Surface / 海滩表面"],
+        "Island Coast inner groups changed",
+    )
+    require(
+        [entry.name() for entry in output_mask.parmTemplates()]
+        == [
+            "no_scatter_extra",
+            "cliff_start",
+            "cliff_full",
+            "water_max_slope",
+            "water_max_height",
+        ],
+        "Output Mask parameters changed",
+    )
+
+    for name in ("height_range", "min_domain_size", "tile_count"):
+        require(group.find(name) is None, f"Removed parameter returned: {name}")
+        require(root.parm(name) is None, f"Instance still contains removed parameter: {name}")
+    require(not root.spareParms(), "Terrain instance contains spare parameter-folder overrides")
+
+    domain = source.node("HF_DOMAIN")
+    require(domain is not None, "HF_DOMAIN is missing")
+    for name in ("sizex", "sizey"):
+        expression = domain.parm(name).expression()
+        require("use_bake_resolution" not in expression, f"{name} uses removed preview switch")
+        require("bake_resolution" not in expression, f"{name} uses removed bake resolution")
+        require("tile_resolution" in expression, f"{name} no longer uses Terrain Resolution")
+
+    return ["Four-tab Terrain interface, no spare/dead parameters, single resolution path"]
+
+
 def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[str, Any]:
     passed = check_topology(root, source)
+    passed.extend(check_interface_contract(root, source))
     original = {name: root.parm(name).eval() for name in TOUCHED_PARAMETERS}
 
     # Stable values shared by sensitivity tests. Individual modules are isolated.
