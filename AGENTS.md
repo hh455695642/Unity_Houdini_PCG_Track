@@ -1,5 +1,13 @@
 # PCG Bike Unity 项目协作规范
 
+## Houdini Engine Unity 插件保护（强制）
+
+- 禁止修改 `Assets/Plugins/HoudiniEngineUnity/` 下的任何文件，包括 Runtime、Editor、HAPI、程序集定义和 `.meta`。
+- Houdini Engine Unity 插件的 Inspector、输入类型列表、序列化结构和通用行为必须保持官方默认实现。
+- 项目专用的输入限制、兼容逻辑和数据合约必须在 `Assets/PCG/`、HDA 节点网络或项目自有工具中实现，不得通过 Patch、Fork 或条件分支侵入 Houdini Engine Unity 插件。
+- 若任务需要的功能只能通过修改该插件实现，必须停止修改并向用户说明限制；未经用户重新明确授权，不得继续。
+- 若发现该目录存在未提交改动，默认视为用户或外部插件更新内容，不得擅自覆盖、还原或格式化。
+
 ## 项目身份
 
 本项目是一个面向移动端的 Unity URP 自行车竞速程序化场景生成项目。
