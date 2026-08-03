@@ -15,7 +15,8 @@ try:
 except ModuleNotFoundError:
     # Houdini MCP executes in its service process and injects a remote ``hou``
     # proxy into the caller globals instead of installing the module.
-    hou = globals()["hou"]
+    import builtins as _builtins
+    hou = _builtins._houdini_mcp_hou
 
 
 CORE_PATH = "/obj/CityRoad_DEV/CityRoadCore"

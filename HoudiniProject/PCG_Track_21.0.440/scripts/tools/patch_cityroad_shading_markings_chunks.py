@@ -1195,6 +1195,12 @@ def connect_chunked_output(
 
 
 def main() -> dict:
+    raise RuntimeError(
+        "CITYROAD_CHUNK_OUTPUT has been retired. Spatial chunking must not be "
+        "reintroduced; use patch_cityroad_topology_outputs.py through the "
+        "live Houdini MCP workflow instead."
+    )
+
     hda = hou.node(HDA_NODE_PATH)
     core = hou.node(CORE_NODE_PATH)
     if hda is None or core is None:
