@@ -370,7 +370,8 @@ $resolvedHoudiniStartupScript = Resolve-HoudiniStartupScriptPath `
 
 Install-HoudiniRpcStartupHook -Path $resolvedHoudiniStartupScript -Port $HoudiniPort
 
-$houdiniProcess = Get-Process -Name 'houdini' -ErrorAction SilentlyContinue | Select-Object -First 1
+$houdiniProcess = Get-Process -Name 'houdini', 'houdinifx', 'houdinicore', 'hindie', 'heducation', 'happrentice' -ErrorAction SilentlyContinue |
+    Select-Object -First 1
 if (-not $houdiniProcess) {
     throw "Houdini is not running. The RPC startup hook is installed; start Houdini and rerun this preflight."
 }

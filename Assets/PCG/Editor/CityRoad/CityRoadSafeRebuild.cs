@@ -6,6 +6,7 @@ using HoudiniEngineUnity;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Splines;
 
 namespace PCG.CityRoad.Editor
 {
@@ -19,7 +20,12 @@ namespace PCG.CityRoad.Editor
     {
         private const string CityRoadAssetPath =
             "Assets/PCG/HDA/City/CityRoad.hda";
-        private const int ExpectedInputCount = 4;
+        private const int ExpectedAssetConnectorCount = 0;
+        private const int ExpectedParameterInputCount = 1;
+        internal const string RoadNetworkParameterName = "unity_road_network";
+        private const string RoadNetworkSourceParameterName =
+            "road_network_source";
+        private const int ExternalRoadNetworkSource = 0;
         private static readonly KeyValuePair<string, string>[] s_MaterialParameters =
         {
             new KeyValuePair<string, string>(
@@ -37,10 +43,7 @@ namespace PCG.CityRoad.Editor
         };
         private static readonly string[] s_InputReaderNodeNames =
         {
-            "IN_ROAD_NETWORK",
-            "IN_RACE_ROUTE",
-            "IN_TERRAIN_SURFACE",
-            "IN_CITY_BOUNDARY"
+            "IN_ROAD_NETWORK"
         };
 
         private static bool s_RebuildQueued;
@@ -183,6 +186,9 @@ namespace PCG.CityRoad.Editor
                     crosswalksEnabled))
                 return false;
 
+            if (!ApplyRoadNetworkSourceContract(root, asset))
+                return false;
+
             if (!ApplyMaterialParameterContract(root, asset))
                 return false;
 
@@ -222,10 +228,31 @@ namespace PCG.CityRoad.Editor
             Debug.LogFormat(
                 root,
                 "CityRoad Safe Rebuild: {0} reloaded and cooked successfully; "
-                + "all {1} inputs were force-uploaded (input 0: {2}).",
+                + "the {1} Spline parameter was force-uploaded ({2}).",
                 root.name,
-                ExpectedInputCount,
+                RoadNetworkParameterName,
                 inputZeroName);
+            return true;
+        }
+
+        private static bool ApplyRoadNetworkSourceContract(
+            HEU_HoudiniAssetRoot root,
+            HEU_HoudiniAsset asset)
+        {
+            if (asset == null || asset.Parameters == null
+                || !asset.Parameters.SetIntParameterValue(
+                    RoadNetworkSourceParameterName,
+                    ExternalRoadNetworkSource,
+                    bRecookAsset: false))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: required source selector {0} is missing.",
+                    RoadNetworkSourceParameterName);
+                return false;
+            }
+
+            EditorUtility.SetDirty(asset.Parameters);
             return true;
         }
 
@@ -359,20 +386,65 @@ namespace PCG.CityRoad.Editor
             HEU_HoudiniAsset asset,
             List<GameObject[]> inputBindings)
         {
-            if (asset == null
-                || asset.InputNodes == null
-                || asset.InputNodes.Count != ExpectedInputCount
-                || inputBindings.Count != ExpectedInputCount)
+            int assetConnectorCount = asset != null
+                ? asset.NodeInfo.inputCount
+                : -1;
+            if (assetConnectorCount != ExpectedAssetConnectorCount)
             {
                 Debug.LogErrorFormat(
                     root,
-                    "CityRoad Safe Rebuild: {0} must expose exactly {1} HDA inputs; "
-                    + "found {2}. Rebuild was cancelled without changing bindings.",
+                    "CityRoad Safe Rebuild: {0} must expose {1} HDA object "
+                    + "connector(s); found {2}. The Road Network must be a "
+                    + "parameter input, not an HDA connector.",
                     root.name,
-                    ExpectedInputCount,
+                    ExpectedAssetConnectorCount,
+                    assetConnectorCount);
+                return false;
+            }
+
+            if (asset == null
+                || asset.InputNodes == null
+                || asset.InputNodes.Count != ExpectedParameterInputCount
+                || inputBindings.Count != ExpectedParameterInputCount)
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: {0} must expose exactly {1} "
+                    + "parameter input(s); found {2}. Rebuild was cancelled "
+                    + "without changing bindings.",
+                    root.name,
+                    ExpectedParameterInputCount,
                     asset != null && asset.InputNodes != null
                         ? asset.InputNodes.Count
                         : 0);
+                return false;
+            }
+
+            HEU_InputNode roadNetworkInput = asset.InputNodes[0];
+            if (roadNetworkInput == null
+                || roadNetworkInput.NodeType
+                    != HEU_InputNodeTypeWrapper.PARAMETER
+                || roadNetworkInput.ObjectType
+                    != HEU_InputObjectTypeWrapper.SPLINE
+                || !string.Equals(
+                    roadNetworkInput.ParamName,
+                    RoadNetworkParameterName,
+                    StringComparison.Ordinal))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: input 0 must be the PARAMETER/SPLINE "
+                    + "input {0}; found NodeType={1}, ObjectType={2}, ParamName={3}.",
+                    RoadNetworkParameterName,
+                    roadNetworkInput != null
+                        ? roadNetworkInput.NodeType.ToString()
+                        : "<null>",
+                    roadNetworkInput != null
+                        ? roadNetworkInput.ObjectType.ToString()
+                        : "<null>",
+                    roadNetworkInput != null
+                        ? roadNetworkInput.ParamName
+                        : "<null>");
                 return false;
             }
 
@@ -382,7 +454,9 @@ namespace PCG.CityRoad.Editor
             {
                 Debug.LogErrorFormat(
                     root,
-                    "CityRoad Safe Rebuild: required road input 0 on {0} is empty.",
+                    "CityRoad Safe Rebuild: required Spline parameter {0} on "
+                    + "{1} is empty.",
+                    RoadNetworkParameterName,
                     root.name);
                 return false;
             }
@@ -396,16 +470,35 @@ namespace PCG.CityRoad.Editor
             List<GameObject[]> bindings)
         {
             if (asset.InputNodes == null
-                || asset.InputNodes.Count != ExpectedInputCount
-                || bindings.Count != ExpectedInputCount)
+                || asset.InputNodes.Count != ExpectedParameterInputCount
+                || bindings.Count != ExpectedParameterInputCount)
             {
                 Debug.LogErrorFormat(
                     root,
                     "CityRoad Safe Rebuild: input contract changed after reload on {0}; "
                     + "expected {1}, found {2}.",
                     root.name,
-                    ExpectedInputCount,
+                    ExpectedParameterInputCount,
                     asset.InputNodes != null ? asset.InputNodes.Count : 0);
+                return false;
+            }
+
+            HEU_InputNode roadNetworkInput = asset.InputNodes[0];
+            if (roadNetworkInput == null
+                || roadNetworkInput.NodeType
+                    != HEU_InputNodeTypeWrapper.PARAMETER
+                || roadNetworkInput.ObjectType
+                    != HEU_InputObjectTypeWrapper.SPLINE
+                || !string.Equals(
+                    roadNetworkInput.ParamName,
+                    RoadNetworkParameterName,
+                    StringComparison.Ordinal))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: {0} parameter input contract "
+                    + "changed after reload.",
+                    RoadNetworkParameterName);
                 return false;
             }
 
@@ -519,7 +612,16 @@ namespace PCG.CityRoad.Editor
                             out connectedMergeId)
                         && connectedMergeId >= 0;
                     if (!hasConnection)
-                        continue;
+                    {
+                        Debug.LogErrorFormat(
+                            root,
+                            "CityRoad Safe Rebuild: parameter input {0} is not "
+                            + "connected to an uploaded Houdini input node.",
+                            inputNode != null
+                                ? inputNode.ParamName
+                                : "<null>");
+                        return false;
+                    }
 
                     if (!CookImmediateInputs(session, connectedMergeId)
                         || !session.CookNode(connectedMergeId, false))
@@ -530,6 +632,17 @@ namespace PCG.CityRoad.Editor
                             + "input merge {0} for input {1}.",
                             connectedMergeId,
                             inputIndex);
+                        return false;
+                    }
+
+                    if (inputIndex >= s_InputReaderNodeNames.Length)
+                    {
+                        Debug.LogErrorFormat(
+                            root,
+                            "CityRoad Safe Rebuild: no input reader mapping for "
+                            + "input {0}; the HDA must expose exactly {1} input(s).",
+                            inputIndex,
+                            ExpectedParameterInputCount);
                         return false;
                     }
 
@@ -556,11 +669,11 @@ namespace PCG.CityRoad.Editor
                             + "IN_ROAD_NETWORK still contains no geometry.",
                             root);
                         return false;
+                    }
                 }
-            }
 
-            return true;
-        }
+                return true;
+            }
             catch (TargetInvocationException exception)
             {
                 Exception cause = exception.InnerException ?? exception;
@@ -687,6 +800,111 @@ namespace PCG.CityRoad.Editor
             return assetPath.EndsWith(
                 CityRoadAssetPath,
                 StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// Marks the CityRoad parameter input dirty when its bound Unity Spline changes.
+    /// The bridge performs no automatic cook and has no Update loop: Houdini Engine's
+    /// standard Recook command remains in control of the actual upload/cook timing.
+    /// </summary>
+    [InitializeOnLoad]
+    internal static class CityRoadSplineInputUploadTracker
+    {
+        static CityRoadSplineInputUploadTracker()
+        {
+            Install();
+        }
+
+        [InitializeOnLoadMethod]
+        private static void Install()
+        {
+            Spline.Changed -= OnSplineChanged;
+            Spline.Changed += OnSplineChanged;
+        }
+
+        private static void OnSplineChanged(
+            Spline changedSpline,
+            int knotIndex,
+            SplineModification modification)
+        {
+            if (changedSpline == null)
+                return;
+
+            HEU_HoudiniAssetRoot[] roots =
+                Resources.FindObjectsOfTypeAll<HEU_HoudiniAssetRoot>();
+            foreach (HEU_HoudiniAssetRoot root in roots)
+            {
+                if (!CityRoadSafeRebuild.IsCityRoad(root)
+                    || root.HoudiniAsset == null
+                    || root.HoudiniAsset.Parameters == null
+                    || !root.gameObject.scene.IsValid()
+                    || !root.gameObject.scene.isLoaded)
+                {
+                    continue;
+                }
+
+                HEU_InputNode roadNetworkInput =
+                    FindRoadNetworkParameterInput(root.HoudiniAsset);
+                GameObject inputObject = roadNetworkInput != null
+                    && roadNetworkInput.NumInputEntries() > 0
+                        ? roadNetworkInput.GetInputEntryGameObject(0)
+                        : null;
+                SplineContainer container = inputObject != null
+                    ? inputObject.GetComponent<SplineContainer>()
+                    : null;
+                if (!ContainsSpline(container, changedSpline))
+                    continue;
+
+                if (root.HoudiniAsset.Parameters.SetAssetRefParameterValue(
+                        CityRoadSafeRebuild.RoadNetworkParameterName,
+                        inputObject,
+                        0,
+                        bRecookAsset: false))
+                {
+                    EditorUtility.SetDirty(root.HoudiniAsset.Parameters);
+                    EditorUtility.SetDirty(root.HoudiniAsset);
+                }
+            }
+        }
+
+        private static HEU_InputNode FindRoadNetworkParameterInput(
+            HEU_HoudiniAsset asset)
+        {
+            if (asset == null || asset.InputNodes == null)
+                return null;
+
+            foreach (HEU_InputNode input in asset.InputNodes)
+            {
+                if (input != null
+                    && input.NodeType == HEU_InputNodeTypeWrapper.PARAMETER
+                    && input.ObjectType == HEU_InputObjectTypeWrapper.SPLINE
+                    && string.Equals(
+                        input.ParamName,
+                        CityRoadSafeRebuild.RoadNetworkParameterName,
+                        StringComparison.Ordinal))
+                {
+                    return input;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ContainsSpline(
+            SplineContainer container,
+            Spline candidate)
+        {
+            if (container == null || candidate == null)
+                return false;
+
+            foreach (Spline spline in container.Splines)
+            {
+                if (ReferenceEquals(spline, candidate))
+                    return true;
+            }
+
+            return false;
         }
     }
 
