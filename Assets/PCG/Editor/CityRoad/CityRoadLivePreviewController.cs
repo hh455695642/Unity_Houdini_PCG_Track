@@ -315,7 +315,10 @@ namespace PCG.CityRoad.Editor
             for (Transform current = transform; current != null; current = current.parent)
             {
                 if (current.name.IndexOf("Corridor_", StringComparison.OrdinalIgnoreCase) >= 0
-                    || current.name.IndexOf("Junction_", StringComparison.OrdinalIgnoreCase) >= 0)
+                    || current.name.IndexOf("Junction_", StringComparison.OrdinalIgnoreCase) >= 0
+                    // Direct-fill sidewalk/curb output is packed per enclosed
+                    // block instead of per road corridor or junction.
+                    || current.name.IndexOf("SidewalkRegion_", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return true;
                 }
