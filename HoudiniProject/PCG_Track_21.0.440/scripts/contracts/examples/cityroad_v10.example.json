@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v10-corner-sections",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CITYROAD_BUILD_CORNER_SECTION_CONSTRAINTS_V10",
+    "CityRoadCore/CITYROAD_BUILD_SIDEWALK_SECTION_CONSTRAINTS_V10",
+    "CityRoadCore/CITYROAD_FUSE_SIDEWALK_TRIANGULATION_V10"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [
+    "CityRoadCore/CITYROAD_MERGE_ROAD_BOUNDARY_PARTITIONS_V7",
+    "CityRoadCore/SIDEWALK_PLANAR_CONSTRAINT_MERGE",
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY"
+  ],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.V7.JunctionExtent",
+    "CityRoad.V8.MobileCornerRails",
+    "CityRoad.V9.FinalBoundaryBudget",
+    "CityRoad.V10.CornerSections",
+    "CityRoad.V10.SidewalkSections"
+  ]
+}
