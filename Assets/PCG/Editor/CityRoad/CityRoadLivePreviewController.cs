@@ -63,7 +63,8 @@ namespace PCG.CityRoad.Editor
                     bool visibleRole =
                         CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
                         || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
-                        || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS");
+                        || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
+                        || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform);
                     bool collisionRole =
                         CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_COLLISION");
                     // HEU keeps a backing renderer under HDA_Data and a
@@ -71,7 +72,8 @@ namespace PCG.CityRoad.Editor
                     // reference the same Mesh, so enabling by output role alone
                     // creates a perfectly overlapping duplicate surface.
                     bool presentationPiece = HasTopologyPieceName(renderer.transform);
-                    bool expectedEnabled = visibleRole && presentationPiece && !collisionRole;
+                    bool streetFurniture = CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform);
+                    bool expectedEnabled = visibleRole && (presentationPiece || streetFurniture) && !collisionRole;
                     if (renderer.enabled != expectedEnabled)
                     {
                         renderer.enabled = expectedEnabled;
@@ -143,7 +145,8 @@ namespace PCG.CityRoad.Editor
                 && renderer.gameObject.activeInHierarchy
                 && (CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
                     || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
-                    || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")));
+                    || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
+                    || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform)));
             return sourceVisible || !hasActiveBake;
         }
 

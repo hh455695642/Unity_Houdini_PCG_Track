@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v15-sidewalk-terminal-front-containment",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_sidewalk_terminal_front_v15.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/SIDEWALK_PLANAR_TRIANGULATE",
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY",
+    "CityRoadCore/SIDEWALK_PLANAR_MARK_SEAMS",
+    "CityRoadCore/CITYROAD_MARK_SIDEWALK_TERMINAL_FRONT_EXCLUSIONS_V15",
+    "CityRoadCore/CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CITYROAD_MARK_SIDEWALK_TERMINAL_FRONT_EXCLUSIONS_V15",
+    "CityRoadCore/CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15"
+  ],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY",
+    "CityRoadCore/SIDEWALK_PLANAR_MARK_SEAMS",
+    "CityRoadCore/CITYROAD_MARK_SIDEWALK_TERMINAL_FRONT_EXCLUSIONS_V15",
+    "CityRoadCore/CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/SIDEWALK_PLANAR_TRIANGULATE:removeoutsidesilhouette"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.V7.JunctionExtent",
+    "CityRoad.V8.MobileCornerRails",
+    "CityRoad.V9.FinalBoundaryBudget",
+    "CityRoad.V10.CornerSections",
+    "CityRoad.V10.SidewalkSections",
+    "CityRoad.V11.DeterministicSidewalkCornerStrips",
+    "CityRoad.V12.FinalBoundaryCornerSections",
+    "CityRoad.V13.SquareOpenEnds",
+    "CityRoad.V14.NonTerminalRounding",
+    "CityRoad.V15.SidewalkTerminalFrontContainment",
+    "CityRoad.Output.NoCookDiagnostics",
+    "CityRoad.Output.GeometrySanity",
+    "CityRoad.Output.Winding"
+  ]
+}

@@ -2,7 +2,8 @@
   "schema_version": 1,
   "asset_type": "pcgbike::CityRoad::1.0",
   "max_inputs": 0,
-  "public_interface_sha256": "6efd6f02eb08296b78ba60c75d8d35af8486ae1e385a71d963c165034eee555a",
+  "public_interface_sha256": "42da45a4abd6c3c25fd88d773da8bf34255922fc4e22e759f39ba9dcc8208d7a",
+  "live_public_interface_sha256": "2577c048207dd6e8473aceba50548cdb39c71a45703b7ff6a1d25a82ebcec479",
   "required_nodes": {
     "CITYROAD_SHADING_VERTEX_CONTRACT": "attribwrangle",
     "CITYROAD_ROAD_MATERIAL_ASSIGN": "attribwrangle",
@@ -45,7 +46,14 @@
     "OUT_ROAD_SURFACE": "output",
     "OUT_SIDEWALK_CURB": "output",
     "OUT_ROAD_COLLISION": "output",
-    "OUT_ROAD_MARKINGS": "output"
+    "OUT_ROAD_MARKINGS": "output",
+    "CITYROAD_STREET_BUILD_LAMPS_V1": "attribwrangle",
+    "CITYROAD_STREET_BUILD_TREES_V1": "attribwrangle",
+    "CITYROAD_STREET_BUILD_TREE_PITS_V1": "attribwrangle",
+    "CITYROAD_STREET_FURNITURE_V1": "null",
+    "OUT_STREET_LAMPS": "output",
+    "OUT_STREET_TREES": "output",
+    "OUT_STREET_TREE_PITS": "output"
   },
   "required_connections": {
     "CITYROAD_BUILD_JUNCTION_PARTITION_CUTS_V7": {
@@ -119,6 +127,32 @@
     },
     "OUT_ROAD_MARKINGS": {
       "0": "CITYROAD_TOPOLOGY_PACK_ROADMARKINGS"
+    },
+    "CITYROAD_STREET_BUILD_LAMPS_V1": {
+      "0": "OUT_ROAD_CENTERLINE_GRAPH",
+      "1": "CITYROAD_JUNCTION_APPROACH_METADATA",
+      "2": "CITYROAD_TOPOLOGY_CLASSIFY_ROAD"
+    },
+    "CITYROAD_STREET_BUILD_TREES_V1": {
+      "0": "OUT_ROAD_CENTERLINE_GRAPH",
+      "1": "CITYROAD_STREET_BUILD_LAMPS_V1",
+      "2": "CITYROAD_JUNCTION_APPROACH_METADATA",
+      "3": "CITYROAD_TOPOLOGY_CLASSIFY_ROAD"
+    },
+    "CITYROAD_STREET_BUILD_TREE_PITS_V1": {
+      "0": "CITYROAD_STREET_BUILD_TREES_V1"
+    },
+    "CITYROAD_STREET_FURNITURE_V1": {
+      "0": "CITYROAD_STREET_BUILD_TREE_PITS_V1"
+    },
+    "OUT_STREET_LAMPS": {
+      "0": "CITYROAD_STREET_BUILD_LAMPS_V1"
+    },
+    "OUT_STREET_TREES": {
+      "0": "CITYROAD_STREET_BUILD_TREES_V1"
+    },
+    "OUT_STREET_TREE_PITS": {
+      "0": "CITYROAD_STREET_BUILD_TREE_PITS_V1"
     }
   },
   "snippet_markers": {
@@ -172,13 +206,29 @@
     ],
     "CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15": [
       "CITYROAD_V15_SIDEWALK_TERMINAL_FRONT_CONTAINMENT"
+    ],
+    "CITYROAD_STREET_BUILD_LAMPS_V1": [
+      "CITYROAD_STREET_FURNITURE_V1",
+      "CITYROAD_STREET_FURNITURE_ROAD_CONTAINMENT_V2",
+      "CITYROAD_STREET_FURNITURE_SURFACE_CONTAINMENT_V3"
+    ],
+    "CITYROAD_STREET_BUILD_TREES_V1": [
+      "CITYROAD_STREET_FURNITURE_V1",
+      "CITYROAD_STREET_FURNITURE_ROAD_CONTAINMENT_V2",
+      "CITYROAD_STREET_FURNITURE_SURFACE_CONTAINMENT_V3"
+    ],
+    "CITYROAD_STREET_BUILD_TREE_PITS_V1": [
+      "CITYROAD_STREET_FURNITURE_V1"
     ]
   },
   "output_nodes": [
     "OUT_ROAD_SURFACE",
     "OUT_SIDEWALK_CURB",
     "OUT_ROAD_COLLISION",
-    "OUT_ROAD_MARKINGS"
+    "OUT_ROAD_MARKINGS",
+    "OUT_STREET_LAMPS",
+    "OUT_STREET_TREES",
+    "OUT_STREET_TREE_PITS"
   ],
   "contract_ids": [
     "CityRoad.Interface.Public",
@@ -202,6 +252,8 @@
     "CityRoad.V15.SidewalkTerminalFrontContainment",
     "CityRoad.Output.NoCookDiagnostics",
     "CityRoad.Output.GeometrySanity",
-    "CityRoad.Output.Winding"
+    "CityRoad.Output.Winding",
+    "CityRoad.V16.StreetFurniture",
+    "CityRoad.V17.StreetFurnitureSurfaceContainment"
   ]
 }

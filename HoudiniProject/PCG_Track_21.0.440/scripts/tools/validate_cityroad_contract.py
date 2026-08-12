@@ -17,6 +17,7 @@ import hashlib
 import importlib
 import json
 import os
+import math
 from pathlib import Path
 import sys
 from typing import Any
@@ -57,9 +58,10 @@ def require_node(core: hou.Node, name: str) -> hou.Node:
 def public_interface_hash(asset: hou.Node) -> str:
     definition = asset.type().definition()
     require(definition is not None, "CityRoad asset has no HDA definition")
-    # Editable production instances can carry transient spare parameter UI.
-    # The public API contract belongs to the persisted HDA definition.
-    dialog = definition.parmTemplateGroup().asDialogScript()
+    # Before persistence the approved public API exists only on the editable
+    # Live instance.  Fresh/locked verification uses the definition verbatim.
+    templates = definition.parmTemplateGroup() if asset.isLockedHDA() else asset.parmTemplateGroup()
+    dialog = templates.asDialogScript()
     return hashlib.sha256(dialog.encode("utf-8")).hexdigest()
 
 
@@ -131,9 +133,16 @@ def bounds_by_piece(geometry: hou.Geometry, kind: str):
 
 def validate_network(asset: hou.Node, core: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
     actual_hash = public_interface_hash(asset)
-    expected_hash = contract["public_interface_sha256"]
+    expected_hash = (
+        contract["public_interface_sha256"]
+        if asset.isLockedHDA()
+        else contract.get("live_public_interface_sha256", contract["public_interface_sha256"])
+    )
     require(expected_hash != "PENDING_CAPTURE", "CityRoad public interface baseline is not captured")
-    require(actual_hash == expected_hash, "CityRoad public parameter interface changed")
+    require(
+        actual_hash == expected_hash,
+        "CityRoad public parameter interface changed: "
+        f"actual={actual_hash} expected={expected_hash}")
 
     for name, expected_type in contract["required_nodes"].items():
         node = require_node(core, name)
@@ -186,13 +195,253 @@ def validate_outputs(core: hou.Node, contract: dict[str, Any]) -> dict[str, Any]
         require(not node.errors(), f"CityRoad output errors at {name}: {node.errors()}")
         require(not node.warnings(), f"CityRoad output warnings at {name}: {node.warnings()}")
         geometry = node.geometry()
-        require(len(geometry.prims()) > 0, f"CityRoad output is empty: {name}")
+        if name.startswith("OUT_STREET_"):
+            require(len(geometry.points()) > 0, f"CityRoad street output is empty: {name}")
+            require(len(geometry.prims()) == 0,
+                    f"CityRoad street output must contain points only: {name}")
+        else:
+            require(len(geometry.prims()) > 0, f"CityRoad output is empty: {name}")
         stats[name] = {
             "points": len(geometry.points()),
             "primitives": len(geometry.prims()),
             "vertices": sum(len(primitive.vertices()) for primitive in geometry.prims()),
         }
     return stats
+
+
+def _point_record(point: hou.Point) -> dict[str, Any]:
+    geometry = point.geometry()
+    def value(name: str, default=None):
+        attribute = geometry.findPointAttrib(name)
+        return point.attribValue(attribute) if attribute is not None else default
+    return {
+        "position": tuple(float(v) for v in point.position()),
+        "instance": str(value("unity_instance", "")),
+        "prefix": str(value("instance_prefix", "")),
+        "kind": str(value("pcg_kind", "")),
+        "group": str(value("pcg_group_key", "")),
+        "corridor": int(value("pcg_corridor_id", -1)),
+        "side": int(value("pcg_side", 0)),
+        "variant": int(value("pcg_variant", -1)),
+        "owner": int(value("pcg_owner_id", -1)),
+        "tangent": tuple(float(v) for v in value("pcg_tangent", (0, 0, 1))),
+        "distance": float(value("pcg_distance", -1.0)),
+        "length": float(value("pcg_corridor_length", -1.0)),
+        "orient": tuple(float(v) for v in value("orient", (0, 0, 0, 1))),
+        "scale": float(value("pscale", -1.0)),
+    }
+
+
+def _street_records(node: hou.Node) -> list[dict[str, Any]]:
+    node.cook(force=True)
+    require(not node.errors(), f"Street output errors at {node.path()}: {node.errors()}")
+    require(not node.warnings(), f"Street output warnings at {node.path()}: {node.warnings()}")
+    geometry = node.geometry()
+    require(detail_value(geometry, "unity_split_attr", "") == "pcg_group_key",
+            f"Street output split attribute changed at {node.name()}")
+    required = {
+        "unity_instance", "instance_prefix", "orient", "pscale", "pcg_kind",
+        "pcg_group_key", "pcg_corridor_id", "pcg_side", "pcg_variant",
+        "pcg_owner_id", "pcg_tangent", "pcg_distance", "pcg_corridor_length",
+    }
+    actual = {attribute.name() for attribute in geometry.pointAttribs()}
+    require(required <= actual,
+            f"Street output metadata missing at {node.name()}: {sorted(required - actual)}")
+    return [_point_record(point) for point in geometry.points()]
+
+
+def _street_signature(records: list[dict[str, Any]]) -> str:
+    payload = json.dumps(records, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _set_and_cook(asset: hou.Node, core: hou.Node, values: dict[str, Any]) -> tuple[int, int, int]:
+    for name, value in values.items():
+        parm = asset.parm(name)
+        require(parm is not None, f"Missing street parameter during boundary test: {name}")
+        parm.set(value)
+    result = []
+    for name in ("OUT_STREET_LAMPS", "OUT_STREET_TREES", "OUT_STREET_TREE_PITS"):
+        node = require_node(core, name)
+        node.cook(force=True)
+        require(not node.errors(), f"Street boundary cook failed at {name}: {node.errors()}")
+        result.append(len(node.geometry().points()))
+    return tuple(result)
+
+
+def validate_street_furniture(asset: hou.Node, core: hou.Node) -> dict[str, Any]:
+    lamp_node = require_node(core, "OUT_STREET_LAMPS")
+    tree_node = require_node(core, "OUT_STREET_TREES")
+    pit_node = require_node(core, "OUT_STREET_TREE_PITS")
+    lamps = _street_records(lamp_node)
+    trees = _street_records(tree_node)
+    pits = _street_records(pit_node)
+    require(lamps and trees and pits, "Default street-furniture outputs must not be empty")
+    require(len(lamps) % 2 == 0, "Street lamps are not strictly paired")
+    require(len(trees) == len(pits), "Default tree-pit probability must produce one pit per tree")
+
+    allowed_prefix = "Assets/PCG/Art/StreetFurniture/Placeholders/"
+    for record in lamps + trees + pits:
+        require(record["instance"].startswith("Assets/") and record["instance"].endswith(".prefab"),
+                f"Invalid Unity prefab path: {record['instance']}")
+        require(record["instance"].startswith(allowed_prefix),
+                f"Unexpected default placeholder path: {record['instance']}")
+        require(record["prefix"] == record["group"], "instance_prefix/group key mismatch")
+        require(record["side"] in (-1, 1), "Street side metadata is invalid")
+
+    # Validate against the same final, unpacked road-top triangles consumed by
+    # the V3 wrangles.  The earlier centre/radius approximation missed the
+    # irregular corner and crosswalk cases visible in Unity.
+    road_surface = require_node(core, "CITYROAD_TOPOLOGY_CLASSIFY_ROAD").geometry()
+    road_triangles = []
+    for primitive in road_surface.prims():
+        positions = [point.position() for point in primitive.points()]
+        if len(positions) == 3:
+            road_triangles.append(tuple((float(p[0]), float(p[2])) for p in positions))
+    require(road_triangles, "Final road-top surface contains no triangles")
+
+    def point_in_triangle_xz(position, triangle, tolerance=0.05):
+        px, pz = float(position[0]), float(position[2])
+        (ax, az), (bx, bz), (cx, cz) = triangle
+
+        def signed_distance(x0, z0, x1, z1, x2, z2):
+            edge_x, edge_z = x2 - x1, z2 - z1
+            length = math.hypot(edge_x, edge_z)
+            if length <= 1e-9:
+                return 1e9
+            return ((x0 - x1) * edge_z - (z0 - z1) * edge_x) / length
+
+        distances = (
+            signed_distance(px, pz, ax, az, bx, bz),
+            signed_distance(px, pz, bx, bz, cx, cz),
+            signed_distance(px, pz, cx, cz, ax, az),
+        )
+        return (max(distances) <= tolerance or min(distances) >= -tolerance)
+
+    road_intrusions = []
+    for record in lamps + trees:
+        if any(point_in_triangle_xz(record["position"], triangle)
+               for triangle in road_triangles):
+            road_intrusions.append((record["kind"], record["corridor"], record["owner"]))
+    require(not road_intrusions,
+            f"Street furniture overlaps final road surface: {road_intrusions[:8]}")
+    lamp_skip_pairs = int(detail_value(
+        require_node(core, "CITYROAD_STREET_BUILD_LAMPS_V1").geometry(),
+        "street_lamp_skipped_road_surface_pair_count", -1))
+    tree_surface_skips = int(detail_value(
+        require_node(core, "CITYROAD_STREET_BUILD_TREES_V1").geometry(),
+        "street_tree_skipped_road_surface_count", -1))
+    require(lamp_skip_pairs > 0 and tree_surface_skips > 0,
+            "Surface-containment fixture did not exercise lamp/tree rejection")
+
+    lamp_groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for lamp in lamps:
+        require(lamp["kind"] == "Lamps" and abs(lamp["scale"] - 1.0) <= 1e-6,
+                "Lamp kind/scale contract changed")
+        lamp_groups.setdefault((lamp["corridor"], lamp["owner"]), []).append(lamp)
+    for key, pair in lamp_groups.items():
+        require(len(pair) == 2 and {item["side"] for item in pair} == {-1, 1},
+                f"Lamp owner is not a left/right pair: {key}")
+        require(abs(pair[0]["distance"] - pair[1]["distance"]) <= 1e-5,
+                f"Lamp pair distance mismatch: {key}")
+        for lamp in pair:
+            require(lamp["distance"] >= asset.evalParm("junction_endpoint_clearance") - 1e-4,
+                    f"Lamp violates endpoint clearance: {key}")
+            require(lamp["distance"] <= lamp["length"] - asset.evalParm("junction_endpoint_clearance") + 1e-4,
+                    f"Lamp violates endpoint clearance: {key}")
+            tangent = hou.Vector3(lamp["tangent"])
+            lateral = hou.Vector3(0, 1, 0).cross(tangent).normalized()
+            expected = -float(lamp["side"]) * lateral
+            forward = hou.Quaternion(lamp["orient"]).rotate(hou.Vector3(0, 0, 1)).normalized()
+            require(forward.dot(expected) > 0.999,
+                    f"Lamp +Z does not face the road centre: {key}")
+    by_corridor_side: dict[tuple[int, int], list[float]] = {}
+    for lamp in lamps:
+        by_corridor_side.setdefault((lamp["corridor"], lamp["side"]), []).append(lamp["distance"])
+    spacing = float(asset.evalParm("lamp_spacing"))
+    for key, distances in by_corridor_side.items():
+        distances.sort()
+        for left, right in zip(distances, distances[1:]):
+            gap = right - left
+            multiple = max(1, round(gap / spacing))
+            require(abs(gap - multiple * spacing) <= 1e-3,
+                    f"Lamp spacing grid changed for {key}: {gap}")
+
+    pit_by_owner = {(pit["corridor"], pit["owner"]): pit for pit in pits}
+    tree_paths = set()
+    non_quarter_turn = False
+    for tree in trees:
+        require(tree["kind"] == "Trees", "Tree kind metadata changed")
+        require(asset.evalParm("tree_scale_min") - 1e-6 <= tree["scale"] <= asset.evalParm("tree_scale_max") + 1e-6,
+                "Tree scale is outside the configured uniform range")
+        tree_paths.add(tree["instance"])
+        angle = 2.0 * math.atan2(tree["orient"][1], tree["orient"][3])
+        quarter = math.pi * 0.5
+        if abs(angle / quarter - round(angle / quarter)) > 1e-3:
+            non_quarter_turn = True
+        key = (tree["corridor"], tree["owner"])
+        require(key in pit_by_owner, f"Tree has no matching pit: {key}")
+        pit = pit_by_owner[key]
+        require(pit["kind"] == "TreePits" and abs(pit["scale"] - 1.0) <= 1e-6,
+                f"Tree pit kind/scale changed: {key}")
+        require(sum((a - b) ** 2 for a, b in zip(tree["position"], pit["position"])) <= 1e-8,
+                f"Tree pit position differs from tree: {key}")
+        require(tree["distance"] >= asset.evalParm("junction_endpoint_clearance") - 1e-4 and
+                tree["distance"] <= tree["length"] - asset.evalParm("junction_endpoint_clearance") + 1e-4,
+                f"Tree violates endpoint clearance: {key}")
+        nearest_lamp_sq = min(sum((a - b) ** 2 for a, b in zip(tree["position"], lamp["position"])) for lamp in lamps)
+        require(nearest_lamp_sq + 1e-5 >= float(asset.evalParm("lamp_tree_clearance")) ** 2,
+                f"Tree violates lamp clearance: {key}")
+    require(non_quarter_turn, "Tree yaw is limited to 90-degree increments")
+    require(len(tree_paths) == 3, f"Default tree variants were not preserved: {sorted(tree_paths)}")
+
+    tracked = [
+        "enable_sidewalk", "sidewalk_width", "minimum_sidewalk_width", "tree_seed",
+        "tree_prefab1", "tree_prefab2", "tree_prefab3",
+    ]
+    original = {name: asset.parm(name).eval() for name in tracked}
+    default_signature = _street_signature(trees)
+    boundary = {}
+    try:
+        boundary["no_sidewalk"] = _set_and_cook(asset, core, {"enable_sidewalk": 0})
+        require(boundary["no_sidewalk"] == (0, 0, 0),
+                f"Street furniture generated without sidewalks: {boundary['no_sidewalk']}")
+        boundary["narrow_sidewalk"] = _set_and_cook(asset, core, {
+            "enable_sidewalk": original["enable_sidewalk"],
+            "sidewalk_width": max(0.0, float(original["minimum_sidewalk_width"]) - 0.1),
+        })
+        require(boundary["narrow_sidewalk"] == (0, 0, 0),
+                f"Street furniture generated on a narrow sidewalk: {boundary['narrow_sidewalk']}")
+        _set_and_cook(asset, core, {
+            "sidewalk_width": original["sidewalk_width"],
+            "tree_seed": int(original["tree_seed"]) + 1,
+        })
+        changed_seed = _street_signature(_street_records(tree_node))
+        require(changed_seed != default_signature, "Changing tree_seed did not change distribution")
+        _set_and_cook(asset, core, {
+            "tree_seed": original["tree_seed"],
+            "tree_prefab2": original["tree_prefab1"],
+        })
+        merged = _street_records(tree_node)
+        require(len({item["instance"] for item in merged}) == 2,
+                "Duplicate tree prefab paths were not merged")
+    finally:
+        _set_and_cook(asset, core, original)
+    restored = _street_records(tree_node)
+    require(_street_signature(restored) == default_signature,
+            "Tree distribution is not deterministic after parameter restore")
+    return {
+        "lamps": len(lamps),
+        "lamp_pairs": len(lamp_groups),
+        "trees": len(trees),
+        "tree_pits": len(pits),
+        "tree_variants": len(tree_paths),
+        "road_surface_intrusions": len(road_intrusions),
+        "lamp_surface_skipped_pairs": lamp_skip_pairs,
+        "tree_surface_skips": tree_surface_skips,
+        "deterministic_signature": default_signature,
+        "boundary": boundary,
+    }
 
 
 def validate_v7_v8_v9(asset: hou.Node, core: hou.Node) -> dict[str, Any]:
@@ -615,6 +864,7 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "contracts": contract["contract_ids"],
         "network": validate_network(asset, core, contract),
         "outputs": validate_outputs(core, contract),
+        "street_furniture": validate_street_furniture(asset, core),
         "v7_v8_v9": validate_v7_v8_v9(asset, core),
         "v10": validate_v10(core),
         "v11_v12_v13": validate_v11_v12_v13(core),

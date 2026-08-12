@@ -554,9 +554,11 @@ def write_capture(
         assert_live_matches_disk(snapshot, disk_snapshot)
         snapshot["houdini"]["unsaved_changes_verified_against_disk"] = True
     if (snapshot["houdini"].get("hip_unsaved_changes_after_capture")
-            and not snapshot["houdini"].get("capture_reloaded_clean")):
+            and not snapshot["houdini"].get("capture_reloaded_clean")
+            and not snapshot["houdini"].get("unsaved_changes_verified_against_disk")):
         raise GateFailure(
-            "Capture dirtied the Live Scene; no baseline was written. Reload the HIP and inspect the capture path.")
+            "Capture left an unverified dirty Live Scene; no baseline was written. "
+            "Reload the HIP and inspect the capture path.")
 
     scoped_files = sorted(set([config["definition"], config["hip"], *manifest["allowed_files"]]))
     snapshot["captured_at"] = _datetime.datetime.now(_datetime.timezone.utc).isoformat()
@@ -663,6 +665,11 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     if actual_definition.lower() != expected_definition.lower():
         raise RuntimeError('Definition changed before persistence: {} != {}'.format(actual_definition, expected_definition))
     definition.updateFromNode(asset)
+    # updateFromNode persists the asset contents but intentionally leaves
+    # instance spare parameters out of the type definition.  Public API
+    # changes have already passed the manifest allowlist at VerifyFast, so the
+    # verified Live template group must be persisted explicitly as well.
+    definition.setParmTemplateGroup(asset.parmTemplateGroup())
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),

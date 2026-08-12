@@ -33,6 +33,12 @@ namespace PCG.CityRoad.Editor
         private const string AsphaltShaderName = "PCG/CityRoad/Asphalt";
         private const string SimpleSurfaceShaderName = "PCG/CityRoad/SimpleSurface";
         private const string MarkingShaderName = "PCG/CityRoad/Marking";
+        private static readonly string[] s_StreetFurnitureOutputs =
+        {
+            "OUT_STREET_LAMPS",
+            "OUT_STREET_TREES",
+            "OUT_STREET_TREE_PITS",
+        };
 
         [MenuItem("PCG/CityRoad/Cook + Validate + Update Bake Selected", priority = 2110)]
         private static void CookValidateAndBakeSelected()
@@ -102,6 +108,18 @@ namespace PCG.CityRoad.Editor
             if (!CityRoadSafeRebuild.Rebuild(root))
             {
                 Debug.LogError("CityRoad Bake: cook/reload failed; Bake was not changed.", root);
+                return false;
+            }
+
+            // Existing scene instances do not receive newly-added HDA
+            // parameters until Reload/Rebuild. Validate configuration after
+            // that migration, but before touching the existing Bake prefab.
+            if (!ValidateStreetFurnitureConfiguration(root.HoudiniAsset, out string furnitureReport))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Bake: street-furniture configuration is invalid; Bake was not changed.\n{0}",
+                    furnitureReport);
                 return false;
             }
 
@@ -240,6 +258,7 @@ namespace PCG.CityRoad.Editor
 
             ValidateRendererMaterials(activeRenderers, issues);
             ValidateRendererShadowContract(activeRenderers, issues);
+            ValidateStreetFurnitureHierarchy(root, activeRenderers, issues);
 
             Transform chunkTransform = root.GetComponentsInChildren<Transform>(true)
                 .FirstOrDefault(transform =>
@@ -322,6 +341,170 @@ namespace PCG.CityRoad.Editor
             if (issues.Count > 0)
                 report += "\n- " + string.Join("\n- ", issues);
             return issues.Count == 0;
+        }
+
+        internal static bool ValidateStreetFurnitureConfiguration(
+            HEU_HoudiniAsset asset,
+            out string report)
+        {
+            var issues = new List<string>();
+            if (asset == null || asset.Parameters == null)
+            {
+                report = "HDA parameters are unavailable.";
+                return false;
+            }
+
+            ValidateConfiguredPrefab(asset, "lamp_prefab", "lamp", issues);
+            ValidateConfiguredPrefab(asset, "tree_pit_prefab", "tree pit", issues);
+
+            HEU_ParameterData variants = asset.Parameters.GetParameter("tree_variants");
+            int variantCount = variants != null && variants.IsMultiParam()
+                ? variants._parmInfo.instanceCount
+                : 0;
+            if (variantCount <= 0)
+            {
+                issues.Add("tree_variants must contain at least one entry.");
+            }
+            else
+            {
+                for (int index = 1; index <= variantCount; index++)
+                {
+                    ValidateConfiguredPrefab(
+                        asset,
+                        "tree_prefab" + index,
+                        "tree variant " + index,
+                        issues);
+                    float weight;
+                    if (!asset.Parameters.GetFloatParameterValue(
+                            "tree_weight" + index,
+                            out weight)
+                        || weight <= 0f)
+                    {
+                        issues.Add("tree_weight" + index + " must be positive.");
+                    }
+                }
+            }
+
+            report = issues.Count == 0
+                ? "Street-furniture prefab configuration passed."
+                : "- " + string.Join("\n- ", issues);
+            return issues.Count == 0;
+        }
+
+        private static void ValidateConfiguredPrefab(
+            HEU_HoudiniAsset asset,
+            string parameterName,
+            string label,
+            List<string> issues)
+        {
+            string path;
+            if (!asset.Parameters.GetStringParameterValue(parameterName, out path))
+            {
+                issues.Add("Missing HDA parameter " + parameterName + ".");
+                return;
+            }
+
+            path = (path ?? string.Empty).Replace('\\', '/');
+            if (!path.StartsWith("Assets/", StringComparison.Ordinal)
+                || !path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(label + " path must be an Assets/*.prefab path: " + path);
+                return;
+            }
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                issues.Add(label + " prefab does not exist: " + path);
+                return;
+            }
+
+            if (!ValidateStreetFurniturePrefab(prefab, out string prefabIssue))
+                issues.Add(label + " prefab is unsupported: " + path + " (" + prefabIssue + ")");
+        }
+
+        internal static bool ValidateStreetFurniturePrefab(GameObject prefab, out string issue)
+        {
+            if (prefab == null)
+            {
+                issue = "Prefab is null.";
+                return false;
+            }
+
+            string path = AssetDatabase.GetAssetPath(prefab).Replace('\\', '/');
+            if (!path.StartsWith("Assets/", StringComparison.Ordinal)
+                || !path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                issue = "Asset is not an Assets/*.prefab.";
+                return false;
+            }
+
+            MeshRenderer[] renderers = prefab.GetComponentsInChildren<MeshRenderer>(true);
+            MeshFilter[] filters = prefab.GetComponentsInChildren<MeshFilter>(true);
+            if (renderers.Length != 1 || filters.Length != 1)
+            {
+                issue = string.Format(
+                    "Expected exactly one MeshRenderer + MeshFilter, found {0} + {1}.",
+                    renderers.Length,
+                    filters.Length);
+                return false;
+            }
+            if (renderers[0].gameObject != filters[0].gameObject || filters[0].sharedMesh == null)
+            {
+                issue = "MeshRenderer/MeshFilter must share one GameObject and a valid mesh.";
+                return false;
+            }
+            if (prefab.GetComponentsInChildren<Collider>(true).Length > 0)
+            {
+                issue = "Collider is not supported.";
+                return false;
+            }
+            if (prefab.GetComponentsInChildren<LODGroup>(true).Length > 0
+                || prefab.GetComponentsInChildren<Animator>(true).Length > 0
+                || prefab.GetComponentsInChildren<Animation>(true).Length > 0
+                || prefab.GetComponentsInChildren<ParticleSystem>(true).Length > 0
+                || prefab.GetComponentsInChildren<MonoBehaviour>(true).Length > 0)
+            {
+                issue = "LOD, animation, particles, and runtime scripts are not supported.";
+                return false;
+            }
+
+            issue = "OK";
+            return true;
+        }
+
+        private static void ValidateStreetFurnitureHierarchy(
+            GameObject root,
+            Renderer[] activeRenderers,
+            List<string> issues)
+        {
+            foreach (string output in s_StreetFurnitureOutputs)
+            {
+                Transform outputRoot = root.GetComponentsInChildren<Transform>(true)
+                    .FirstOrDefault(transform => transform.name.IndexOf(
+                        output,
+                        StringComparison.OrdinalIgnoreCase) >= 0);
+                if (outputRoot == null)
+                {
+                    issues.Add("Missing street-furniture output: " + output);
+                    continue;
+                }
+
+                Renderer[] instances = activeRenderers
+                    .Where(renderer => IsUnderNamedOutput(renderer.transform, output))
+                    .ToArray();
+                if (instances.Length == 0)
+                {
+                    issues.Add("Street-furniture output contains no enabled prefab instances: " + output);
+                    continue;
+                }
+                if (outputRoot.GetComponentsInChildren<Collider>(true).Length > 0)
+                    issues.Add(output + " contains Collider components.");
+                if (outputRoot.GetComponentsInChildren<LODGroup>(true).Length > 0
+                    || outputRoot.GetComponentsInChildren<Animator>(true).Length > 0
+                    || outputRoot.GetComponentsInChildren<ParticleSystem>(true).Length > 0)
+                    issues.Add(output + " contains unsupported runtime components.");
+            }
         }
 
         private static void ValidateRendererMaterials(
@@ -623,7 +806,8 @@ namespace PCG.CityRoad.Editor
             for (Transform current = transform; current != null; current = current.parent)
             {
                 if (current.name.IndexOf("Corridor_", StringComparison.OrdinalIgnoreCase) >= 0
-                    || current.name.IndexOf("Junction_", StringComparison.OrdinalIgnoreCase) >= 0)
+                    || current.name.IndexOf("Junction_", StringComparison.OrdinalIgnoreCase) >= 0
+                    || current.name.IndexOf("SidewalkRegion_", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return true;
                 }
@@ -644,6 +828,11 @@ namespace PCG.CityRoad.Editor
                     return true;
             }
             return false;
+        }
+
+        internal static bool IsStreetFurnitureOutput(Transform transform)
+        {
+            return s_StreetFurnitureOutputs.Any(output => IsUnderNamedOutput(transform, output));
         }
 
         private static string GetHierarchyPath(Transform transform)
