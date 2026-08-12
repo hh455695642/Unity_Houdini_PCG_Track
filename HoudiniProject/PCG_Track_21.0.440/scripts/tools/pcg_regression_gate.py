@@ -56,6 +56,27 @@ MODULES: dict[str, dict[str, Any]] = {
         "network_roots": ["TerrainCore", "TerrainCore/10_TERRAIN_SOURCE"],
         "outputs": ["TerrainCore/10_TERRAIN_SOURCE/OUT_BASE_HEIGHTFIELD"],
     },
+    "StreetBuilding": {
+        # This module is authored and validated in disposable hython processes.
+        # The dirty CityRoad GUI session is an observed dependency, never a
+        # persistence target for StreetBuilding.
+        "isolated": True,
+        "asset_path": "/obj/StreetBuilding_DEV",
+        "asset_type": "pcgbike::StreetBuilding::1.0",
+        "definition": "Assets/PCG/HDA/City/StreetBuilding.hda",
+        "hip": "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip",
+        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/create_streetbuilding_graybox.py",
+        "restore_files": ["Assets/PCG/HDA/City/StreetBuilding.hda.meta"],
+        "network_roots": ["StreetBuildingCore"],
+        "outputs": [
+            "StreetBuildingCore/OUT_BUILDING_LOD0",
+            "StreetBuildingCore/OUT_BUILDING_LOD1",
+            "StreetBuildingCore/OUT_BUILDING_LOD2",
+            "StreetBuildingCore/OUT_DETAIL_INSTANCES",
+            "StreetBuildingCore/OUT_BUILDING_COLLISION",
+            "StreetBuildingCore/OUT_BUILDING_METADATA",
+        ],
+    },
 }
 
 
@@ -201,8 +222,21 @@ def compare_snapshots(
                 violations.append(f"Node parameter changed outside allowlist: {scoped_name}")
 
     if not manifest["allow_output_changes"]:
+        # needs_cook is transient cache state, not output semantics. A validator
+        # or benchmark may cook one formal output without changing its graph,
+        # geometry, attributes, or diagnostics.
+        baseline_outputs = {
+            path: {key: value for key, value in state.items()
+                   if key != "needs_cook"}
+            for path, state in baseline.get("outputs", {}).items()
+        }
+        current_outputs = {
+            path: {key: value for key, value in state.items()
+                   if key != "needs_cook"}
+            for path, state in current.get("outputs", {}).items()
+        }
         changed_outputs = _changed_keys(
-            baseline.get("outputs", {}), current.get("outputs", {}))
+            baseline_outputs, current_outputs)
         for output in sorted(changed_outputs):
             violations.append(f"Output changed without allow_output_changes: {output}")
 
@@ -376,8 +410,10 @@ def _pcg_capture_live(module, config_json):
     if definition is None:
         raise RuntimeError("Target asset has no HDA definition: " + asset.path())
     nodes = {".": _pcg_node_state(asset, asset)}
-    # Capture explicit authored network roots.  allSubChildren() also walks
-    # hundreds of generated attribvop internals and is unstable over RPC.
+    # Capture explicit authored network roots.  For CityRoad, recurse exactly
+    # one authored level into CR_* subnets; never walk Wrangle/VOP internals.
+    # This keeps structural gates stable while allowing leaf nodes to retain
+    # their unique names after the V19 layout migration.
     for network_path in config["network_roots"]:
         network = asset.node(network_path)
         if network is None:
@@ -385,6 +421,9 @@ def _pcg_capture_live(module, config_json):
         nodes[_pcg_relative(asset.path(), network.path())] = _pcg_node_state(asset, network)
         for node in network.children():
             nodes[_pcg_relative(asset.path(), node.path())] = _pcg_node_state(asset, node)
+            if node.name().startswith("CR_") and node.type().name() == "subnet":
+                for child in node.children():
+                    nodes[_pcg_relative(asset.path(), child.path())] = _pcg_node_state(asset, child)
     outputs = {
         path: _pcg_output_state(asset, path) for path in config["outputs"]
     }
@@ -538,6 +577,33 @@ def default_snapshot_path(project_root: Path, module: str, task: str) -> Path:
     return project_root / ".codex_tmp" / "regression" / f"{stamp}-{module}-{safe_task}" / "baseline.json"
 
 
+def isolated_snapshot(
+    project_root: Path, module: str, config: dict[str, Any]
+) -> dict[str, Any]:
+    """Describe an isolated module without reading or mutating the live GUI."""
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "module": module,
+        "houdini": {
+            "module": module,
+            "hip": normalize_path(resolve_scoped_path(project_root, config["hip"])),
+            "hip_unsaved_changes": False,
+            "asset_path": config["asset_path"],
+            "asset_type": config["asset_type"],
+            "definition": normalize_path(
+                resolve_scoped_path(project_root, config["definition"])),
+            "editable": False,
+            "locked": True,
+            "isolated_process": True,
+        },
+        "public_interface": {},
+        "nodes": {},
+        "outputs": {},
+        "diagnostics": {"errors": [], "warnings": []},
+    }
+
+
 def write_capture(
     project_root: Path,
     module: str,
@@ -547,18 +613,22 @@ def write_capture(
     host: str,
     port: int,
 ) -> dict[str, Any]:
-    snapshot = capture_live(module, config, host, port)
-    assert_identity(snapshot, project_root, config)
-    if snapshot["houdini"].get("hip_unsaved_changes"):
-        disk_snapshot = capture_disk(module, config, project_root)
-        assert_live_matches_disk(snapshot, disk_snapshot)
-        snapshot["houdini"]["unsaved_changes_verified_against_disk"] = True
-    if (snapshot["houdini"].get("hip_unsaved_changes_after_capture")
-            and not snapshot["houdini"].get("capture_reloaded_clean")
-            and not snapshot["houdini"].get("unsaved_changes_verified_against_disk")):
-        raise GateFailure(
-            "Capture left an unverified dirty Live Scene; no baseline was written. "
-            "Reload the HIP and inspect the capture path.")
+    if config.get("isolated"):
+        snapshot = isolated_snapshot(project_root, module, config)
+        assert_identity(snapshot, project_root, config)
+    else:
+        snapshot = capture_live(module, config, host, port)
+        assert_identity(snapshot, project_root, config)
+        if snapshot["houdini"].get("hip_unsaved_changes"):
+            disk_snapshot = capture_disk(module, config, project_root)
+            assert_live_matches_disk(snapshot, disk_snapshot)
+            snapshot["houdini"]["unsaved_changes_verified_against_disk"] = True
+        if (snapshot["houdini"].get("hip_unsaved_changes_after_capture")
+                and not snapshot["houdini"].get("capture_reloaded_clean")
+                and not snapshot["houdini"].get("unsaved_changes_verified_against_disk")):
+            raise GateFailure(
+                "Capture left an unverified dirty Live Scene; no baseline was written. "
+                "Reload the HIP and inspect the capture path.")
 
     scoped_files = sorted(set([config["definition"], config["hip"], *manifest["allowed_files"]]))
     snapshot["captured_at"] = _datetime.datetime.now(_datetime.timezone.utc).isoformat()
@@ -570,8 +640,12 @@ def write_capture(
     backup_root = snapshot_path.parent / "backup"
     backup_root.mkdir(parents=True, exist_ok=True)
     backups: dict[str, str] = {}
-    for relative in (config["definition"], config["hip"]):
+    for relative in (config["definition"], config["hip"], *config.get("restore_files", [])):
         source = resolve_scoped_path(project_root, relative)
+        if not source.is_file() and config.get("isolated"):
+            # A missing HDA/HIP pair is the valid baseline for a new isolated
+            # asset. Restore will remove only these exact files if needed.
+            continue
         if not source.is_file():
             raise GateFailure(f"Required baseline file not found: {source}")
         destination = backup_root / relative
@@ -602,7 +676,11 @@ def verify_fast(
     expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
-    current = capture_live(module, config, host, port)
+    current = (
+        isolated_snapshot(project_root, module, config)
+        if config.get("isolated")
+        else capture_live(module, config, host, port)
+    )
     assert_identity(current, project_root, config)
     scoped_files = baseline.get("files", {}).keys()
     current["files"] = file_state(project_root, scoped_files)
@@ -620,6 +698,61 @@ def verify_fast(
     }
 
 
+def persist_isolated(
+    project_root: Path,
+    module: str,
+    config: dict[str, Any],
+    manifest: dict[str, Any],
+    snapshot_path: Path,
+) -> dict[str, Any]:
+    """Create a new asset in a disposable hython process, never in Live GUI."""
+
+    baseline = load_baseline(snapshot_path)
+    expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
+    if baseline.get("manifest_sha256") != expected_manifest_hash:
+        raise GateFailure("Change manifest differs from the one used by Capture")
+    for relative in (config["definition"], config["hip"]):
+        if not matches(relative, manifest["allowed_files"]):
+            raise GateFailure(
+                f"VerifyFull persistence requires allowed_files to include {relative}")
+    builder = resolve_scoped_path(project_root, config["builder"])
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(builder),
+            "--project-root",
+            str(project_root),
+            "--save",
+            "true",
+            "--update-existing",
+            "true",
+        ],
+        cwd=project_root,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        raise GateFailure(
+            "Isolated builder failed:\n" + (result.stderr or result.stdout).strip())
+    states = file_state(project_root, (config["definition"], config["hip"]))
+    missing = [path for path, state in states.items() if not state["exists"]]
+    if missing:
+        raise GateFailure("Isolated builder did not create: " + ", ".join(missing))
+    return {
+        "status": "PASS",
+        "module": module,
+        "stage": "Persist",
+        "snapshot": normalize_path(snapshot_path),
+        "files": states,
+        "houdini": {"isolated_process": True, "live_scene_untouched": True},
+    }
+
+
 def persist_live(
     project_root: Path,
     module: str,
@@ -631,11 +764,14 @@ def persist_live(
 ) -> dict[str, Any]:
     """Persist the already-verified Live Scene to its exact HDA/HIP targets."""
 
+    if config.get("isolated"):
+        return persist_isolated(project_root, module, config, manifest, snapshot_path)
+
     baseline = load_baseline(snapshot_path)
     expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
-    for relative in (config["definition"], config["hip"]):
+    for relative in (config["definition"], config["hip"], *config.get("restore_files", [])):
         if not matches(relative, manifest["allowed_files"]):
             raise GateFailure(
                 f"VerifyFull persistence requires allowed_files to include {relative}")
@@ -645,10 +781,12 @@ def persist_live(
         resolve_scoped_path(project_root, config["definition"]))
     connection = connect_live(host, port)
     try:
+        preserve_public_interface = not bool(manifest.get("allowed_public_parameters", []))
         connection.execute(
             """
 import hou
-def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_definition):
+def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_definition,
+                      preserve_public_interface):
     asset = hou.node(expected_path)
     if asset is None or asset.type().name() != expected_type:
         matches = [node for node in hou.node('/obj').children() if node.type().name() == expected_type]
@@ -664,12 +802,18 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         raise RuntimeError('HIP changed before persistence: {} != {}'.format(actual_hip, expected_hip))
     if actual_definition.lower() != expected_definition.lower():
         raise RuntimeError('Definition changed before persistence: {} != {}'.format(actual_definition, expected_definition))
+    original_templates = definition.parmTemplateGroup()
     definition.updateFromNode(asset)
-    # updateFromNode persists the asset contents but intentionally leaves
-    # instance spare parameters out of the type definition.  Public API
-    # changes have already passed the manifest allowlist at VerifyFast, so the
-    # verified Live template group must be persisted explicitly as well.
-    definition.setParmTemplateGroup(asset.parmTemplateGroup())
+    if preserve_public_interface:
+        # Internal network edits can make Houdini synthesize instance-only
+        # baseparm/folder ids on the unlocked implementation node.  They are
+        # not public API and must never leak into a definition when the
+        # manifest allows no public parameter changes.
+        definition.setParmTemplateGroup(original_templates)
+    else:
+        # Only a manifest with an explicit public-parameter allowlist may
+        # promote the verified Live template group into the definition.
+        definition.setParmTemplateGroup(asset.parmTemplateGroup())
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),
@@ -680,8 +824,9 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
 """
         )
         payload = connection.eval(
-            "_pcg_persist_live({!r}, {!r}, {!r}, {!r})".format(
-                config["asset_path"], config["asset_type"], expected_hip, expected_definition))
+            "_pcg_persist_live({!r}, {!r}, {!r}, {!r}, {!r})".format(
+                config["asset_path"], config["asset_type"], expected_hip,
+                expected_definition, preserve_public_interface))
         persisted = dict(payload)
     finally:
         connection.close()
@@ -709,9 +854,17 @@ def restore_baseline(
 
     baseline = load_baseline(snapshot_path)
     restored: dict[str, str] = {}
-    for relative in (config["definition"], config["hip"]):
+    restore_targets = [config["definition"], config["hip"], *config.get("restore_files", [])]
+    for relative in restore_targets:
         backup_relative = baseline.get("backups", {}).get(relative)
         if not backup_relative:
+            expected_state = baseline.get("files", {}).get(relative, {})
+            destination = resolve_scoped_path(project_root, relative)
+            if config.get("isolated") and not expected_state.get("exists", False):
+                if destination.is_file():
+                    destination.unlink()
+                    restored[relative] = "REMOVED_NEW_FILE"
+                continue
             raise GateFailure(f"Baseline has no backup entry for {relative}")
         source = resolve_scoped_path(project_root, backup_relative)
         destination = resolve_scoped_path(project_root, relative)
@@ -722,6 +875,16 @@ def restore_baseline(
             raise GateFailure(f"Baseline backup hash mismatch: {source}")
         shutil.copy2(source, destination)
         restored[relative] = sha256_file(destination)
+
+    if config.get("isolated"):
+        return {
+            "status": "RESTORED",
+            "module": module,
+            "stage": "Restore",
+            "snapshot": normalize_path(snapshot_path),
+            "files": restored,
+            "houdini": {"isolated_process": True, "live_scene_untouched": True},
+        }
 
     hip_path = normalize_path(resolve_scoped_path(project_root, config["hip"]))
     hda_path = normalize_path(resolve_scoped_path(project_root, config["definition"]))

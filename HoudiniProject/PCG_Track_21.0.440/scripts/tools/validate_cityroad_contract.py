@@ -30,6 +30,7 @@ PROJECT_ROOT = SCRIPT_DIR.parents[3]
 DEFAULT_HDA = PROJECT_ROOT / "Assets/PCG/HDA/City/CityRoad.hda"
 DEFAULT_HIP = PROJECT_ROOT / "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip"
 CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_contract.json"
+LAYOUT_CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_subnet_layout_contract.json"
 ASSET_TYPE = "pcgbike::CityRoad::1.0"
 LIVE_ASSET_PATH = "/obj/CityRoad_DEV"
 CORE_NAME = "CityRoadCore"
@@ -51,18 +52,111 @@ def detail_value(geometry: hou.Geometry, name: str, default: Any = None) -> Any:
 
 def require_node(core: hou.Node, name: str) -> hou.Node:
     node = core.node(name)
-    require(node is not None, f"Missing required CityRoad node: {core.path()}/{name}")
-    return node
+    if node is not None:
+        return node
+    matches = []
+    for child in core.children():
+        if child.type().name() != "subnet" or not child.name().startswith("CR_"):
+            continue
+        candidate = child.node(name)
+        if candidate is not None:
+            matches.append(candidate)
+    require(
+        len(matches) == 1,
+        f"Required CityRoad leaf must be unique: {name}, found "
+        f"{[candidate.path() for candidate in matches]}")
+    return matches[0]
+
+
+def _subnet_output_source(subnet: hou.Node, output_index: int) -> hou.Node | None:
+    outputs = []
+    for child in subnet.children():
+        if child.type().name() != "output":
+            continue
+        parm = child.parm("outputidx")
+        index = int(parm.eval()) if parm is not None else len(outputs)
+        outputs.append((index, child))
+    for index, output in sorted(outputs, key=lambda item: item[0]):
+        if index != output_index:
+            continue
+        connections = output.inputConnections()
+        return connections[0].inputNode() if connections else None
+    return None
+
+
+def logical_source_name(connection: hou.NodeConnection) -> str | None:
+    """Resolve a connection through an authored subnet output to its leaf."""
+
+    source = connection.inputNode()
+    output_index = connection.outputIndex()
+    visited = set()
+    while source is not None and source.type().name() == "subnet" and source.name().startswith("CR_"):
+        if source.path() in visited:
+            raise ContractFailure(f"Subnet output cycle at {source.path()}")
+        visited.add(source.path())
+        source = _subnet_output_source(source, output_index)
+        output_index = 0
+    return source.name() if source is not None else None
+
+
+def _safe(callable_value, default=None):
+    try:
+        return callable_value()
+    except Exception:
+        return default
+
+
+def _json_value(value):
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (tuple, list)):
+        return [_json_value(item) for item in value]
+    return str(value)
+
+
+def public_interface_schema(asset: hou.Node) -> dict[str, Any]:
+    definition = asset.type().definition()
+    require(definition is not None, "CityRoad asset has no HDA definition")
+    result = {}
+
+    def visit(templates, folder):
+        for template in templates:
+            name = _safe(lambda: template.name(), "")
+            label = _safe(lambda: template.label(), "")
+            template_type = _safe(lambda: template.type(), None)
+            kind = (_safe(lambda: template_type.name(), str(template_type))
+                    if template_type is not None else "unknown")
+            key = "/".join(folder + [name or ("@" + label)])
+            result[key] = {
+                "name": name,
+                "label": label,
+                "type": kind,
+                "folder": folder,
+                "components": _safe(lambda: template.numComponents(), None),
+                "default": _json_value(_safe(lambda: template.defaultValue(), None)),
+                "min": _safe(lambda: template.minValue(), None),
+                "max": _safe(lambda: template.maxValue(), None),
+                "min_strict": _safe(lambda: template.minIsStrict(), None),
+                "max_strict": _safe(lambda: template.maxIsStrict(), None),
+                "menu_items": _json_value(_safe(lambda: template.menuItems(), None)),
+                "menu_labels": _json_value(_safe(lambda: template.menuLabels(), None)),
+                "hidden": _safe(lambda: template.isHidden(), None),
+                "conditionals": str(_safe(lambda: template.conditionals(), {})),
+            }
+            children = _safe(lambda: template.parmTemplates(), None)
+            if children:
+                visit(children, folder + [name or ("@" + label)])
+
+    # Hash the persisted definition schema.  Houdini is free to rewrite
+    # DialogScript-only folder/baseparm ids; those are not public API.
+    visit(definition.parmTemplateGroup().parmTemplates(), [])
+    return result
 
 
 def public_interface_hash(asset: hou.Node) -> str:
-    definition = asset.type().definition()
-    require(definition is not None, "CityRoad asset has no HDA definition")
-    # Before persistence the approved public API exists only on the editable
-    # Live instance.  Fresh/locked verification uses the definition verbatim.
-    templates = definition.parmTemplateGroup() if asset.isLockedHDA() else asset.parmTemplateGroup()
-    dialog = templates.asDialogScript()
-    return hashlib.sha256(dialog.encode("utf-8")).hexdigest()
+    payload = json.dumps(public_interface_schema(asset), ensure_ascii=False,
+                         sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def load_contract() -> dict[str, Any]:
@@ -70,6 +164,140 @@ def load_contract() -> dict[str, Any]:
     require(contract.get("schema_version") == 1, "Unsupported CityRoad contract schema")
     require(contract.get("asset_type") == ASSET_TYPE, "CityRoad contract type mismatch")
     return contract
+
+
+def load_layout_contract() -> dict[str, Any]:
+    contract = json.loads(LAYOUT_CONTRACT_PATH.read_text(encoding="utf-8"))
+    require(contract.get("schema_version") == 1,
+            "Unsupported CityRoad subnet layout contract schema")
+    return contract
+
+
+def _positions_overlap(nodes: list[hou.Node]) -> list[tuple[str, str]]:
+    buckets: dict[tuple[float, float], str] = {}
+    overlaps = []
+    for node in nodes:
+        position = node.position()
+        key = (round(float(position.x()), 3), round(float(position.y()), 3))
+        if key in buckets:
+            overlaps.append((buckets[key], node.path()))
+        else:
+            buckets[key] = node.path()
+    return overlaps
+
+
+def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
+    contract = load_layout_contract()
+    expected_subnets = contract["subnets"]
+    direct = list(core.children())
+    direct_names = {node.name() for node in direct}
+    expected_direct = set(expected_subnets) | set(contract["preserved_top_level"])
+    require(
+        len(direct) == contract["top_level_node_count"],
+        f"CityRoadCore direct node count changed: {len(direct)} "
+        f"expected={contract['top_level_node_count']}")
+    require(direct_names == expected_direct,
+            "CityRoadCore direct node membership differs from V19 layout contract")
+
+    leaf_paths: dict[str, str] = {}
+    member_count = 0
+    max_inputs = 0
+    max_outputs = 0
+    dependencies: dict[str, set[str]] = {name: set() for name in expected_subnets}
+    for subnet_name, expected_members in expected_subnets.items():
+        subnet = core.node(subnet_name)
+        require(subnet is not None and subnet.type().name() == "subnet",
+                f"Missing authored CityRoad subnet: {subnet_name}")
+        outputs = [node for node in subnet.children() if node.type().name() == "output"]
+        members = [node for node in subnet.children() if node.type().name() != "output"]
+        require({node.name() for node in members} == set(expected_members),
+                f"CityRoad subnet membership changed: {subnet_name}")
+        member_count += len(members)
+        max_inputs = max(max_inputs, len(subnet.inputConnections()))
+        max_outputs = max(max_outputs, len(outputs))
+        require(len(subnet.inputConnections()) <= contract["max_subnet_inputs"],
+                f"CityRoad subnet input limit exceeded: {subnet_name}")
+        require(len(outputs) <= contract["max_subnet_outputs"],
+                f"CityRoad subnet output limit exceeded: {subnet_name}")
+        require(subnet.comment().strip(), f"CityRoad subnet comment is empty: {subnet_name}")
+        for connection in subnet.inputConnections():
+            label_parm = subnet.parm(f"label{connection.inputIndex() + 1}")
+            require(label_parm is not None and label_parm.evalAsString().strip() and
+                    not label_parm.evalAsString().startswith("Sub-Network Input"),
+                    f"CityRoad subnet connector label is not authored: "
+                    f"{subnet_name}[{connection.inputIndex()}]")
+        for output in outputs:
+            require(output.name().startswith("SUBNET_OUT_") and output.comment().strip(),
+                    f"CityRoad subnet output is not explicitly named: {output.path()}")
+        require(not _positions_overlap(list(subnet.children())),
+                f"Overlapping nodes inside CityRoad subnet: {subnet_name}")
+        for node in subnet.children():
+            position = node.position()
+            require(not (abs(float(position.x())) < 1e-6 and
+                         abs(float(position.y())) < 1e-6),
+                    f"CityRoad node remains at origin: {node.path()}")
+            if node.type().name() in ("attribwrangle", "switch", "output"):
+                require(node.comment().strip(),
+                        f"CityRoad Wrangle/Switch/Output comment is empty: {node.path()}")
+        for member in members:
+            previous = leaf_paths.get(member.name())
+            require(previous is None,
+                    f"Duplicate CityRoad leaf name: {member.name()} at "
+                    f"{previous} and {member.path()}")
+            leaf_paths[member.name()] = member.path()
+        for connection in subnet.inputConnections():
+            source = connection.inputNode()
+            if source is not None and source.name() in dependencies:
+                dependencies[subnet_name].add(source.name())
+
+    require(member_count == contract["original_member_count"],
+            f"CityRoad moved leaf count changed: {member_count}")
+    require(not _positions_overlap(direct), "Overlapping nodes at CityRoadCore top level")
+    for node in direct:
+        position = node.position()
+        require(not (abs(float(position.x())) < 1e-6 and
+                     abs(float(position.y())) < 1e-6),
+                f"CityRoad top-level node remains at origin: {node.path()}")
+        if node.type().name() == "output":
+            require(node.comment().strip(),
+                    f"CityRoad formal output comment is empty: {node.path()}")
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    def visit(name: str) -> None:
+        if name in visiting:
+            raise ContractFailure(f"CityRoad subnet dependency cycle detected at {name}")
+        if name in visited:
+            return
+        visiting.add(name)
+        for dependency in dependencies[name]:
+            visit(dependency)
+        visiting.remove(name)
+        visited.add(name)
+    for name in dependencies:
+        visit(name)
+
+    boxes = list(core.networkBoxes())
+    expected_areas = contract["areas"]
+    require(len(boxes) == len(expected_areas),
+            f"CityRoad top-level Network Box count changed: {len(boxes)}")
+    for name, expected_members in expected_areas.items():
+        box = next((item for item in boxes if item.name() == name), None)
+        require(box is not None, f"Missing CityRoad top-level Network Box: {name}")
+        actual_members = {item.name() for item in box.items()}
+        require(actual_members == set(expected_members),
+                f"CityRoad Network Box membership changed: {name}")
+
+    return {
+        "contract_id": contract["contract_id"],
+        "top_level_nodes": len(direct),
+        "author_subnets": len(expected_subnets),
+        "moved_leaf_nodes": member_count,
+        "max_subnet_inputs": max_inputs,
+        "max_subnet_outputs": max_outputs,
+        "network_boxes": len(boxes),
+        "dependency_dag": True,
+    }
 
 
 def position_key(position, precision: int = 4) -> tuple[float, float, float]:
@@ -153,7 +381,7 @@ def validate_network(asset: hou.Node, core: hou.Node, contract: dict[str, Any]) 
     for name, expected_inputs in contract["required_connections"].items():
         node = require_node(core, name)
         actual_inputs = {
-            str(connection.inputIndex()): connection.inputNode().name()
+            str(connection.inputIndex()): logical_source_name(connection)
             for connection in node.inputConnections()
         }
         for index, source in expected_inputs.items():
@@ -845,6 +1073,332 @@ def validate_phase17_geometry(core: hou.Node) -> dict[str, Any]:
     return {**actual, "road_triangles": checked, "road_positive_y_triangles": positive_y}
 
 
+def _geometry_equivalence_snapshot(node: hou.Node) -> dict[str, Any]:
+    node.cook(force=False)
+    require(not node.errors(), f"Geometry equivalence errors at {node.name()}: {node.errors()}")
+    require(not node.warnings(),
+            f"Geometry equivalence warnings at {node.name()}: {node.warnings()}")
+    geometry = node.geometry()
+    positions = sorted(tuple(float(component) for component in point.position())
+                       for point in geometry.points())
+    area = 0.0
+    for primitive in geometry.prims():
+        points = primitive.points()
+        if len(points) < 3:
+            continue
+        origin = points[0].position()
+        for index in range(1, len(points) - 1):
+            a = points[index].position() - origin
+            b = points[index + 1].position() - origin
+            area += 0.5 * a.cross(b).length()
+    box = geometry.boundingBox()
+    material_attribs = {}
+    for name in ("shop_materialpath", "unity_material", "material_id"):
+        attrib = geometry.findPrimAttrib(name)
+        if attrib is not None:
+            material_attribs[name] = sorted(str(primitive.attribValue(attrib))
+                                            for primitive in geometry.prims())
+    return {
+        "points": len(geometry.points()),
+        "primitives": len(geometry.prims()),
+        "positions": positions,
+        "bounds": tuple(float(value) for vector in (box.minvec(), box.maxvec())
+                        for value in vector),
+        "area": area,
+        "primitive_groups": sorted((group.name(), len(group.prims()))
+                                   for group in geometry.primGroups()),
+        "point_groups": sorted((group.name(), len(group.points()))
+                               for group in geometry.pointGroups()),
+        "materials": material_attribs,
+    }
+
+
+def _require_geometry_equivalent(name: str, v1: dict[str, Any],
+                                 v2: dict[str, Any]) -> dict[str, Any]:
+    for key in ("points", "primitives", "primitive_groups", "point_groups", "materials"):
+        require(v1[key] == v2[key],
+                f"V18 {name} V1/V2 {key} changed: V1={v1[key]!r} V2={v2[key]!r}")
+    require(len(v1["positions"]) == len(v2["positions"]),
+            f"V18 {name} V1/V2 point count changed")
+    point_error = max((max(abs(a - b) for a, b in zip(left, right))
+                       for left, right in zip(v1["positions"], v2["positions"])),
+                      default=0.0)
+    bounds_error = max((abs(a - b) for a, b in zip(v1["bounds"], v2["bounds"])),
+                       default=0.0)
+    area_scale = max(abs(float(v1["area"])), 1e-12)
+    area_relative_error = abs(float(v2["area"]) - float(v1["area"])) / area_scale
+    require(point_error <= 1e-4,
+            f"V18 {name} V1/V2 point error {point_error} exceeds 1e-4")
+    require(bounds_error <= 1e-4,
+            f"V18 {name} V1/V2 bounds error {bounds_error} exceeds 1e-4")
+    require(area_relative_error <= 1e-5,
+            f"V18 {name} V1/V2 area error {area_relative_error} exceeds 1e-5")
+    return {
+        "points": v2["points"], "primitives": v2["primitives"],
+        "point_error": point_error, "bounds_error": bounds_error,
+        "area_relative_error": area_relative_error,
+    }
+
+
+def _v18_output_snapshot(core: hou.Node) -> dict[str, Any]:
+    geometry_nodes = {
+        "road": "CITYROAD_UNITY_ROAD_NORMALS",
+        "sidewalk": "CURB_SIDEWALK_STATS",
+        "collision": "OUT_ROAD_COLLISION",
+        "marking": "CITYROAD_MARKING_OUTPUT_CONTRACT",
+    }
+    geometry = {key: _geometry_equivalence_snapshot(require_node(core, node_name))
+                for key, node_name in geometry_nodes.items()}
+    street = {}
+    for key, node_name in (
+        ("lamps", "OUT_STREET_LAMPS"),
+        ("trees", "OUT_STREET_TREES"),
+        ("tree_pits", "OUT_STREET_TREE_PITS"),
+    ):
+        street[key] = _street_signature(_street_records(require_node(core, node_name)))
+    return {"geometry": geometry, "street": street}
+
+
+def validate_v18_cook_optimization(core: hou.Node,
+                                   compare_switches: bool = True) -> dict[str, Any]:
+    """V18 structural/index contracts; performance is gated separately."""
+
+    segment_index = require_node(core, "GRAPH_SEGMENT_INDEX_V2").geometry()
+    approach_index = require_node(core, "JUNCTION_APPROACH_INDEX_V2").geometry()
+    junction_center_index = require_node(core, "JUNCTION_CENTER_INDEX_V2").geometry()
+    corridor_index = require_node(core, "CORRIDOR_INTERVAL_INDEX_V2").geometry()
+    graph_switch = require_node(core, "CITYROAD_GRAPH_V1_V2")
+    road_switch = require_node(core, "CITYROAD_ROAD_SURFACE_V1_V2")
+    adaptive_switch = require_node(core, "CITYROAD_ADAPTIVE_SURFACE_V1_V2")
+    audit_switch = require_node(core, "CITYROAD_SIDEWALK_AUDIT_V1_V2")
+    require(graph_switch.evalParm("input") == 1,
+            "V18 graph V1/V2 switch is not on V2")
+    require(road_switch.evalParm("input") == 1,
+            "V18 road-surface V1/V2 switch is not on V2")
+    require(adaptive_switch.evalParm("input") == 1,
+            "V18 adaptive-surface V1/V2 switch is not on V2")
+    require(audit_switch.evalParm("input") == 1,
+            "V18 sidewalk audit switch is not on the Cook path")
+    values = {
+        "segment_count": int(detail_value(segment_index, "segment_index_count", -1)),
+        "approach_count": int(detail_value(approach_index, "approach_index_count", -1)),
+        "junction_count": int(detail_value(
+            junction_center_index, "junction_center_index_count", -1)),
+        "corridor_count": int(detail_value(corridor_index, "corridor_interval_count", -1)),
+        "corridor_source_segment_count": int(detail_value(
+            corridor_index, "corridor_source_segment_count", -1)),
+        "segment_points": len(segment_index.points()),
+        "approach_points": len(approach_index.points()),
+        "junction_points": len(junction_center_index.points()),
+        "corridor_points": len(corridor_index.points()),
+    }
+    require(values["segment_count"] > 0 and
+            values["segment_count"] == values["segment_points"],
+            f"V18 segment index count mismatch: {values}")
+    require(values["approach_count"] > 0 and
+            values["approach_count"] == values["approach_points"],
+            f"V18 approach index count mismatch: {values}")
+    require(values["junction_count"] > 0 and
+            values["junction_count"] == values["junction_points"],
+            f"V18 junction index count mismatch: {values}")
+    require(values["corridor_count"] > 0 and
+            values["corridor_count"] == values["corridor_points"],
+            f"V18 corridor index count mismatch: {values}")
+    require(values["corridor_source_segment_count"] > 0,
+            f"V18 corridor source-segment count mismatch: {values}")
+
+    corridor_attributes = (
+        "source_primitive", "source_segment", "interval_start", "interval_end",
+        "interval_start_boundary", "interval_end_boundary",
+        "interval_start_approach", "interval_end_approach",
+        "interval_start_tangent", "interval_end_tangent",
+    )
+    missing_corridor_attributes = [
+        name for name in corridor_attributes
+        if corridor_index.findPointAttrib(name) is None
+    ]
+    require(not missing_corridor_attributes,
+            f"V18 corridor attributes missing: {missing_corridor_attributes}")
+    unbound_boundaries = 0
+    for point in corridor_index.points():
+        if (int(point.attribValue("interval_start_boundary")) and
+                int(point.attribValue("interval_start_approach")) < 0):
+            unbound_boundaries += 1
+        if (int(point.attribValue("interval_end_boundary")) and
+                int(point.attribValue("interval_end_approach")) < 0):
+            unbound_boundaries += 1
+    require(unbound_boundaries == 0,
+            f"V18 corridor has {unbound_boundaries} unbound junction boundaries")
+    values["unbound_corridor_boundaries"] = unbound_boundaries
+
+    stable_approach_ids = sorted(
+        int(point.attribValue("stable_approach_id"))
+        for point in approach_index.points())
+    stable_junction_ids = sorted(
+        int(point.attribValue("stable_junction_id"))
+        for point in junction_center_index.points())
+    require(stable_approach_ids == list(range(values["approach_count"])),
+            "V18 stable Approach ids are not dense and deterministic")
+    require(stable_junction_ids == list(range(values["junction_count"])),
+            "V18 stable Junction ids are not dense and deterministic")
+
+    for switch_name in (
+        "CITYROAD_CROSSWALK_ENABLE_V2", "CITYROAD_MARKING_ENABLE_V2",
+        "CITYROAD_STREET_LAMP_ENABLE_V2", "CITYROAD_STREET_TREE_ENABLE_V2",
+    ):
+        require(require_node(core, switch_name).evalParm("input") == 1,
+                f"V18 early feature gate is not enabled by its default: {switch_name}")
+
+    for node_name in ("ROAD_BUILD_SURFACE_V2",
+                      "ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2"):
+        source = require_node(core, node_name).parm("snippet").evalAsString()
+        require("CITYROAD_COOK_OPTIMIZATION_V18_CORRIDOR_CONSUMER" in source,
+                f"V18 road node does not consume Corridor intervals: {node_name}")
+        require("Shared interval table already validated this trim." in source,
+                f"V18 road node retained the per-segment junction diagnostic: {node_name}")
+    require("CITYROAD_COOK_OPTIMIZATION_V18_MARKING_TABLE" in
+            require_node(core, "CITYROAD_BUILD_STATIC_MARKING_MESH")
+            .parm("snippet").evalAsString(),
+            "V18 static marking branch did not remove duplicate junction work")
+    require("CITYROAD_COOK_OPTIMIZATION_V18_APPROACH_MARKING_OWNER" in
+            require_node(core, "CITYROAD_BUILD_APPROACH_MARKINGS_V5")
+            .parm("snippet").evalAsString(),
+            "V18 Approach marking branch is not the junction-marking owner")
+    require("CITYROAD_COOK_OPTIMIZATION_V18_LAMP_TREE_TWO_POINTER" in
+            require_node(core, "CITYROAD_STREET_BUILD_TREES_V1")
+            .parm("snippet").evalAsString(),
+            "V18 street tree branch does not use the ordered lamp merge")
+    for node_name in (
+        "GRAPH_SEGMENT_INDEX_V2", "JUNCTION_APPROACH_INDEX_V2",
+        "JUNCTION_CENTER_INDEX_V2",
+        "CORRIDOR_INTERVAL_INDEX_V2", "GRAPH_CLASSIFY_JUNCTIONS",
+        "ROAD_BUILD_SURFACE_V2", "ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2",
+        "CITYROAD_TOPOLOGY_CLASSIFY_ROAD",
+        "CITYROAD_STREET_BUILD_LAMPS_V1", "CITYROAD_STREET_BUILD_TREES_V1",
+    ):
+        node = require_node(core, node_name)
+        require(not node.errors(), f"V18 errors at {node_name}: {node.errors()}")
+        require(not node.warnings(), f"V18 warnings at {node_name}: {node.warnings()}")
+    if not compare_switches:
+        values["equivalence"] = "deferred_to_disposable_unlocked_copy"
+        return values
+    try:
+        graph_switch.parm("input").set(0)
+        road_switch.parm("input").set(0)
+        adaptive_switch.parm("input").set(0)
+        v1 = _v18_output_snapshot(core)
+        graph_switch.parm("input").set(1)
+        road_switch.parm("input").set(1)
+        adaptive_switch.parm("input").set(1)
+        v2 = _v18_output_snapshot(core)
+        equivalence = {
+            key: _require_geometry_equivalent(key, v1["geometry"][key],
+                                              v2["geometry"][key])
+            for key in v1["geometry"]
+        }
+        require(v1["street"] == v2["street"],
+                "V18 street-furniture V1/V2 deterministic signature changed")
+
+        # The exact sidewalk audit remains available on input 0 and is cooked
+        # explicitly by cumulative contracts; input 1 is the production path.
+        audit_switch.parm("input").set(0)
+        audit_v1 = _geometry_equivalence_snapshot(
+            require_node(core, "SIDEWALK_REGION_CONNECTIVITY"))
+        audit_switch.parm("input").set(1)
+        audit_v2 = _geometry_equivalence_snapshot(
+            require_node(core, "SIDEWALK_REGION_CONNECTIVITY"))
+        equivalence["sidewalk_audit_path"] = _require_geometry_equivalent(
+            "sidewalk_audit_path", audit_v1, audit_v2)
+        values["equivalence"] = equivalence
+        values["street_signatures_equal"] = True
+    finally:
+        graph_switch.parm("input").set(1)
+        road_switch.parm("input").set(1)
+        adaptive_switch.parm("input").set(1)
+        audit_switch.parm("input").set(1)
+    return values
+
+
+def debug_v18_graph(asset: hou.Node) -> dict[str, Any]:
+    core = require_node(asset, CORE_NAME)
+    switch = require_node(core, "CITYROAD_GRAPH_V1_V2")
+    graph = require_node(core, "GRAPH_CLASSIFY_JUNCTIONS")
+    snapshots = {}
+    try:
+        for mode in (0, 1):
+            switch.parm("input").set(mode)
+            graph.cook(force=False)
+            geometry = graph.geometry()
+            primitive_rows = []
+            for primitive in geometry.prims():
+                def prim_value(name, fallback):
+                    attrib = geometry.findPrimAttrib(name)
+                    return primitive.attribValue(attrib) if attrib is not None else fallback
+                primitive_rows.append((
+                    int(prim_value("road_id", -1)),
+                    int(prim_value("road_level", -1)),
+                    int(prim_value("junction_id", -1)),
+                    str(prim_value("junction_type", "")),
+                ))
+            helper_rows = []
+            for point in geometry.points():
+                attrib = geometry.findPointAttrib("junction_id")
+                if attrib is None:
+                    continue
+                junction_id = int(point.attribValue(attrib))
+                if junction_id < 0:
+                    continue
+                helper_rows.append((
+                    junction_id,
+                    tuple(round(float(value), 6) for value in point.position()),
+                ))
+            snapshots[str(mode)] = {
+                "primitives": primitive_rows,
+                "helpers": sorted(set(helper_rows)),
+                "detail": {
+                    name: detail_value(geometry, name, -1)
+                    for name in (
+                        "cityroad_graph_segment_count",
+                        "cityroad_graph_broadphase_candidates",
+                        "cityroad_graph_exact_tests",
+                    )
+                },
+            }
+    finally:
+        switch.parm("input").set(1)
+    left, right = snapshots["0"], snapshots["1"]
+    return {
+        "v1": left,
+        "v2": right,
+        "primitive_differences": [
+            {"index": index, "v1": v1, "v2": v2}
+            for index, (v1, v2) in enumerate(zip(left["primitives"], right["primitives"]))
+            if v1 != v2
+        ],
+        "helpers_only_v1": sorted(set(left["helpers"]) - set(right["helpers"])),
+        "helpers_only_v2": sorted(set(right["helpers"]) - set(left["helpers"])),
+    }
+
+
+def debug_remote_v18_graph(asset_path: str, host: str, port: int) -> dict[str, Any]:
+    import hrpyc
+    connection, _remote_hou = hrpyc.import_remote_module(host, port, "hou")
+    try:
+        tools_path = str(SCRIPT_DIR).replace("\\", "/")
+        connection.execute(
+            "import sys, importlib, hou; "
+            f"sys.path.insert(0, {tools_path!r}) if {tools_path!r} not in sys.path else None; "
+            "import validate_cityroad_contract as _pcg_cityroad_contract; "
+            "importlib.reload(_pcg_cityroad_contract)")
+        payload = connection.eval(
+            "_pcg_cityroad_contract.json.dumps("
+            f"_pcg_cityroad_contract.debug_v18_graph(hou.node({asset_path!r})), "
+            "ensure_ascii=False)")
+        return json.loads(str(payload))
+    finally:
+        connection.close()
+
+
 def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, Any]:
     require(asset is not None, "CityRoad asset is missing")
     require(asset.type().name() == ASSET_TYPE,
@@ -862,6 +1416,7 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "definition": definition.libraryFilePath(),
         "locked": asset.isLockedHDA(),
         "contracts": contract["contract_ids"],
+        "subnet_layout": validate_subnet_layout(core),
         "network": validate_network(asset, core, contract),
         "outputs": validate_outputs(core, contract),
         "street_furniture": validate_street_furniture(asset, core),
@@ -872,6 +1427,8 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "v15_sidewalk_terminal_front_containment": (
             validate_v15_sidewalk_terminal_front_containment(core)),
         "phase17": validate_phase17_geometry(core),
+        "v18_cook_optimization": validate_v18_cook_optimization(
+            core, compare_switches=not require_locked),
     }
     return result
 
@@ -887,7 +1444,7 @@ def validate_remote_live(asset_path: str, host: str, port: int) -> dict[str, Any
     try:
         tools_path = str(SCRIPT_DIR).replace("\\", "/")
         connection.execute(
-            "import sys, importlib; "
+            "import sys, importlib, hou; "
             f"sys.path.insert(0, {tools_path!r}) if {tools_path!r} not in sys.path else None; "
             "import validate_cityroad_contract as _pcg_cityroad_contract; "
             "importlib.reload(_pcg_cityroad_contract)")
@@ -938,6 +1495,13 @@ def validate_fresh(hda_path: Path, hip_path: Path) -> dict[str, Any]:
     require(production is not None, f"Production CityRoad instance is missing: {LIVE_ASSET_PATH}")
     skipped = copy_production_configuration(production, fresh)
     result = validate_asset(fresh, require_locked=True)
+    # A locked instance proves the persisted definition is consumable.  The
+    # internal rollback switch is intentionally not public/editable, so run
+    # its equivalence comparison only after unlocking this disposable copy.
+    fresh.allowEditingOfContents(propagate=True)
+    result["v18_cook_optimization"] = validate_v18_cook_optimization(
+        require_node(fresh, CORE_NAME), compare_switches=True)
+    result["locked_validation_completed_before_equivalence"] = True
     result["source"] = "fresh_locked_instance"
     result["hip"] = str(hip_path)
     result["hda"] = str(hda_path)
@@ -961,10 +1525,14 @@ def remote_interface_hash(asset_path: str, host: str, port: int) -> str:
     try:
         asset = remote_hou.node(asset_path)
         require(asset is not None, f"Live CityRoad asset is missing: {asset_path}")
-        definition = asset.type().definition()
-        require(definition is not None, "Live CityRoad asset has no HDA definition")
-        dialog = definition.parmTemplateGroup().asDialogScript()
-        return hashlib.sha256(str(dialog).encode("utf-8")).hexdigest()
+        tools_path = str(SCRIPT_DIR).replace("\\", "/")
+        connection.execute(
+            "import sys, importlib, hou; "
+            f"sys.path.insert(0, {tools_path!r}) if {tools_path!r} not in sys.path else None; "
+            "import validate_cityroad_contract as _pcg_cityroad_contract; "
+            "importlib.reload(_pcg_cityroad_contract)")
+        return str(connection.eval(
+            f"_pcg_cityroad_contract.public_interface_hash(hou.node({asset_path!r}))"))
     finally:
         connection.close()
 
@@ -978,11 +1546,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18811)
     parser.add_argument("--emit-interface-hash", action="store_true")
+    parser.add_argument("--debug-v18-graph", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.debug_v18_graph:
+        print(json.dumps(debug_remote_v18_graph(args.asset, args.host, args.port),
+                         ensure_ascii=False, indent=2))
+        return 0
     if args.emit_interface_hash:
         if args.source == "live":
             value = remote_interface_hash(args.asset, args.host, args.port)

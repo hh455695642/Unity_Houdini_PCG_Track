@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-cook-v2-20260812",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_cook_v2_20260812.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_cook_v2_20260812.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/benchmark_cityroad_cook.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/pcg_regression_gate.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/GRAPH_CLASSIFY_JUNCTIONS",
+    "CityRoadCore/CITYROAD_TOPOLOGY_CLASSIFY_ROAD",
+    "CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/ROAD_SELECT_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/CITYROAD_BUILD_STATIC_MARKING_MESH",
+    "CityRoadCore/CITYROAD_BUILD_APPROACH_MARKINGS_V5",
+    "CityRoadCore/CITYROAD_MARKING_HELPERS_MERGE",
+    "CityRoadCore/CITYROAD_MARKING_OUTPUT_CONTRACT",
+    "CityRoadCore/CITYROAD_TOPOLOGY_TRANSFER_ROADMARKINGS",
+    "CityRoadCore/CITYROAD_MARKING_TRIANGULATE_FOR_WINDING",
+    "CityRoadCore/ROAD_BUILD_SURFACE",
+    "CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/ROAD_SELECT_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/ROAD_PLANAR_CLASSIFY_FROM_FINAL_BOUNDARY",
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY",
+    "CityRoadCore/CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15",
+    "CityRoadCore/SIDEWALK_PLANAR_MARK_SEAMS",
+    "CityRoadCore/SIDEWALK_TOPOLOGY_VALIDATE",
+    "CityRoadCore/SIDEWALK_REGION_CONNECTIVITY",
+    "CityRoadCore/CITYROAD_STREET_BUILD_LAMPS_V1",
+    "CityRoadCore/CITYROAD_STREET_BUILD_TREES_V1",
+    "CityRoadCore/CITYROAD_STREET_BUILD_TREE_PITS_V1"
+    ,"CityRoadCore/OUT_ROAD_MARKINGS"
+    ,"CityRoadCore/OUT_STREET_LAMPS"
+    ,"CityRoadCore/OUT_STREET_TREES"
+    ,"CityRoadCore/OUT_STREET_TREE_PITS"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/GRAPH_SEGMENT_INDEX_V2",
+    "CityRoadCore/JUNCTION_APPROACH_INDEX_V2",
+    "CityRoadCore/CORRIDOR_INTERVAL_INDEX_V2",
+    "CityRoadCore/CITYROAD_MARKING_*_V2",
+    "CityRoadCore/CITYROAD_STREET_*_V2",
+    "CityRoadCore/CITYROAD_SIDEWALK_*_V2",
+    "CityRoadCore/CITYROAD_*_V1_V2"
+    ,"CityRoadCore/JUNCTION_CENTER_INDEX_V2"
+    ,"CityRoadCore/ROAD_BUILD_SURFACE_V2"
+    ,"CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2"
+    ,"CityRoadCore/CITYROAD_*_ENABLE_V2"
+    ,"CityRoadCore/CITYROAD_*_EMPTY_V2"
+  ],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [
+    "CityRoadCore/GRAPH_CLASSIFY_JUNCTIONS",
+    "CityRoadCore/CITYROAD_TOPOLOGY_CLASSIFY_ROAD",
+    "CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/CITYROAD_BUILD_STATIC_MARKING_MESH",
+    "CityRoadCore/CITYROAD_BUILD_APPROACH_MARKINGS_V5",
+    "CityRoadCore/CITYROAD_MARKING_HELPERS_MERGE",
+    "CityRoadCore/CITYROAD_MARKING_OUTPUT_CONTRACT",
+    "CityRoadCore/CITYROAD_TOPOLOGY_TRANSFER_ROADMARKINGS",
+    "CityRoadCore/CITYROAD_MARKING_TRIANGULATE_FOR_WINDING",
+    "CityRoadCore/ROAD_BUILD_SURFACE",
+    "CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE",
+    "CityRoadCore/ROAD_PLANAR_CLASSIFY_FROM_FINAL_BOUNDARY",
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY",
+    "CityRoadCore/CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15",
+    "CityRoadCore/SIDEWALK_PLANAR_MARK_SEAMS",
+    "CityRoadCore/SIDEWALK_TOPOLOGY_VALIDATE",
+    "CityRoadCore/SIDEWALK_REGION_CONNECTIVITY",
+    "CityRoadCore/CITYROAD_STREET_BUILD_LAMPS_V1",
+    "CityRoadCore/CITYROAD_STREET_BUILD_TREES_V1",
+    "CityRoadCore/CITYROAD_STREET_BUILD_TREE_PITS_V1",
+    "CityRoadCore/GRAPH_SEGMENT_INDEX_V2",
+    "CityRoadCore/JUNCTION_APPROACH_INDEX_V2",
+    "CityRoadCore/CORRIDOR_INTERVAL_INDEX_V2",
+    "CityRoadCore/CITYROAD_MARKING_*_V2",
+    "CityRoadCore/CITYROAD_STREET_*_V2",
+    "CityRoadCore/CITYROAD_SIDEWALK_*_V2",
+    "CityRoadCore/CITYROAD_*_V1_V2"
+    ,"CityRoadCore/JUNCTION_CENTER_INDEX_V2"
+    ,"CityRoadCore/ROAD_BUILD_SURFACE_V2"
+    ,"CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2"
+    ,"CityRoadCore/CITYROAD_*_ENABLE_V2"
+    ,"CityRoadCore/CITYROAD_*_EMPTY_V2"
+    ,"CityRoadCore/OUT_ROAD_MARKINGS"
+    ,"CityRoadCore/OUT_STREET_LAMPS"
+    ,"CityRoadCore/OUT_STREET_TREES"
+    ,"CityRoadCore/OUT_STREET_TREE_PITS"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/GRAPH_CLASSIFY_JUNCTIONS:snippet",
+    "CityRoadCore/CITYROAD_TOPOLOGY_CLASSIFY_ROAD:snippet",
+    "CityRoadCore/CITYROAD_BUILD_APPROACH_MARKINGS_V5:snippet",
+    "CityRoadCore/ROAD_BUILD_SURFACE:snippet",
+    "CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE:snippet",
+    "CityRoadCore/ROAD_PLANAR_CLASSIFY_FROM_FINAL_BOUNDARY:snippet",
+    "CityRoadCore/SIDEWALK_PLANAR_CLASSIFY:snippet",
+    "CityRoadCore/GRAPH_SEGMENT_INDEX_V2:*",
+    "CityRoadCore/JUNCTION_APPROACH_INDEX_V2:*",
+    "CityRoadCore/CORRIDOR_INTERVAL_INDEX_V2:*",
+    "CityRoadCore/CITYROAD_MARKING_*_V2:*",
+    "CityRoadCore/CITYROAD_STREET_*:snippet",
+    "CityRoadCore/CITYROAD_STREET_*_V2:*",
+    "CityRoadCore/CITYROAD_SIDEWALK_*_V2:*",
+    "CityRoadCore/CITYROAD_*_V1_V2:*"
+    ,"CityRoadCore/JUNCTION_CENTER_INDEX_V2:*"
+    ,"CityRoadCore/ROAD_BUILD_SURFACE_V2:*"
+    ,"CityRoadCore/ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2:*"
+    ,"CityRoadCore/CITYROAD_*_ENABLE_V2:*"
+    ,"CityRoadCore/CITYROAD_*_EMPTY_V2:*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.Phase13.ShadingAndChunks",
+    "CityRoad.Phase14.TopologyOutputs",
+    "CityRoad.Phase15.SingleInput",
+    "CityRoad.Phase16.AdaptiveCorner",
+    "CityRoad.Phase17.FinalBoundary",
+    "CityRoad.V7.JunctionExtent",
+    "CityRoad.V7.MarkingClip",
+    "CityRoad.V8.MobileCornerRails",
+    "CityRoad.V8.EdgeLineContinuity",
+    "CityRoad.V9.FinalBoundaryBudget",
+    "CityRoad.V10.CornerSections",
+    "CityRoad.V10.SidewalkSections",
+    "CityRoad.V11.DeterministicSidewalkCornerStrips",
+    "CityRoad.V12.FinalBoundaryCornerSections",
+    "CityRoad.V13.SquareOpenEnds",
+    "CityRoad.V14.NonTerminalRounding",
+    "CityRoad.V15.SidewalkTerminalFrontContainment",
+    "CityRoad.Output.NoCookDiagnostics",
+    "CityRoad.Output.GeometrySanity",
+    "CityRoad.Output.Winding",
+    "CityRoad.V16.StreetFurniture",
+    "CityRoad.V17.StreetFurnitureSurfaceContainment",
+    "CityRoad.V18.CookOptimization"
+  ]
+}
