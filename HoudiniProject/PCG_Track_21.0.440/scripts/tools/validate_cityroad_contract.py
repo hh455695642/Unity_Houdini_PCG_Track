@@ -368,6 +368,194 @@ def validate_v10(core: hou.Node) -> dict[str, Any]:
     }
 
 
+def validate_v11_v12_v13(core: hou.Node) -> dict[str, Any]:
+    """Cumulative contracts for the current sidewalk/final-boundary chain."""
+    v11 = require_node(
+        core, "CITYROAD_REPLACE_SIDEWALK_CORNER_WITH_QUAD_STRIPS_V11").geometry()
+    v12 = require_node(
+        core, "CITYROAD_FUSE_FINAL_BOUNDARY_CORNER_SECTIONS_V12").geometry()
+    boundary = require_node(core, "ROAD_UNION_ROUND_FINAL_BOUNDARY").geometry()
+    connectors = require_node(core, "SIDEWALK_OPEN_END_SIDE_CONNECTORS").geometry()
+    seams = require_node(core, "SIDEWALK_PLANAR_MARK_SEAMS").geometry()
+    topology = require_node(core, "SIDEWALK_TOPOLOGY_VALIDATE").geometry()
+    regions = require_node(core, "SIDEWALK_REGION_METADATA").geometry()
+
+    require(str(detail_value(v11, "cityroad_sidewalk_corner_strip_patch", "")) == "V11",
+            "V11 sidewalk corner strip marker missing")
+    require(int(detail_value(v11, "sidewalk_corner_strip_invalid_quad_count", -1)) == 0,
+            "V11 contains invalid sidewalk corner strips")
+    require(int(detail_value(v11, "sidewalk_corner_strip_missing_connector_count", -1)) == 0,
+            "V11 is missing sidewalk corner connectors")
+    require(str(detail_value(v12, "cityroad_shared_corner_boundary_patch", "")) == "V12",
+            "V12 final boundary marker missing")
+
+    terminal_count = int(detail_value(boundary, "square_open_end_terminal_count", -1))
+    cap_count = int(detail_value(boundary, "square_open_end_cap_edge_count", -1))
+    occluded_count = int(detail_value(
+        boundary, "square_open_end_occluded_terminal_count", -1))
+    target_count = int(detail_value(
+        boundary, "square_open_end_corner_target_count", -1))
+    skip_count = int(detail_value(
+        boundary, "square_open_end_corner_skip_count", -1))
+    connector_count = int(detail_value(
+        connectors, "sidewalk_open_end_connector_count", -1))
+    unmatched_count = int(detail_value(
+        connectors, "sidewalk_open_end_unmatched_connector_count", -1))
+    complete_count = int(detail_value(
+        seams, "sidewalk_partition_complete_connector_count", -1))
+    uncovered_count = int(detail_value(
+        seams, "sidewalk_partition_uncovered_connector_count", -1))
+    coverage = float(detail_value(
+        seams, "sidewalk_partition_min_connector_coverage", -1.0))
+    partition_errors = int(detail_value(
+        regions, "square_open_end_partition_error_count", -1))
+    topology_ok = int(detail_value(
+        topology, "sidewalk_validation_topology_ok", 0))
+    inside = int(detail_value(
+        topology, "sidewalk_validation_road_inside_vertex_count", -1))
+    crossings = int(detail_value(
+        topology, "sidewalk_validation_road_boundary_crossing_edge_count", -1))
+    overlaps = int(detail_value(
+        topology, "sidewalk_validation_positive_overlap_triangle_count", -1))
+
+    require(terminal_count == 8, f"V13 terminal count changed: {terminal_count}")
+    require(cap_count + occluded_count == terminal_count,
+            f"V13 cap accounting changed: caps={cap_count} occluded={occluded_count}")
+    require(target_count == skip_count == cap_count * 2,
+            f"V13 square corner accounting changed: target={target_count} skip={skip_count}")
+    require(connector_count == terminal_count * 2 and unmatched_count == 0,
+            f"V13 connector contract failed: count={connector_count} unmatched={unmatched_count}")
+    require(complete_count == connector_count and uncovered_count == 0,
+            f"V13 connector coverage failed: complete={complete_count} uncovered={uncovered_count}")
+    require(coverage >= 0.985,
+            f"V13 minimum active connector coverage changed: {coverage}")
+    require(partition_errors == 0,
+            f"V13 sidewalk region partition errors: {partition_errors}")
+    require(topology_ok == 1 and inside == 0 and crossings == 0 and overlaps == 0,
+            "V13 sidewalk topology validation failed: "
+            f"ok={topology_ok} inside={inside} crossings={crossings} overlaps={overlaps}")
+    return {
+        "v11_patch": "V11",
+        "v12_patch": "V12",
+        "terminal_count": terminal_count,
+        "square_cap_count": cap_count,
+        "occluded_terminal_count": occluded_count,
+        "connector_count": connector_count,
+        "complete_connector_count": complete_count,
+        "uncovered_connector_count": uncovered_count,
+        "minimum_active_connector_coverage": coverage,
+        "partition_error_count": partition_errors,
+        "topology_ok": topology_ok,
+    }
+
+
+def validate_v14_nonterminal_rounding(core: hou.Node) -> dict[str, Any]:
+    """V14: square only real open ends; preserve all other V9 rounding."""
+    boundary = require_node(core, "ROAD_UNION_ROUND_FINAL_BOUNDARY").geometry()
+    rounded = int(detail_value(
+        boundary, "final_boundary_mobile_rounded_corner_count", -1))
+    right_angles = int(detail_value(
+        boundary, "final_boundary_mobile_right_angle_corner_count", -1))
+    skipped = int(detail_value(
+        boundary, "square_open_end_corner_skip_count", -1))
+    candidates = int(detail_value(
+        boundary, "nonterminal_rounding_candidate_count", -1))
+    max_segments = int(detail_value(
+        boundary, "final_boundary_mobile_max_segment_count", -1))
+    patch = str(detail_value(
+        boundary, "cityroad_nonterminal_rounding_patch", ""))
+
+    require(patch == "V14", f"V14 marker missing: {patch}")
+    require(rounded == 32 and rounded > 0,
+            f"V14 non-terminal rounding changed: {rounded}")
+    require(right_angles == 10,
+            f"V14 right-angle rounding changed: {right_angles}")
+    require(skipped == 14,
+            f"V14 square open-end skip count changed: {skipped}")
+    require(candidates == rounded + skipped == 46,
+            "V14 candidate accounting failed: "
+            f"candidates={candidates} rounded={rounded} skipped={skipped}")
+    require(max_segments == 4,
+            f"V14 mobile segment budget changed: {max_segments}")
+    return {
+        "rounded_nonterminal_corner_count": rounded,
+        "rounded_right_angle_corner_count": right_angles,
+        "square_open_end_corner_skip_count": skipped,
+        "rounding_candidate_count": candidates,
+        "max_segments": max_segments,
+    }
+
+
+def validate_v15_sidewalk_terminal_front_containment(
+        core: hou.Node) -> dict[str, Any]:
+    """V15: remove only constrained sidewalk in front of square open ends."""
+    containment_node = require_node(
+        core, "CITYROAD_VALIDATE_SIDEWALK_TERMINAL_FRONT_CONTAINMENT_V15")
+    containment = containment_node.geometry()
+    regions = require_node(core, "SIDEWALK_REGION_METADATA").geometry()
+    seams = require_node(core, "SIDEWALK_PLANAR_MARK_SEAMS").geometry()
+    values = {
+        "active_terminal_front_count": int(detail_value(
+            containment, "sidewalk_terminal_front_active_count", -1)),
+        "sealed_terminal_front_count": int(detail_value(
+            containment, "sidewalk_terminal_front_sealed_count", -1)),
+        "occluded_terminal_front_count": int(detail_value(
+            containment, "sidewalk_terminal_front_occluded_count", -1)),
+        "invalid_terminal_front_count": int(detail_value(
+            containment, "sidewalk_terminal_front_invalid_count", -1)),
+        "marked_triangle_count": int(detail_value(
+            containment, "sidewalk_terminal_front_marked_triangle_count", -1)),
+        "deleted_triangle_count": int(detail_value(
+            containment, "sidewalk_terminal_front_deleted_triangle_count", -1)),
+        "residual_triangle_count": int(detail_value(
+            containment, "sidewalk_terminal_front_residual_triangle_count", -1)),
+        "nonconforming_triangle_count": int(detail_value(
+            containment,
+            "sidewalk_terminal_front_nonconforming_triangle_count", -1)),
+        "outside_vertex_count": int(detail_value(
+            containment, "sidewalk_site_outside_vertex_count", -1)),
+        "site_boundary_crossing_edge_count": int(detail_value(
+            containment, "sidewalk_site_boundary_crossing_edge_count", -1)),
+        "outside_positive_area_triangle_count": int(detail_value(
+            containment,
+            "sidewalk_site_outside_positive_area_triangle_count", -1)),
+        "containment_ok": int(detail_value(
+            containment, "sidewalk_terminal_front_containment_ok", 0)),
+        "patch": str(detail_value(
+            containment, "cityroad_sidewalk_terminal_front_patch", "")),
+        "sidewalk_primitive_count": len(regions.prims()),
+        "region_count": int(detail_value(
+            regions, "sidewalk_region_partition_count", -1)),
+        "complete_connector_count": int(detail_value(
+            seams, "sidewalk_partition_complete_connector_count", -1)),
+        "uncovered_connector_count": int(detail_value(
+            seams, "sidewalk_partition_uncovered_connector_count", -1)),
+    }
+    expected = {
+        "active_terminal_front_count": 3,
+        "sealed_terminal_front_count": 4,
+        "occluded_terminal_front_count": 1,
+        "invalid_terminal_front_count": 0,
+        "marked_triangle_count": 4,
+        "deleted_triangle_count": 4,
+        "residual_triangle_count": 0,
+        "nonconforming_triangle_count": 0,
+        "outside_vertex_count": 0,
+        "site_boundary_crossing_edge_count": 0,
+        "outside_positive_area_triangle_count": 0,
+        "containment_ok": 1,
+        "patch": "V15",
+        "sidewalk_primitive_count": 167,
+        "region_count": 9,
+        "complete_connector_count": 16,
+        "uncovered_connector_count": 0,
+    }
+    failures = [key for key, expected_value in expected.items()
+                if values[key] != expected_value]
+    require(not failures, f"V15 sidewalk containment changed {failures}: {values}")
+    return values
+
+
 def validate_phase17_geometry(core: hou.Node) -> dict[str, Any]:
     stats_geometry = require_node(core, "CURB_SIDEWALK_STATS").geometry()
     checks = {
@@ -429,6 +617,10 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "outputs": validate_outputs(core, contract),
         "v7_v8_v9": validate_v7_v8_v9(asset, core),
         "v10": validate_v10(core),
+        "v11_v12_v13": validate_v11_v12_v13(core),
+        "v14_nonterminal_rounding": validate_v14_nonterminal_rounding(core),
+        "v15_sidewalk_terminal_front_containment": (
+            validate_v15_sidewalk_terminal_front_containment(core)),
         "phase17": validate_phase17_geometry(core),
     }
     return result
