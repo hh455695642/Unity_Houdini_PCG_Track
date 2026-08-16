@@ -684,14 +684,18 @@ def validate_v7_v8_v9(asset: hou.Node, core: hou.Node) -> dict[str, Any]:
     require(expected == actual and extent_errors == 0,
             f"V7 Junction extent failed: expected={expected} actual={actual} errors={extent_errors}")
 
-    markings = require_node(core, "CITYROAD_BUILD_STATIC_MARKING_MESH").geometry()
+    markings = require_node(
+        core, "CITYROAD_VALIDATE_STATIC_MARKING_JUNCTION_CLIP_V24").geometry()
     intrusion = int(detail_value(markings, "longitudinal_marking_junction_intrusion_count", -1))
+    validation_stage = str(detail_value(markings, "marking_validation_stage", ""))
     boundary_gap = float(detail_value(markings, "marking_boundary_gap_max", 1e9))
     join_error = float(detail_value(markings, "edge_line_join_error_max", 1e9))
     lane_primitives = int(detail_value(markings, "lane_line_primitive_count", -1))
     lane_count = int(asset.parm("default_lane_count").eval())
+    require(validation_stage == "post_commit_v24",
+            f"V24 marking validation stage changed: {validation_stage}")
     require(intrusion == 0 and boundary_gap <= 0.001,
-            f"V7 marking clip failed: intrusion={intrusion} gap={boundary_gap}")
+            f"V7/V24 marking clip failed: intrusion={intrusion} gap={boundary_gap}")
     require(join_error <= 0.001, f"V8 edge-line continuity failed: {join_error}")
     if lane_count == 2:
         require(lane_primitives == 0,
@@ -747,6 +751,7 @@ def validate_v7_v8_v9(asset: hou.Node, core: hou.Node) -> dict[str, Any]:
             f"V9 final boundary contract changed: points={final_points} patch={final_patch}")
     return {
         "junction_approaches": actual,
+        "marking_validation_stage": validation_stage,
         "marking_boundary_gap_max": boundary_gap,
         "edge_line_join_error_max": join_error,
         "corner_max_segments": max_segments,
@@ -1507,6 +1512,12 @@ def validate_fresh(hda_path: Path, hip_path: Path) -> dict[str, Any]:
     result["hda"] = str(hda_path)
     result["saved"] = False
     result["configuration_copy_skipped"] = skipped
+    try:
+        from validate_cityroad_short_curve_markings_v24 import run as validate_short_curves
+        result["v24_short_curve_markings"] = validate_short_curves(hda_path, "fixed")
+    except Exception as exception:
+        raise ContractFailure(
+            f"V24 short-curve marking regression failed: {exception}") from exception
     return result
 
 

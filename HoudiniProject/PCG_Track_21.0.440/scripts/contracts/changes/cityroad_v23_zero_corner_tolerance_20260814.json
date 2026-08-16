@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v23-zero-corner-tolerance-20260814",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "change_id": "cityroad-v23-zero-corner-tolerance-20260814",
+  "precondition": {
+    "hda": "Assets/PCG/HDA/City/CityRoad.hda",
+    "hip": "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "live_node": "/obj/CityRoad_DEV",
+    "save": false
+  },
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json"
+  ],
+  "allowed_nodes": [
+    "/obj/CityRoad_DEV/CityRoadCore/CITYROAD_REPLACE_CORNER_WITH_QUAD_STRIPS_V11",
+    "/obj/CityRoad_DEV/CityRoadCore/CR_UNION_BOUNDARY/CITYROAD_SNAP_FINAL_BOUNDARY_TO_CORNER_SECTIONS_V12",
+    "/obj/CityRoad_DEV/CityRoadCore/CR_SIDEWALK_CONSTRAINT_BUILD/CITYROAD_REPLACE_SIDEWALK_CORNER_WITH_QUAD_STRIPS_V11"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [
+    "CityRoadCore/CITYROAD_REPLACE_CORNER_WITH_QUAD_STRIPS_V11:snippet",
+    "CityRoadCore/CR_UNION_BOUNDARY/CITYROAD_SNAP_FINAL_BOUNDARY_TO_CORNER_SECTIONS_V12:snippet",
+    "CityRoadCore/CR_SIDEWALK_CONSTRAINT_BUILD/CITYROAD_REPLACE_SIDEWALK_CORNER_WITH_QUAD_STRIPS_V11:snippet"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "allowed_public_interfaces": [],
+  "allowed_outputs": [
+    "OUT_ROAD_SURFACE",
+    "OUT_ROAD_MARKINGS",
+    "OUT_SIDEWALK_CURB"
+  ],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.V22.ZeroCornerTolerance"
+  ]
+}
