@@ -32,6 +32,9 @@ DEFAULT_HDA = PROJECT_ROOT / "Assets/PCG/HDA/City/CityRoad.hda"
 DEFAULT_HIP = PROJECT_ROOT / "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip"
 CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_contract.json"
 LAYOUT_CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_subnet_layout_contract.json"
+ANNOTATION_CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_annotation_contract.json"
+DEAD_NODE_CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_dead_node_contract.json"
+DEAD_BRANCH_CONTRACT_PATH = SCRIPT_DIR.parent / "contracts/cityroad_dead_branch_contract.json"
 ASSET_TYPE = "pcgbike::CityRoad::1.0"
 LIVE_ASSET_PATH = "/obj/CityRoad_DEV"
 CORE_NAME = "CityRoadCore"
@@ -172,9 +175,108 @@ def load_contract() -> dict[str, Any]:
 
 def load_layout_contract() -> dict[str, Any]:
     contract = json.loads(LAYOUT_CONTRACT_PATH.read_text(encoding="utf-8"))
-    require(contract.get("schema_version") == 1,
+    require(contract.get("schema_version") in (1, 2),
             "Unsupported CityRoad subnet layout contract schema")
     return contract
+
+
+def load_annotation_contract() -> dict[str, Any]:
+    contract = json.loads(ANNOTATION_CONTRACT_PATH.read_text(encoding="utf-8"))
+    require(contract.get("schema_version") == 1,
+            "Unsupported CityRoad annotation contract schema")
+    return contract
+
+
+def validate_annotation_clarity(core: hou.Node) -> dict[str, Any]:
+    """Keep navigation text compact while retaining detailed stored comments."""
+    contract = load_annotation_contract()
+    main = require_node(core, "CR_MAIN_PIPELINE")
+
+    def validate_level(parent: hou.Node, spec: dict[str, Any], label: str) -> None:
+        notes = list(parent.stickyNotes())
+        require(len(notes) == spec["note_count"],
+                f"{label} Sticky Note count changed: {len(notes)}")
+        note = notes[0]
+        require(note.name() == spec["note_name"],
+                f"{label} reading note name changed: {note.name()}")
+        require(float(note.size().x()) <= spec["max_note_width"] and
+                float(note.size().y()) <= spec["max_note_height"],
+                f"{label} reading note became oversized")
+        for token in spec["required_text"]:
+            require(token in note.text(),
+                    f"{label} reading note is missing: {token}")
+        visible = sorted(node.name() for node in parent.children()
+                         if node.isGenericFlagSet(hou.nodeFlag.DisplayComment))
+        require(visible == sorted(spec["visible_comment_nodes"]),
+                f"{label} always-visible comments changed: {visible}")
+        actual_boxes = {box.name(): box.comment() for box in parent.networkBoxes()}
+        require(actual_boxes == spec["network_box_labels"],
+                f"{label} Network Box labels changed")
+
+    validate_level(core, contract["top_level"], "CityRoadCore")
+    validate_level(main, contract["main_pipeline"], "CR_MAIN_PIPELINE")
+    return {
+        "contract_id": contract["contract_id"],
+        "top_level_notes": len(core.stickyNotes()),
+        "main_pipeline_notes": len(main.stickyNotes()),
+        "always_visible_comments": 0,
+    }
+
+
+def validate_dead_node_cleanup(core: hou.Node) -> dict[str, Any]:
+    contract = json.loads(DEAD_NODE_CONTRACT_PATH.read_text(encoding="utf-8"))
+    require(contract.get("schema_version") == 1,
+            "Unsupported CityRoad dead-node contract schema")
+    for relative_path in contract["absent_nodes"]:
+        require(core.node(relative_path) is None,
+                f"Removed CityRoad orphan returned: {relative_path}")
+    is_live_asset = core.parent().path() == LIVE_ASSET_PATH
+    for portal_spec in contract["protected_unwired_debug_portals"]:
+        portal = require_node(core, portal_spec["name"])
+        require(not portal.inputConnections() and not portal.outputConnections(),
+                f"Lab path portal unexpectedly acquired a wire: {portal.path()}")
+        if is_live_asset:
+            dependents = {node.path() for node in portal.dependents(include_children=True)}
+            require(portal_spec["dependent"] in dependents,
+                    f"Lab path portal lost its Tutorial reader: {portal.path()}")
+    for relative_path in contract["protected_lab_returns"]:
+        node = require_node(core, relative_path)
+        require(node.outputConnections(),
+                f"Used Lab return became disconnected: {node.path()}")
+    return {
+        "contract_id": contract["contract_id"],
+        "removed_orphans": len(contract["absent_nodes"]),
+        "protected_path_portals": len(contract["protected_unwired_debug_portals"]),
+        "protected_lab_returns": len(contract["protected_lab_returns"]),
+    }
+
+
+def validate_dead_branch_cleanup(core: hou.Node) -> dict[str, Any]:
+    contract = json.loads(DEAD_BRANCH_CONTRACT_PATH.read_text(encoding="utf-8"))
+    require(contract.get("schema_version") == 1,
+            "Unsupported CityRoad dead-branch contract schema")
+    for relative_path in contract["absent_nodes"]:
+        require(core.node(relative_path) is None,
+                f"Removed CityRoad dead branch returned: {relative_path}")
+    for relative_path in contract["protected_nodes"]:
+        require(core.node(relative_path) is not None,
+                f"Protected CityRoad branch is missing: {relative_path}")
+
+    main = require_node(core, "CR_MAIN_PIPELINE")
+    source, source_output = _subnet_output_source(
+        main, contract["collision_output"]["main_output_index"])
+    require(source is not None and
+            source.name() == contract["collision_output"]["source_node"] and
+            source_output == contract["collision_output"]["source_output_index"],
+            "Official road collision output no longer comes from "
+            "CR_ROAD_OUTPUT_CLASSIFY output 1")
+    return {
+        "contract_id": contract["contract_id"],
+        "removed_nodes": len(contract["absent_nodes"]),
+        "protected_nodes": len(contract["protected_nodes"]),
+        "collision_source": source.name(),
+        "collision_source_output": source_output,
+    }
 
 
 def _positions_overlap(nodes: list[hou.Node]) -> list[tuple[str, str]]:
@@ -190,8 +292,269 @@ def _positions_overlap(nodes: list[hou.Node]) -> list[tuple[str, str]]:
     return overlaps
 
 
+def _validate_three_level_layout(core: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
+    """Validate the V46 overview -> pipeline -> function-subnet hierarchy."""
+    main = core.node("CR_MAIN_PIPELINE")
+    park = core.node("CR_CITY_PARK")
+    require(main is not None and main.type().name() == "subnet",
+            "Missing V46 CR_MAIN_PIPELINE")
+    require(park is not None and park.type().name() == "subnet",
+            "Missing V46 CR_CITY_PARK")
+
+    direct = list(core.children())
+    expected_direct = set(contract["preserved_top_level"]) | {"CR_CITY_PARK"}
+    require(len(direct) == contract["top_level_node_count"],
+            f"CityRoadCore direct node count changed: {len(direct)}")
+    require({node.name() for node in direct} == expected_direct,
+            "CityRoadCore V46 overview membership changed")
+    require(sum(len(node.inputConnections()) for node in direct) ==
+            contract["top_level_connection_count"],
+            "CityRoadCore V46 wired connection budget changed")
+    require(not _positions_overlap(direct),
+            "Overlapping nodes at CityRoadCore V46 overview")
+    require(main.comment().strip(), "CR_MAIN_PIPELINE documentation is missing")
+    require(len(main.inputConnections()) == 0,
+            "CR_MAIN_PIPELINE acquired a hidden/external wired input")
+
+    main_outputs = [node for node in main.children() if node.type().name() == "output"]
+    require(len(main_outputs) == contract["main_pipeline_output_count"],
+            "CR_MAIN_PIPELINE output count changed")
+    main_members = [node for node in main.children() if node.type().name() != "output"]
+    require({node.name() for node in main_members} == set(contract["main_pipeline_members"]),
+            "CR_MAIN_PIPELINE direct membership changed")
+    require(not _positions_overlap(list(main.children())),
+            "Overlapping nodes inside CR_MAIN_PIPELINE")
+
+    output_by_index = {}
+    for output in main_outputs:
+        index_parm = output.parm("outputidx")
+        index = int(index_parm.eval()) if index_parm is not None else -1
+        require(index not in output_by_index,
+                f"Duplicate CR_MAIN_PIPELINE output index: {index}")
+        output_by_index[index] = output
+        require(output.name().startswith("SUBNET_OUT_") and output.comment().strip(),
+                f"Unnamed/undocumented V46 output connector: {output.path()}")
+    require(set(output_by_index) == set(range(contract["main_pipeline_output_count"])),
+            "CR_MAIN_PIPELINE output indices are not contiguous")
+    for top_name, (source_name, source_index, main_index) in \
+            contract["main_output_sources"].items():
+        top = core.node(top_name)
+        top_connections = top.inputConnections() if top is not None else []
+        require(len(top_connections) == 1 and
+                top_connections[0].inputNode() == main and
+                top_connections[0].outputIndex() == main_index,
+                f"V46 overview output mapping changed: {top_name}")
+        output = output_by_index[main_index]
+        connections = output.inputConnections()
+        require(len(connections) == 1 and
+                connections[0].inputNode().name() == source_name and
+                connections[0].outputIndex() == source_index,
+                f"V46 pipeline output source changed: {top_name}")
+
+    for portal_contract in contract["debug_portals"]:
+        portal = core.node(portal_contract["name"])
+        require(portal is not None and
+                portal.type().name() == portal_contract["type"],
+                f"V46 Lab portal type changed: {portal_contract['name']}")
+        require(portal.parm("objpath1").evalAsString() == portal_contract["path"],
+                f"V46 Lab portal path changed: {portal_contract['name']}")
+        require(portal.comment().strip(),
+                f"V46 Lab portal is undocumented: {portal_contract['name']}")
+
+    leaf_paths: dict[str, str] = {}
+    member_count = 0
+    max_inputs = 0
+    max_outputs = 0
+    dependencies: dict[str, set[str]] = {
+        name: set() for name in contract["subnets"] if name != "CR_CITY_PARK"
+    }
+    for subnet_name, expected_members in contract["subnets"].items():
+        parent = core if subnet_name == "CR_CITY_PARK" else main
+        subnet = parent.node(subnet_name)
+        require(subnet is not None and subnet.type().name() == "subnet",
+                f"Missing authored CityRoad function subnet: {subnet_name}")
+        if subnet_name in contract.get("member_connections", {}):
+            actual_connections = sorted([
+                [connection.inputIndex(), connection.inputNode().name(),
+                 connection.outputIndex()]
+                for connection in subnet.inputConnections()
+            ])
+            require(
+                actual_connections == contract["member_connections"][subnet_name],
+                f"CityRoad function connection changed: {subnet_name}; "
+                f"actual={actual_connections}")
+        outputs = [node for node in subnet.children() if node.type().name() == "output"]
+        members = [node for node in subnet.children() if node.type().name() != "output"]
+        require({node.name() for node in members} == set(expected_members),
+                f"CityRoad function subnet membership changed: {subnet_name}")
+        require(subnet.comment().strip(),
+                f"CityRoad function subnet comment is empty: {subnet_name}")
+        max_inputs = max(max_inputs, len(subnet.inputConnections()))
+        max_outputs = max(max_outputs, len(outputs))
+        require(len(subnet.inputConnections()) <= contract["max_subnet_inputs"],
+                f"CityRoad function subnet input limit exceeded: {subnet_name}")
+        require(len(outputs) <= contract["max_subnet_outputs"],
+                f"CityRoad function subnet output limit exceeded: {subnet_name}")
+        for connection in subnet.inputConnections():
+            label = subnet.parm(f"label{connection.inputIndex() + 1}")
+            require(label is not None and label.evalAsString().strip() and
+                    not label.evalAsString().startswith("Sub-Network Input") and
+                    not label.evalAsString().startswith("CR_"),
+                    f"CityRoad semantic connector label is missing: "
+                    f"{subnet_name}[{connection.inputIndex()}]")
+        for output in outputs:
+            require(output.name().startswith("SUBNET_OUT_") and output.comment().strip(),
+                    f"CityRoad function output is not named/documented: {output.path()}")
+        require(not _positions_overlap(list(subnet.children())),
+                f"Overlapping nodes inside CityRoad function subnet: {subnet_name}")
+        authored_members = list(members)
+        for member in members:
+            previous = leaf_paths.get(member.name())
+            require(previous is None,
+                    f"Duplicate CityRoad leaf name: {member.name()} at "
+                    f"{previous} and {member.path()}")
+            leaf_paths[member.name()] = member.path()
+
+        nested_prefix = subnet_name + "/"
+        for nested_path, expected_nested_members in contract.get("nested_subnets", {}).items():
+            if not nested_path.startswith(nested_prefix):
+                continue
+            nested = subnet.node(nested_path[len(nested_prefix):])
+            require(nested is not None and nested.type().name() == "subnet",
+                    f"Missing nested CityRoad subnet: {nested_path}")
+            nested_outputs = [node for node in nested.children()
+                              if node.type().name() == "output"]
+            nested_members = [node for node in nested.children()
+                              if node.type().name() != "output"]
+            require({node.name() for node in nested_members} ==
+                    set(expected_nested_members),
+                    f"CityRoad nested subnet membership changed: {nested_path}")
+            require(nested.comment().strip(),
+                    f"CityRoad nested subnet comment is empty: {nested_path}")
+            require(len(nested.inputConnections()) <= contract["max_subnet_inputs"],
+                    f"CityRoad nested subnet input limit exceeded: {nested_path}")
+            require(len(nested_outputs) <= contract["max_subnet_outputs"],
+                    f"CityRoad nested subnet output limit exceeded: {nested_path}")
+            max_inputs = max(max_inputs, len(nested.inputConnections()))
+            max_outputs = max(max_outputs, len(nested_outputs))
+            authored_members.extend(nested_members)
+            for member in nested_members:
+                previous = leaf_paths.get(member.name())
+                require(previous is None,
+                        f"Duplicate CityRoad nested leaf: {member.name()} at "
+                        f"{previous} and {member.path()}")
+                leaf_paths[member.name()] = member.path()
+        member_count += len(authored_members)
+        if subnet_name in dependencies:
+            for connection in subnet.inputConnections():
+                source = connection.inputNode()
+                if source is not None and source.name() in dependencies:
+                    dependencies[subnet_name].add(source.name())
+
+    require(member_count == contract["original_member_count"],
+            f"CityRoad moved leaf count changed: {member_count}")
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    def visit(name: str) -> None:
+        if name in visiting:
+            raise ContractFailure(f"CityRoad function dependency cycle at {name}")
+        if name in visited:
+            return
+        visiting.add(name)
+        for dependency in dependencies[name]:
+            visit(dependency)
+        visiting.remove(name)
+        visited.add(name)
+    for name in dependencies:
+        visit(name)
+
+    actual_stage_areas = {
+        box.name(): {item.name() for item in box.items()}
+        for box in main.networkBoxes()
+    }
+    require(actual_stage_areas == {
+                name: set(members) for name, members in contract["stage_areas"].items()},
+            "CityRoad V46 stage Network Box membership changed")
+    actual_top_areas = {
+        box.name(): {item.name() for item in box.items()}
+        for box in core.networkBoxes()
+    }
+    require(actual_top_areas == {
+                name: set(members) for name, members in contract["top_areas"].items()},
+            "CityRoad V46 overview Network Box membership changed")
+    require(len([dot for dot in main.networkDots()
+                 if dot.name().startswith("CR_BUS_")]) >=
+            contract.get("semantic_bus_min", 7),
+            "CityRoad V46 semantic bus coverage changed")
+
+    # The navigation subnet must preserve every ../../ channel read without
+    # rewriting leaf VEX.  Hidden main parameters are transparent proxies to
+    # the original CityRoadCore parameters.
+    relative_pattern = re.compile(r"\.\./\.\./([A-Za-z_][A-Za-z0-9_]*)")
+    indexed_pattern = re.compile(
+        r"\.\./\.\./([A-Za-z_][A-Za-z0-9_]*)%d")
+    checked_refs = 0
+    for subnet_name in contract["subnets"]:
+        if subnet_name == "CR_CITY_PARK":
+            continue
+        subnet = main.node(subnet_name)
+        for node in [subnet] + list(subnet.allSubChildren()):
+            snippet = node.parm("snippet")
+            if snippet is None:
+                continue
+            snippet_text = snippet.evalAsString()
+            indexed_names = set(indexed_pattern.findall(snippet_text))
+            for parm_name in relative_pattern.findall(snippet_text):
+                target = node.parm("../../" + parm_name)
+                if target is None and parm_name in indexed_names:
+                    # VEX commonly addresses a multiparm instance through
+                    # sprintf("../../tree_prefab%d", variant).  The regex
+                    # intentionally sees the stable base name, while Houdini
+                    # only exposes concrete parms such as tree_prefab1.
+                    target = node.parm("../../" + parm_name + "1")
+                require(target is not None and target.node() == main,
+                        f"V46 unresolved leaf channel: {node.path()} ../../{parm_name}")
+                checked_refs += 1
+    require(checked_refs >= 100,
+            "CityRoad V46 channel proxy coverage is unexpectedly small")
+
+    # V45 Park is intentionally outside CR_MAIN_PIPELINE and must retain its
+    # authored learning structure and relative asset-channel depth.
+    expected_park_boxes = {
+        "PARK_AREA_INPUT": {"CR_PARK_INPUT"},
+        "PARK_AREA_MASTERPLAN": {"CR_PARK_MASTERPLAN"},
+        "PARK_AREA_OUTPUT": {
+            "CR_PARK_OUTPUTS", "SUBNET_OUT_PARK_GROUND_0",
+            "SUBNET_OUT_PARK_PATHS_1", "SUBNET_OUT_PARK_WATER_2",
+            "SUBNET_OUT_PARK_COLLISION_3", "SUBNET_OUT_PARK_TREES_4",
+            "SUBNET_OUT_PARK_EXCLUSION_5"},
+    }
+    require({box.name(): {item.name() for item in box.items()}
+             for box in park.networkBoxes()} == expected_park_boxes,
+            "CityRoad V45 Park Network Box membership changed")
+    require(any(note.name() == "NOTE_PARK_V45_README" and note.text().strip()
+                for note in park.stickyNotes()),
+            "CityRoad V45 Park learning note is missing")
+
+    return {
+        "contract_id": contract["contract_id"],
+        "top_level_nodes": len(direct),
+        "top_level_connections": contract["top_level_connection_count"],
+        "logical_top_dependencies": contract["logical_top_dependency_count"],
+        "author_subnets": len(contract["subnets"]),
+        "moved_leaf_nodes": member_count,
+        "max_subnet_inputs": max_inputs,
+        "max_subnet_outputs": max_outputs,
+        "stage_boxes": len(contract["stage_areas"]),
+        "channel_proxy_references": checked_refs,
+        "dependency_dag": True,
+    }
+
+
 def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
     contract = load_layout_contract()
+    if contract["schema_version"] == 2:
+        return _validate_three_level_layout(core, contract)
     expected_subnets = contract["subnets"]
     expected_nested_subnets = contract.get("nested_subnets", {})
     direct = list(core.children())
@@ -1916,6 +2279,9 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "locked": asset.isLockedHDA(),
         "contracts": contract["contract_ids"],
         "subnet_layout": validate_subnet_layout(core),
+        "annotation_clarity": validate_annotation_clarity(core),
+        "dead_node_cleanup": validate_dead_node_cleanup(core),
+        "dead_branch_cleanup": validate_dead_branch_cleanup(core),
         "network": validate_network(asset, core, contract),
         "outputs": validate_outputs(core, contract),
         "street_furniture": validate_street_furniture(asset, core),

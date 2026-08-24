@@ -144,6 +144,69 @@ class CompareSnapshotsTests(unittest.TestCase):
             with self.assertRaises(gate.GateFailure):
                 gate.load_manifest(path, "CityRoad")
 
+    def test_moved_leaf_keeps_parameter_and_connection_contract(self):
+        before = snapshot()
+        before["nodes"]["CityRoadCore/CR_CONTEXT/LEAF"] = {
+            "type": "attribwrangle",
+            "inputs": [{"input": 0, "source": "CityRoadCore/CR_CONTEXT/SOURCE", "output": 0}],
+            "parameters": {"snippet": {"raw": "UNCHANGED_VEX", "expression": None}},
+            "flags": {"bypass": False},
+            "comment": "old comment",
+        }
+        after = copy.deepcopy(before)
+        moved = after["nodes"].pop("CityRoadCore/CR_CONTEXT/LEAF")
+        moved["inputs"][0]["source"] = (
+            "CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT/SOURCE")
+        moved["comment"] = "learning comment"
+        after["nodes"]["CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT/LEAF"] = moved
+        change = manifest()
+        change["path_rewrites"] = [{
+            "from": "CityRoadCore/CR_CONTEXT",
+            "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT",
+        }]
+        self.assertEqual([], gate.compare_snapshots(before, after, change))
+
+    def test_moved_leaf_vex_change_is_blocked(self):
+        before = snapshot()
+        before["nodes"]["CityRoadCore/CR_CONTEXT/LEAF"] = {
+            "type": "attribwrangle", "inputs": [],
+            "parameters": {"snippet": {"raw": "ORIGINAL_VEX", "expression": None}},
+            "flags": {"bypass": False}, "comment": "",
+        }
+        after = copy.deepcopy(before)
+        moved = after["nodes"].pop("CityRoadCore/CR_CONTEXT/LEAF")
+        moved["parameters"]["snippet"]["raw"] = "CHANGED_VEX"
+        after["nodes"]["CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT/LEAF"] = moved
+        change = manifest()
+        change["path_rewrites"] = [{
+            "from": "CityRoadCore/CR_CONTEXT",
+            "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT",
+        }]
+        violations = gate.compare_snapshots(before, after, change)
+        self.assertTrue(any("Moved node parameter changed" in item for item in violations))
+
+    def test_moved_hscript_reference_may_gain_one_parent_level(self):
+        before = snapshot()
+        before["nodes"]["CityRoadCore/CR_CONTEXT/SWITCH"] = {
+            "type": "switch", "inputs": [],
+            "parameters": {"input": {
+                "raw": 'ch("../../../toggle")',
+                "expression": 'ch("../../../toggle")'}},
+            "flags": {"bypass": False}, "comment": "",
+        }
+        after = copy.deepcopy(before)
+        moved = after["nodes"].pop("CityRoadCore/CR_CONTEXT/SWITCH")
+        moved["parameters"]["input"] = {
+            "raw": 'ch("../../../../toggle")',
+            "expression": 'ch("../../../../toggle")'}
+        after["nodes"]["CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT/SWITCH"] = moved
+        change = manifest()
+        change["path_rewrites"] = [{
+            "from": "CityRoadCore/CR_CONTEXT",
+            "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_CONTEXT",
+        }]
+        self.assertEqual([], gate.compare_snapshots(before, after, change))
+
 
 if __name__ == "__main__":
     unittest.main()

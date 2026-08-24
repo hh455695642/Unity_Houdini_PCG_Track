@@ -14,7 +14,6 @@
     "CITYROAD_TOPOLOGY_CLASSIFY_ROAD": "attribwrangle",
     "CITYROAD_UNITY_ROAD_NORMALS": "normal",
     "CITYROAD_TOPOLOGY_TRANSFER_SIDEWALKCURB": "attribwrangle",
-    "CITYROAD_TOPOLOGY_TRANSFER_ROADCOLLISION": "attribwrangle",
     "CITYROAD_TOPOLOGY_TRANSFER_ROADMARKINGS": "attribwrangle",
     "CITYROAD_TAG_JUNCTION_MOUTH_EDGES_V4": "attribwrangle",
     "CITYROAD_BUILD_JUNCTION_SURFACE_BOUNDARY_V5": "attribwrangle",
@@ -265,7 +264,7 @@
       "1": "CITYROAD_ADAPTIVE_SURFACE_V1_V2"
     },
     "CITYROAD_MARKING_HELPERS_MERGE": {
-      "1": "JUNCTION_APPROACH_INDEX_V2"
+      "1": "CITYROAD_MARKING_GRAPH_ATTR_ALIGN"
     },
     "CITYROAD_BUILD_APPROACH_MARKINGS_V5": {
       "2": "JUNCTION_APPROACH_INDEX_V2"
@@ -576,6 +575,10 @@
     "CityRoad.V41.ParkMasterplan",
     "CityRoad.V43.ParkSurfaceLift",
     "CityRoad.V44.ParkVisibleAboveSidewalk",
-    "CityRoad.V45.ParkReadability"
+    "CityRoad.V45.ParkReadability",
+    "CityRoad.V46.ThreeLevelReadability",
+    "CityRoad.V47.AnnotationClarity",
+    "CityRoad.V48.DeadNodeCleanup",
+    "CityRoad.V49.RemoveDeadCollisionAndShellBranches"
   ]
 }

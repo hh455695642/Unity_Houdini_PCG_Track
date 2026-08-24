@@ -12,12 +12,14 @@ covered by ordinary Python unit tests.
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as _datetime
 import fnmatch
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -150,6 +152,15 @@ def load_manifest(path: Path, module: str) -> dict[str, Any]:
         raise GateFailure("Manifest allowed_warning_signatures must be an array")
     if not isinstance(data.get("authoritative_live_scene", False), bool):
         raise GateFailure("Manifest authoritative_live_scene must be boolean")
+    if not isinstance(data.get("path_rewrites", []), list):
+        raise GateFailure("Manifest path_rewrites must be an array")
+    for rewrite in data.get("path_rewrites", []):
+        if (not isinstance(rewrite, dict) or
+                not isinstance(rewrite.get("from"), str) or
+                not isinstance(rewrite.get("to"), str)):
+            raise GateFailure("Each path_rewrites entry needs string from/to fields")
+    if not isinstance(data.get("moved_parameter_exceptions", []), list):
+        raise GateFailure("Manifest moved_parameter_exceptions must be an array")
     return data
 
 
@@ -160,6 +171,45 @@ def matches(value: str, patterns: Iterable[str]) -> bool:
 
 def _changed_keys(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
     return {key for key in before.keys() | after.keys() if before.get(key) != after.get(key)}
+
+
+def _rewrite_path(value: str, rewrites: list[dict[str, str]], reverse: bool = False) -> str:
+    """Rewrite an exact authored node root and all descendants."""
+    normalized = normalize_path(value)
+    ordered = sorted(rewrites, key=lambda item: len(item["from"]), reverse=True)
+    for item in ordered:
+        source = normalize_path(item["to"] if reverse else item["from"])
+        target = normalize_path(item["from"] if reverse else item["to"])
+        if normalized == source:
+            return target
+        if normalized.startswith(source.rstrip("/") + "/"):
+            return target.rstrip("/") + normalized[len(source):]
+    return normalized
+
+
+def _normalize_moved_state(
+    state: dict[str, Any], rewrites: list[dict[str, str]]
+) -> dict[str, Any]:
+    result = copy.deepcopy(state)
+    for connection in result.get("inputs", []):
+        source = connection.get("source")
+        if isinstance(source, str):
+            connection["source"] = _rewrite_path(source, rewrites, reverse=True)
+    return result
+
+
+def _is_one_level_relative_rewrite(before: Any, after: Any) -> bool:
+    """Accept Houdini's deterministic path-depth update after subnet collapse."""
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return False
+    if set(before) != set(after):
+        return False
+    def deepen(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        return re.sub(r"([\"'])(?=(?:\.\./)+)", r"\1../", value)
+    expected = {key: deepen(value) for key, value in before.items()}
+    return expected == after
 
 
 def compare_snapshots(
@@ -189,6 +239,39 @@ def compare_snapshots(
     after_nodes = current.get("nodes", {})
     before_names = set(before_nodes)
     after_names = set(after_nodes)
+    rewrites = manifest.get("path_rewrites", [])
+    moved_pairs = {
+        before_name: _rewrite_path(before_name, rewrites)
+        for before_name in before_names
+        if _rewrite_path(before_name, rewrites) != before_name and
+        _rewrite_path(before_name, rewrites) in after_nodes
+    }
+    moved_before = set(moved_pairs)
+    moved_after = set(moved_pairs.values())
+    for before_name, after_name in sorted(moved_pairs.items()):
+        before = before_nodes[before_name]
+        after = _normalize_moved_state(after_nodes[after_name], rewrites)
+        if before.get("type") != after.get("type"):
+            violations.append(f"Moved node type changed: {before_name} -> {after_name}")
+        if before.get("inputs") != after.get("inputs"):
+            violations.append(f"Moved node inputs changed: {before_name} -> {after_name}")
+        if before.get("flags") != after.get("flags"):
+            violations.append(f"Moved node flags changed: {before_name} -> {after_name}")
+        # Comments are an intentional readability surface.  Parameters are
+        # behavior and remain byte-for-byte stable except for named interface
+        # labels and the three TutorialLab bridge paths declared by manifest.
+        before_parms = before.get("parameters", {})
+        after_parms = after.get("parameters", {})
+        for parm in sorted(_changed_keys(before_parms, after_parms)):
+            scoped_name = f"{after_name}:{parm}"
+            if (not _is_one_level_relative_rewrite(
+                    before_parms.get(parm), after_parms.get(parm)) and
+                    not matches(scoped_name,
+                                manifest.get("moved_parameter_exceptions", []))):
+                violations.append(
+                    f"Moved node parameter changed: {before_name}:{parm} -> {after_name}")
+    before_names -= moved_before
+    after_names -= moved_after
     for node in sorted(after_names - before_names):
         if not (
             matches(node, manifest["allowed_added_nodes"])
@@ -412,20 +495,21 @@ def _pcg_capture_live(module, config_json):
     if definition is None:
         raise RuntimeError("Target asset has no HDA definition: " + asset.path())
     nodes = {".": _pcg_node_state(asset, asset)}
-    # Capture explicit authored network roots.  For CityRoad, recurse exactly
-    # one authored level into CR_* subnets; never walk Wrangle/VOP internals.
-    # This keeps structural gates stable while allowing leaf nodes to retain
-    # their unique names after the V19 layout migration.
+    # Capture authored CR_* navigation/function subnets recursively, but never
+    # walk Wrangle/VOP internals.  V46 adds CR_MAIN_PIPELINE above the existing
+    # function subnets; recursion keeps their leaf parameters/VEX protected.
     for network_path in config["network_roots"]:
         network = asset.node(network_path)
         if network is None:
             raise RuntimeError("Configured network root is missing: " + network_path)
         nodes[_pcg_relative(asset.path(), network.path())] = _pcg_node_state(asset, network)
-        for node in network.children():
-            nodes[_pcg_relative(asset.path(), node.path())] = _pcg_node_state(asset, node)
-            if node.name().startswith("CR_") and node.type().name() == "subnet":
-                for child in node.children():
-                    nodes[_pcg_relative(asset.path(), child.path())] = _pcg_node_state(asset, child)
+        queue = [network]
+        while queue:
+            authored_network = queue.pop(0)
+            for node in authored_network.children():
+                nodes[_pcg_relative(asset.path(), node.path())] = _pcg_node_state(asset, node)
+                if node.name().startswith("CR_") and node.type().name() == "subnet":
+                    queue.append(node)
     outputs = {
         path: _pcg_output_state(asset, path) for path in config["outputs"]
     }
