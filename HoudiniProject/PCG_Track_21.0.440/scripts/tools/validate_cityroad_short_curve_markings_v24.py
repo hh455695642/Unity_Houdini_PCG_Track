@@ -33,6 +33,17 @@ def require(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def find_authored_node(core: hou.Node, name: str) -> hou.Node | None:
+    """Resolve a stable leaf name after one or more readability subnets."""
+    direct = core.node(name)
+    if direct is not None:
+        return direct
+    matches = [node for node in core.allSubChildren() if node.name() == name]
+    require(len(matches) <= 1,
+            f"Short-curve fixture found duplicate authored nodes: {name}")
+    return matches[0] if matches else None
+
+
 def build_input() -> hou.Node:
     container = hou.node("/obj").createNode("geo", "CITYROAD_V24_SHORT_CURVE_INPUT")
     for child in container.children():
@@ -92,9 +103,10 @@ def run(hda_path: Path, expect: str) -> dict:
         parm.set(value)
 
     core = asset.node("CityRoadCore")
-    builder = core.node("CITYROAD_BUILD_STATIC_MARKING_MESH")
-    validator = core.node(VALIDATOR_NAME)
-    output = core.node("OUT_ROAD_MARKINGS")
+    builder = find_authored_node(core, "CITYROAD_BUILD_STATIC_MARKING_MESH")
+    validator = find_authored_node(core, VALIDATOR_NAME)
+    output = find_authored_node(core, "OUT_ROAD_MARKINGS")
+    require(output is not None, "Road marking output is missing")
     try:
         output.cook(force=True)
     except hou.OperationFailed:

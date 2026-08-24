@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v45-park-readability-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "authoritative_live_scene": true,
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v45_park_readability_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_park_readability_v45_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CR_CITY_PARK",
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CR_CITY_PARK/CR_PARK_*",
+    "CityRoadCore/CR_CITY_PARK/CR_PARK_*/*"
+  ],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_connections": [
+    "CityRoadCore/CR_CITY_PARK",
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/CR_CITY_PARK:*",
+    "CityRoadCore/CR_CITY_PARK/*:*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V19.SubnetLayout",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V38.CoreReadability",
+    "CityRoad.V41.ParkMasterplan",
+    "CityRoad.V43.ParkSurfaceLift",
+    "CityRoad.V44.ParkVisibleAboveSidewalk",
+    "CityRoad.V45.ParkReadability"
+  ]
+}

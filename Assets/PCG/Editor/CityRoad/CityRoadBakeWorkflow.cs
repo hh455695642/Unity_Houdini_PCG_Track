@@ -39,6 +39,13 @@ namespace PCG.CityRoad.Editor
             "OUT_STREET_TREES",
             "OUT_STREET_TREE_PITS",
         };
+        private static readonly string[] s_ParkVisibleOutputs =
+        {
+            "OUT_PARK_GROUND",
+            "OUT_PARK_PATHS",
+            "OUT_PARK_WATER",
+            "OUT_PARK_TREES"
+        };
 
         [MenuItem("PCG/CityRoad/Cook + Validate + Update Bake Selected", priority = 2110)]
         private static void CookValidateAndBakeSelected()
@@ -104,12 +111,28 @@ namespace PCG.CityRoad.Editor
 
             if (!EnsureProjectMaterialContract())
                 return false;
+            if (!CityRoadParkAssets.ValidateMaterialContract(out string parkAssetReport))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Bake: City Park assets are invalid; Bake was not changed.\n{0}",
+                    parkAssetReport);
+                return false;
+            }
+
+            var sceneRootsBeforeCook = new HashSet<GameObject>(
+                root.gameObject.scene.GetRootGameObjects());
+            HashSet<string> palettePaths = CaptureTreePalettePaths(root.HoudiniAsset);
 
             if (!CityRoadSafeRebuild.Rebuild(root))
             {
                 Debug.LogError("CityRoad Bake: cook/reload failed; Bake was not changed.", root);
                 return false;
             }
+            CleanupNewOrphanedTreePrefabRoots(
+                root,
+                sceneRootsBeforeCook,
+                palettePaths);
 
             // Existing scene instances do not receive newly-added HDA
             // parameters until Reload/Rebuild. Validate configuration after
@@ -124,7 +147,16 @@ namespace PCG.CityRoad.Editor
             }
 
             CityRoadLivePreviewController.EnterLivePreview(root);
+            ApplyCollisionOutputContract(root.gameObject);
             ApplyShadowContract(root.gameObject);
+            if (!ValidateParkLiveContract(root, out string parkLiveReport))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Bake: City Park live output contract failed; Bake was not changed.\n{0}",
+                    parkLiveReport);
+                return false;
+            }
             if (!ValidateGeneratedHierarchy(root.gameObject, out string liveReport))
             {
                 Debug.LogErrorFormat(
@@ -179,11 +211,24 @@ namespace PCG.CityRoad.Editor
                 ApplyShadowContract(prefab);
                 PrefabUtility.SavePrefabAsset(prefab);
             }
+            if (!CompileParkPrefab(prefabPath, folder, out string parkBakeReport))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Bake: City Park data compilation failed.\n{0}",
+                    parkBakeReport);
+                return false;
+            }
             AssetDatabase.SaveAssets();
             prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             string bakeReport = "Prefab asset is missing after Bake.";
-            if (prefab == null || !ValidateGeneratedHierarchy(prefab, out bakeReport))
+            var parkIssues = new List<string>();
+            if (prefab == null
+                || !ValidateGeneratedHierarchy(prefab, out bakeReport)
+                || !CityRoadParkAssets.ValidateCompiledPrefab(prefab, parkIssues))
             {
+                if (parkIssues.Count > 0)
+                    bakeReport += "\n- " + string.Join("\n- ", parkIssues);
                 Debug.LogErrorFormat(
                     root,
                     "CityRoad Bake: updated prefab failed post-bake validation.\n{0}",
@@ -199,8 +244,8 @@ namespace PCG.CityRoad.Editor
                 root,
                 "CityRoad Bake updated: {0}\nLive: {1}\nBake: {2}",
                 prefabPath,
-                liveReport,
-                bakeReport);
+                liveReport + "\n" + parkLiveReport,
+                bakeReport + "\n" + parkBakeReport);
             return true;
         }
 
@@ -240,6 +285,154 @@ namespace PCG.CityRoad.Editor
                 .ToList();
         }
 
+        private static HashSet<string> CaptureTreePalettePaths(
+            HEU_HoudiniAsset asset)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (asset == null || asset.Parameters == null)
+                return result;
+            for (int index = 1; index <= 3; index++)
+            {
+                string path;
+                if (asset.Parameters.GetStringParameterValue(
+                        "tree_prefab" + index,
+                        out path)
+                    && !string.IsNullOrEmpty(path))
+                    result.Add(path.Replace('\\', '/'));
+            }
+            return result;
+        }
+
+        private static void CleanupNewOrphanedTreePrefabRoots(
+            HEU_HoudiniAssetRoot source,
+            HashSet<GameObject> rootsBeforeCook,
+            HashSet<string> palettePaths)
+        {
+            if (source == null || rootsBeforeCook == null || palettePaths == null)
+                return;
+            foreach (GameObject candidate in source.gameObject.scene.GetRootGameObjects())
+            {
+                if (candidate == null
+                    || rootsBeforeCook.Contains(candidate)
+                    || candidate == source.gameObject)
+                    continue;
+                string path = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(candidate)
+                    .Replace('\\', '/');
+                if (palettePaths.Contains(path))
+                    UnityEngine.Object.DestroyImmediate(candidate);
+            }
+        }
+
+        private static bool ValidateParkLiveContract(
+            HEU_HoudiniAssetRoot root,
+            out string report)
+        {
+            var issues = new List<string>();
+            HEU_HoudiniAsset asset = root != null ? root.HoudiniAsset : null;
+            bool enabled;
+            if (asset == null || asset.Parameters == null
+                || !asset.Parameters.GetBoolParameterValue(
+                    "enable_city_park",
+                    out enabled))
+            {
+                report = "City Park parameters are unavailable after reload.";
+                return false;
+            }
+            HEU_InputNode parkInput = asset.InputNodes != null
+                ? asset.InputNodes.FirstOrDefault(input => input != null
+                    && string.Equals(
+                        input.ParamName,
+                        CityRoadSafeRebuild.ParkAreasParameterName,
+                        StringComparison.Ordinal))
+                : null;
+            bool hasBoundary = parkInput != null
+                && parkInput.NumInputEntries() > 0
+                && parkInput.GetInputEntryGameObject(0) != null;
+            Transform ground = FindNamedOutput(root.gameObject, "OUT_PARK_GROUND");
+            int groundTriangles = ground == null
+                ? 0
+                : ground.GetComponentsInChildren<MeshFilter>(true)
+                    .Where(filter => filter.sharedMesh != null)
+                    .Sum(filter => Enumerable.Range(0, filter.sharedMesh.subMeshCount)
+                        .Sum(subMesh => (int)(filter.sharedMesh.GetIndexCount(subMesh) / 3)));
+            if (enabled && hasBoundary && groundTriangles == 0)
+                issues.Add("Enabled City Park boundary produced no ground; old Bake must be retained.");
+
+            Transform collision = FindNamedOutput(root.gameObject, "OUT_PARK_COLLISION");
+            if (collision != null)
+            {
+                if (collision.GetComponentsInChildren<MeshCollider>(true).Length == 0)
+                    issues.Add("OUT_PARK_COLLISION contains no MeshCollider.");
+                if (collision.GetComponentsInChildren<Renderer>(true)
+                    .Any(renderer => renderer.enabled))
+                    issues.Add("OUT_PARK_COLLISION contains an enabled Renderer.");
+            }
+            Transform exclusion = FindNamedOutput(root.gameObject, "OUT_PARK_EXCLUSION");
+            if (exclusion != null
+                && exclusion.GetComponentsInChildren<Renderer>(true)
+                    .Any(renderer => renderer.enabled))
+                issues.Add("OUT_PARK_EXCLUSION must remain hidden in Live Preview.");
+
+            report = string.Format(
+                "enabled={0}, boundary={1}, groundTriangles={2}, issues={3}",
+                enabled,
+                hasBoundary,
+                groundTriangles,
+                issues.Count);
+            if (issues.Count > 0)
+                report += "\n- " + string.Join("\n- ", issues);
+            return issues.Count == 0;
+        }
+
+        private static bool CompileParkPrefab(
+            string prefabPath,
+            string bakeFolder,
+            out string report)
+        {
+            GameObject contents = null;
+            try
+            {
+                contents = PrefabUtility.LoadPrefabContents(prefabPath);
+                if (contents == null)
+                {
+                    report = "Failed to load the CityRoad prefab contents.";
+                    return false;
+                }
+                ApplyCollisionOutputContract(contents);
+                StripParkCollisionRenderers(contents);
+                ApplyShadowContract(contents);
+                if (!CityRoadParkAssets.CompilePrefab(
+                        contents,
+                        bakeFolder + "/CityPark",
+                        out report))
+                    return false;
+                var issues = new List<string>();
+                if (!CityRoadParkAssets.ValidateCompiledPrefab(contents, issues))
+                {
+                    report += "\n- " + string.Join("\n- ", issues);
+                    return false;
+                }
+                PrefabUtility.SaveAsPrefabAsset(contents, prefabPath);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                report = exception.ToString();
+                return false;
+            }
+            finally
+            {
+                if (contents != null)
+                    PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        private static Transform FindNamedOutput(GameObject root, string outputName)
+        {
+            return root.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(transform => IsUnderNamedOutput(transform, outputName));
+        }
+
         private static bool ValidateGeneratedHierarchy(GameObject root, out string report)
         {
             var issues = new List<string>();
@@ -267,7 +460,8 @@ namespace PCG.CityRoad.Editor
                 issues.Add("Spatial chunk output remains: " + GetHierarchyPath(chunkTransform));
 
             int collisionRendererCount = activeRenderers.Count(renderer =>
-                IsUnderNamedOutput(renderer.transform, "OUT_ROAD_COLLISION"));
+                IsUnderNamedOutput(renderer.transform, "OUT_ROAD_COLLISION")
+                || IsUnderNamedOutput(renderer.transform, "OUT_PARK_COLLISION"));
             if (collisionRendererCount > 0)
                 issues.Add("OUT_ROAD_COLLISION still contains enabled Renderer(s): " + collisionRendererCount);
 
@@ -285,6 +479,20 @@ namespace PCG.CityRoad.Editor
                     issues.Add("Road MeshCollider must remain non-convex: " + GetHierarchyPath(collider.transform));
                 if (collider.isTrigger)
                     issues.Add("Road MeshCollider must not be a trigger: " + GetHierarchyPath(collider.transform));
+            }
+
+            Transform parkCollisionRoot = FindNamedOutput(root, "OUT_PARK_COLLISION");
+            if (parkCollisionRoot != null)
+            {
+                MeshCollider[] parkColliders = parkCollisionRoot
+                    .GetComponentsInChildren<MeshCollider>(true);
+                if (parkColliders.Length == 0)
+                    issues.Add("OUT_PARK_COLLISION contains no MeshCollider.");
+                foreach (MeshCollider collider in parkColliders)
+                {
+                    if (collider.sharedMesh == null || collider.convex || collider.isTrigger)
+                        issues.Add("Invalid park MeshCollider: " + GetHierarchyPath(collider.transform));
+                }
             }
 
             foreach (MeshFilter filter in filters)
@@ -681,6 +889,53 @@ namespace PCG.CityRoad.Editor
             return valid;
         }
 
+        internal static void ApplyCollisionOutputContract(GameObject root)
+        {
+            foreach (MeshFilter filter in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                bool roadCollision = IsUnderNamedOutput(
+                    filter.transform,
+                    "OUT_ROAD_COLLISION");
+                bool parkCollision = IsUnderNamedOutput(
+                    filter.transform,
+                    "OUT_PARK_COLLISION");
+                bool exclusion = IsUnderNamedOutput(
+                    filter.transform,
+                    "OUT_PARK_EXCLUSION");
+                Renderer renderer = filter.GetComponent<Renderer>();
+                if (renderer != null && (roadCollision || parkCollision || exclusion))
+                {
+                    renderer.enabled = false;
+                    EditorUtility.SetDirty(renderer);
+                }
+                if ((!roadCollision && !parkCollision) || filter.sharedMesh == null)
+                    continue;
+
+                MeshCollider collider = filter.GetComponent<MeshCollider>();
+                if (collider == null)
+                    collider = filter.gameObject.AddComponent<MeshCollider>();
+                collider.sharedMesh = filter.sharedMesh;
+                collider.convex = false;
+                collider.isTrigger = false;
+                EditorUtility.SetDirty(collider);
+            }
+            EditorUtility.SetDirty(root);
+        }
+
+        private static void StripParkCollisionRenderers(GameObject root)
+        {
+            if (root == null)
+                return;
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true)
+                .Where(renderer => renderer != null
+                    && IsUnderNamedOutput(
+                        renderer.transform,
+                        "OUT_PARK_COLLISION"))
+                .ToArray();
+            foreach (Renderer renderer in renderers)
+                UnityEngine.Object.DestroyImmediate(renderer);
+        }
+
         /// <summary>
         /// Visible CityRoad geometry receives world shadows but never writes the
         /// mobile shadow map. This removes self-shadow wedges from road caps,
@@ -692,7 +947,8 @@ namespace PCG.CityRoad.Editor
             {
                 if (IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
                     || IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
-                    || IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB"))
+                    || IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
+                    || IsUnderAnyParkVisibleOutput(renderer.transform))
                 {
                     renderer.shadowCastingMode = ShadowCastingMode.Off;
                 }
@@ -722,7 +978,8 @@ namespace PCG.CityRoad.Editor
                 bool isRoad = IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE");
                 bool isMarking = IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS");
                 bool isSidewalk = IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB");
-                if (!isRoad && !isMarking && !isSidewalk)
+                bool isPark = IsUnderAnyParkVisibleOutput(renderer.transform);
+                if (!isRoad && !isMarking && !isSidewalk && !isPark)
                     continue;
 
                 ShadowCastingMode expectedMode = ShadowCastingMode.Off;
@@ -833,6 +1090,11 @@ namespace PCG.CityRoad.Editor
         internal static bool IsStreetFurnitureOutput(Transform transform)
         {
             return s_StreetFurnitureOutputs.Any(output => IsUnderNamedOutput(transform, output));
+        }
+
+        internal static bool IsUnderAnyParkVisibleOutput(Transform transform)
+        {
+            return s_ParkVisibleOutputs.Any(output => IsUnderNamedOutput(transform, output));
         }
 
         private static string GetHierarchyPath(Transform transform)

@@ -194,6 +194,150 @@ def check_topology(root: hou.Node, source: hou.Node) -> List[str]:
     return messages
 
 
+def check_output_routing(root: hou.Node) -> List[str]:
+    """Protect the final HeightField/metadata split from connector-order drift."""
+
+    core = root.node("TerrainCore")
+    require(core is not None, "TerrainCore is missing")
+    layers = core.node("60_MATERIAL_LAYERS")
+    output_stage = core.node("70_OUTPUT")
+    terrain_heightfield = core.node("OUT_TERRAIN_HEIGHTFIELD")
+    terrain_metadata = core.node("OUT_TERRAIN_METADATA")
+    validation = core.node("80_VALIDATION")
+    metadata_output = output_stage.node("OUT_METADATA") if output_stage else None
+    require(
+        all(
+            (
+                layers,
+                output_stage,
+                terrain_heightfield,
+                terrain_metadata,
+                validation,
+                metadata_output,
+            )
+        ),
+        "Terrain final output nodes are incomplete",
+    )
+
+    require(
+        core.node("70_OUTPUT/OUTPUT_material_layers") is None,
+        "Redundant final material Object Merge returned",
+    )
+    require(
+        core.node("70_OUTPUT/OUT_HEIGHTFIELD") is None,
+        "Redundant 70_OUTPUT HeightField connector returned",
+    )
+    require(
+        metadata_output.parm("outputidx").eval() == 0,
+        "70_OUTPUT metadata connector index changed",
+    )
+    require(
+        terrain_heightfield.input(0) == layers,
+        "60_MATERIAL_LAYERS no longer feeds OUT_TERRAIN_HEIGHTFIELD",
+    )
+    require(
+        terrain_metadata.input(0) == output_stage,
+        "70_OUTPUT metadata no longer feeds OUT_TERRAIN_METADATA",
+    )
+    metadata_connections = terrain_metadata.inputConnections()
+    require(
+        len(metadata_connections) == 1 and metadata_connections[0].outputIndex() == 0,
+        "OUT_TERRAIN_METADATA must consume 70_OUTPUT connector 0",
+    )
+    require(
+        validation.input(1) == terrain_heightfield,
+        "80_VALIDATION no longer consumes the final HeightField",
+    )
+    return ["Final HeightField/metadata routing and redundant branch removal"]
+
+
+def check_mask_cleanup(root: hou.Node) -> List[str]:
+    """Protect the material-only cliff controls and removed dead mask branches."""
+
+    core = root.node("TerrainCore")
+    earthwork = core.node("40_CONFORM_EARTHWORK") if core else None
+    output_stage = core.node("70_OUTPUT") if core else None
+    require(all((core, earthwork, output_stage)), "Terrain mask cleanup networks are incomplete")
+
+    removed_paths = (
+        "40_CONFORM_EARTHWORK/MASK_no_scatter",
+        "40_CONFORM_EARTHWORK/MASK_water_candidate",
+        "40_CONFORM_EARTHWORK/MASK_apply_water_exclusions",
+        "40_CONFORM_EARTHWORK/PREP_isolate_mask_no_scatter",
+        "40_CONFORM_EARTHWORK/PREP_keep_mask_no_scatter",
+        "40_CONFORM_EARTHWORK/PREP_name_no_scatter",
+        "40_CONFORM_EARTHWORK/PREP_isolate_mask_water_candidate",
+        "40_CONFORM_EARTHWORK/PREP_keep_mask_water_candidate",
+        "40_CONFORM_EARTHWORK/PREP_name_water_candidate",
+        "70_OUTPUT/OUTPUT_contract_layers",
+        "70_OUTPUT/OUTPUT_keep_road",
+        "70_OUTPUT/OUTPUT_keep_shoulder",
+        "70_OUTPUT/OUTPUT_keep_cut",
+        "70_OUTPUT/OUTPUT_keep_fill",
+        "70_OUTPUT/OUTPUT_keep_slope",
+        "70_OUTPUT/OUTPUT_keep_no_scatter",
+        "70_OUTPUT/OUTPUT_keep_cliff",
+        "70_OUTPUT/OUTPUT_keep_water_candidate",
+        "70_OUTPUT/OUTPUT_keep_artist_lock",
+    )
+    for path in removed_paths:
+        require(core.node(path) is None, f"Removed dead mask node returned: {path}")
+
+    prep = earthwork.node("PREP_contract_mask_layers")
+    mask_fill = earthwork.node("MASK_fill")
+    mask_cliff = earthwork.node("MASK_cliff")
+    resolve_overlap = earthwork.node("MASK_resolve_cut_fill_overlap")
+    final_guard = earthwork.node("FINAL_road_clearance_guard")
+    require(
+        all((prep, mask_fill, mask_cliff, resolve_overlap, final_guard)),
+        "Terrain retained mask nodes are incomplete",
+    )
+    expected_prep_inputs = [
+        "TRACK_CONTEXT_enable_switch",
+        "PREP_name_road",
+        "PREP_name_shoulder",
+        "PREP_name_cut",
+        "PREP_name_fill",
+        "PREP_name_slope",
+        "PREP_name_cliff",
+        "PREP_name_artist_lock",
+    ]
+    actual_prep_inputs = [
+        connection.inputNode().name()
+        for connection in sorted(prep.inputConnections(), key=lambda item: item.inputIndex())
+    ]
+    require(actual_prep_inputs == expected_prep_inputs, "Terrain contract mask merge inputs changed")
+
+    for node_name in (
+        "ADAPT_measure_grid",
+        "CONFORM_BASE_LOW",
+        "CONFORM_core_exact_height",
+        "CONFORM_enable_switch",
+    ):
+        require(
+            earthwork.node(node_name).input(0) == mask_fill,
+            f"MASK_fill bypass route changed: {node_name}",
+        )
+    require(resolve_overlap.input(0) == mask_cliff, "Cliff -> overlap mask route changed")
+    require(final_guard.input(0) == resolve_overlap, "Overlap mask -> clearance guard route changed")
+    require(
+        mask_cliff.parm("min_slopeangle").expression() == 'ch("../../../cliff_start")',
+        "Stone slope start binding changed",
+    )
+    require(
+        mask_cliff.parm("max_slopeangle").expression() == 'ch("../../../cliff_full")',
+        "Stone slope full binding changed",
+    )
+
+    metadata = output_stage.node("METADATA_write_contract")
+    require(metadata is not None, "Terrain metadata writer is missing")
+    snippet = metadata.parm("snippet").evalAsString()
+    require('s@terrain_contract_version = "1.14";' in snippet, "Terrain metadata version changed")
+    require("no_scatter" not in snippet, "Removed no_scatter metadata returned")
+    require("water_candidate" not in snippet, "Removed water_candidate metadata returned")
+    return ["Dead no-scatter/water masks removed; cliff remains material-only"]
+
+
 def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
     """Protect the authored Terrain panel hierarchy from spare-folder drift."""
 
@@ -209,14 +353,14 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         "Overview / 总览",
         "Terrain Shape / 地形形态",
         "Advanced / 高级",
-        "Output Mask / 输出 Mask",
+        "Terrain Material / 地形材质",
     ]
     require(
         [entry.label() for entry in top_tabs] == expected_top_labels,
         "Terrain top-level parameter tabs changed",
     )
 
-    overview, _, advanced, output_mask = top_tabs
+    overview, _, advanced, terrain_material = top_tabs
     require(
         [entry.name() for entry in overview.parmTemplates()]
         == [
@@ -256,18 +400,34 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         "Island Coast inner groups changed",
     )
     require(
-        [entry.name() for entry in output_mask.parmTemplates()]
+        [entry.name() for entry in terrain_material.parmTemplates()]
         == [
-            "no_scatter_extra",
+            "material_layers_enabled",
             "cliff_start",
             "cliff_full",
-            "water_max_slope",
-            "water_max_height",
         ],
-        "Output Mask parameters changed",
+        "Terrain Material parameters changed",
+    )
+    require(
+        terrain_material.parmTemplates()[1].label()
+        == "Stone Slope Start (deg) / 岩石材质起始坡度",
+        "Stone Slope Start label changed",
+    )
+    require(
+        terrain_material.parmTemplates()[2].label()
+        == "Stone Slope Full (deg) / 岩石材质完全坡度",
+        "Stone Slope Full label changed",
     )
 
-    for name in ("height_range", "min_domain_size", "tile_count"):
+    for name in (
+        "height_range",
+        "min_domain_size",
+        "tile_count",
+        "no_scatter_extra",
+        "water_max_slope",
+        "water_max_height",
+        "terrain_material_output_folder",
+    ):
         require(group.find(name) is None, f"Removed parameter returned: {name}")
         require(root.parm(name) is None, f"Instance still contains removed parameter: {name}")
     require(not root.spareParms(), "Terrain instance contains spare parameter-folder overrides")
@@ -280,11 +440,13 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         require("bake_resolution" not in expression, f"{name} uses removed bake resolution")
         require("tile_resolution" in expression, f"{name} no longer uses Terrain Resolution")
 
-    return ["Four-tab Terrain interface, no spare/dead parameters, single resolution path"]
+    return ["Four-tab Terrain interface, material-only slope controls, no dead parameters"]
 
 
 def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[str, Any]:
     passed = check_topology(root, source)
+    passed.extend(check_output_routing(root))
+    passed.extend(check_mask_cleanup(root))
     passed.extend(check_interface_contract(root, source))
     original = {name: root.parm(name).eval() for name in TOUCHED_PARAMETERS}
 

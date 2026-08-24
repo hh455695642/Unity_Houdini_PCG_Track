@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HoudiniEngineUnity;
 using UnityEditor;
@@ -21,8 +22,10 @@ namespace PCG.CityRoad.Editor
         private const string CityRoadAssetPath =
             "Assets/PCG/HDA/City/CityRoad.hda";
         private const int ExpectedAssetConnectorCount = 0;
-        private const int ExpectedParameterInputCount = 1;
+        private const int ExpectedParameterInputCount = 2;
+        private const int MinimumPreReloadParameterInputCount = 1;
         internal const string RoadNetworkParameterName = "unity_road_network";
+        internal const string ParkAreasParameterName = "unity_park_areas";
         private const string RoadNetworkSourceParameterName =
             "road_network_source";
         private const int ExternalRoadNetworkSource = 0;
@@ -39,12 +42,77 @@ namespace PCG.CityRoad.Editor
                 "Assets/PCG/Materials/M_PCG_CityRoad_Curb.mat"),
             new KeyValuePair<string, string>(
                 "marking_unity_material",
-                "Assets/PCG/Materials/M_PCG_CityRoad_Marking.mat")
+                "Assets/PCG/Materials/M_PCG_CityRoad_Marking.mat"),
+            new KeyValuePair<string, string>(
+                "park_ground_unity_material",
+                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Grass.mat"),
+            new KeyValuePair<string, string>(
+                "park_path_unity_material",
+                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Path.mat"),
+            new KeyValuePair<string, string>(
+                "park_water_unity_material",
+                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Water.mat")
         };
         private static readonly string[] s_InputReaderNodeNames =
         {
-            "IN_ROAD_NETWORK"
+            "IN_ROAD_NETWORK",
+            "IN_UNITY_PARK_AREAS"
         };
+        // HEU uploads parameter-input geometry after the HDA's first cook.
+        // Cook the dependent park stages explicitly so their cached empty
+        // result cannot survive a Safe Rebuild.
+        private static readonly string[] s_PostInputCookNodeNames =
+        {
+            "PARK_ENABLE_INPUT_SWITCH",
+            "PARK_CONVERT_HAPI_CURVE_V32",
+            "PARK_REBUILD_HAPI_TOPOLOGY_V29",
+            // V41 contract pulls every modular park branch (surface zones,
+            // connected paths, woodland layers and exclusion) after HEU has
+            // uploaded the Unity spline parameter input.
+            "PARK_CONTRACT_V41"
+        };
+        private static readonly string[] s_ParkBoolParameters =
+        {
+            "enable_city_park",
+            "enable_park_water",
+            "enable_park_paths",
+            "enable_park_trees"
+        };
+        private static readonly string[] s_ParkIntParameters =
+        {
+            "park_seed",
+            "park_lake_count",
+            "park_path_branch_count"
+        };
+        private static readonly string[] s_ParkFloatParameters =
+        {
+            "park_boundary_inset",
+            "park_lake_area_ratio",
+            "park_path_width",
+            "park_path_jitter",
+            "park_tree_density_per_hectare",
+            "park_tree_min_spacing",
+            "park_tree_clearance"
+        };
+        private static readonly string[] s_ParkStringParameters =
+        {
+            "park_ground_unity_material",
+            "park_path_unity_material",
+            "park_water_unity_material"
+        };
+
+        private sealed class ParkParameterSnapshot
+        {
+            internal bool IsPresent;
+            internal readonly Dictionary<string, bool> Bools =
+                new Dictionary<string, bool>(StringComparer.Ordinal);
+            internal readonly Dictionary<string, int> Ints =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+            internal readonly Dictionary<string, float> Floats =
+                new Dictionary<string, float>(StringComparer.Ordinal);
+            internal readonly Dictionary<string, string> Strings =
+                new Dictionary<string, string>(StringComparer.Ordinal);
+        }
 
         private static bool s_RebuildQueued;
         private static readonly Type[] s_UploadInputNodesParameterTypes =
@@ -151,8 +219,13 @@ namespace PCG.CityRoad.Editor
                 return false;
 
             HEU_HoudiniAsset asset = root.HoudiniAsset;
-            List<GameObject[]> inputBindings = CaptureInputBindings(asset);
+            Dictionary<string, GameObject[]> inputBindings =
+                CaptureInputBindings(asset);
             if (!ValidateInputContract(root, asset, inputBindings))
+                return false;
+
+            ParkParameterSnapshot parkParameters;
+            if (!CaptureParkParameters(root, asset, out parkParameters))
                 return false;
 
             bool roadMarkingsEnabled;
@@ -164,18 +237,31 @@ namespace PCG.CityRoad.Editor
                     out crosswalksEnabled))
                 return false;
 
-            if (!asset.RequestReload(bAsync: false))
+            HashSet<GameObject> sceneRootsBeforeReload = root.gameObject.scene.IsValid()
+                ? new HashSet<GameObject>(root.gameObject.scene.GetRootGameObjects())
+                : null;
+            HashSet<string> treePalettePaths = CaptureTreePalettePaths(asset);
+
+            // HEU 3.0 can temporarily instantiate object-merge prefab points as
+            // scene roots during a blocking reload/cook. Always remove only the
+            // roots created by this rebuild and only when their prefab path is
+            // one of the configured tree palette assets.
+            try
             {
-                Debug.LogErrorFormat(
-                    root,
-                    "CityRoad Safe Rebuild: RequestReload failed for {0}.",
-                    root.name);
-                return false;
-            }
+                if (!asset.RequestReload(bAsync: false))
+                {
+                    Debug.LogErrorFormat(
+                        root,
+                        "CityRoad Safe Rebuild: RequestReload failed for {0}.",
+                        root.name);
+                    return false;
+                }
 
             // RequestReload can refresh the component reference, so fetch it
             // again before forcing a cook/input upload.
             asset = root.HoudiniAsset;
+            if (asset == null || !NormalizeEmptyNewParkInput(root, asset))
+                return false;
             if (asset == null || !RestoreInputBindings(root, asset, inputBindings))
                 return false;
 
@@ -184,6 +270,9 @@ namespace PCG.CityRoad.Editor
                     asset,
                     roadMarkingsEnabled,
                     crosswalksEnabled))
+                return false;
+
+            if (!RestoreParkParameters(root, asset, parkParameters))
                 return false;
 
             if (!ApplyRoadNetworkSourceContract(root, asset))
@@ -222,17 +311,159 @@ namespace PCG.CityRoad.Editor
             if (root.gameObject.scene.IsValid())
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
 
-            string inputZeroName = inputBindings[0][0] != null
-                ? inputBindings[0][0].name
+            GameObject[] roadBindings;
+            inputBindings.TryGetValue(RoadNetworkParameterName, out roadBindings);
+            string inputZeroName = roadBindings != null
+                && roadBindings.Length > 0
+                && roadBindings[0] != null
+                ? roadBindings[0].name
                 : "<missing>";
-            Debug.LogFormat(
-                root,
-                "CityRoad Safe Rebuild: {0} reloaded and cooked successfully; "
-                + "the {1} Spline parameter was force-uploaded ({2}).",
-                root.name,
-                RoadNetworkParameterName,
-                inputZeroName);
-            return true;
+            GameObject[] parkBindings;
+            inputBindings.TryGetValue(ParkAreasParameterName, out parkBindings);
+            string parkInputName = parkBindings != null
+                && parkBindings.Length > 0
+                && parkBindings[0] != null
+                ? parkBindings[0].name
+                : "<empty>";
+                Debug.LogFormat(
+                    root,
+                    "CityRoad Safe Rebuild: {0} reloaded and cooked successfully; "
+                    + "named Spline inputs were restored: {1}={2}, {3}={4}.",
+                    root.name,
+                    RoadNetworkParameterName,
+                    inputZeroName,
+                    ParkAreasParameterName,
+                    parkInputName);
+                return true;
+            }
+            finally
+            {
+                CleanupNewTreePrefabRoots(
+                    root,
+                    sceneRootsBeforeReload,
+                    treePalettePaths);
+                CleanupKnownHapiOrphanTreeRoots(root);
+            }
+        }
+
+        private static HashSet<string> CaptureTreePalettePaths(
+            HEU_HoudiniAsset asset)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (asset == null || asset.Parameters == null)
+                return result;
+
+            // HEU may materialize every object-merge palette, not only tree
+            // variants, as transient scene-root instances. Include the two
+            // street-furniture palettes in the same exact-path allowlist.
+            foreach (string parameterName in new[] { "lamp_prefab", "tree_pit_prefab" })
+            {
+                string path;
+                if (asset.Parameters.GetStringParameterValue(parameterName, out path)
+                    && !string.IsNullOrEmpty(path))
+                    result.Add(path.Replace('\\', '/'));
+            }
+            for (int index = 1; index <= 3; index++)
+            {
+                string path;
+                if (asset.Parameters.GetStringParameterValue(
+                        "tree_prefab" + index,
+                        out path)
+                    && !string.IsNullOrEmpty(path))
+                    result.Add(path.Replace('\\', '/'));
+            }
+            return result;
+        }
+
+        private static void CleanupNewTreePrefabRoots(
+            HEU_HoudiniAssetRoot source,
+            HashSet<GameObject> rootsBeforeReload,
+            HashSet<string> palettePaths)
+        {
+            if (source == null
+                || rootsBeforeReload == null
+                || palettePaths == null
+                || palettePaths.Count == 0
+                || !source.gameObject.scene.IsValid())
+                return;
+
+            foreach (GameObject candidate in source.gameObject.scene.GetRootGameObjects())
+            {
+                if (candidate == null
+                    || candidate == source.gameObject
+                    || rootsBeforeReload.Contains(candidate))
+                    continue;
+                string path = PrefabUtility
+                    .GetPrefabAssetPathOfNearestInstanceRoot(candidate)
+                    .Replace('\\', '/');
+                if (palettePaths.Contains(path))
+                    UnityEngine.Object.DestroyImmediate(candidate);
+            }
+        }
+
+        internal static int CleanupKnownHapiOrphanTreeRoots(
+            HEU_HoudiniAssetRoot source)
+        {
+            const int minimumGeneratedClusterSize = 64;
+            if (source == null
+                || source.HoudiniAsset == null
+                || !source.gameObject.scene.IsValid())
+                return 0;
+
+            HashSet<string> palettePaths = CaptureTreePalettePaths(
+                source.HoudiniAsset);
+            if (palettePaths.Count == 0)
+                return 0;
+            // PrefabUtility deliberately stops exposing prefab ancestry for
+            // HEU's leaked root instances after entering PlayMode. Keep the
+            // configured asset filenames as a second, exact identity signal;
+            // the large-cluster threshold below still prevents deleting a
+            // manually placed singleton with the same prefab name.
+            var paletteNames = new HashSet<string>(
+                palettePaths.Select(System.IO.Path.GetFileNameWithoutExtension),
+                StringComparer.Ordinal);
+
+            var candidates = new List<GameObject>();
+            foreach (GameObject candidate in source.gameObject.scene.GetRootGameObjects())
+            {
+                if (candidate == null
+                    || candidate == source.gameObject
+                    || candidate.transform.position.sqrMagnitude > 0.00000001f
+                    || Quaternion.Angle(
+                        candidate.transform.rotation,
+                        Quaternion.identity) > 0.001f
+                    || (candidate.transform.localScale - Vector3.one).sqrMagnitude
+                        > 0.00000001f)
+                    continue;
+
+                Component[] components = candidate.GetComponents<Component>();
+                if (components.Length != 3
+                    || !(components[0] is Transform)
+                    || !components.Any(component => component is MeshFilter)
+                    || !components.Any(component => component is MeshRenderer))
+                    continue;
+
+                string path = PrefabUtility
+                    .GetPrefabAssetPathOfNearestInstanceRoot(candidate)
+                    .Replace('\\', '/');
+                bool configuredPrefab = palettePaths.Contains(path);
+                bool configuredPlayModeInstance = string.IsNullOrEmpty(path)
+                    && EditorApplication.isPlayingOrWillChangePlaymode
+                    && paletteNames.Contains(candidate.name);
+                if (configuredPrefab || configuredPlayModeInstance)
+                    candidates.Add(candidate);
+            }
+
+            // A single palette prefab at the origin may be intentional. HEU's
+            // leaked object-merge previews always arrive as a large cluster,
+            // so only clean that provable generated pattern.
+            if (candidates.Count < minimumGeneratedClusterSize)
+                return 0;
+
+            foreach (GameObject candidate in candidates)
+                UnityEngine.Object.DestroyImmediate(candidate);
+            EditorSceneManager.MarkSceneDirty(source.gameObject.scene);
+            return candidates.Count;
         }
 
         private static bool ApplyRoadNetworkSourceContract(
@@ -364,18 +595,126 @@ namespace PCG.CityRoad.Editor
             return true;
         }
 
-        private static List<GameObject[]> CaptureInputBindings(HEU_HoudiniAsset asset)
+        private static bool CaptureParkParameters(
+            HEU_HoudiniAssetRoot root,
+            HEU_HoudiniAsset asset,
+            out ParkParameterSnapshot snapshot)
         {
-            var result = new List<GameObject[]>();
+            snapshot = new ParkParameterSnapshot();
+            if (asset == null || asset.Parameters == null)
+                return false;
+
+            // Existing scenes legitimately have no park parameters before the
+            // HDA definition is reloaded for the first time. In that case the
+            // new definition defaults are preserved.
+            if (asset.Parameters.GetParameter("enable_city_park") == null)
+                return true;
+
+            snapshot.IsPresent = true;
+            foreach (string name in s_ParkBoolParameters)
+            {
+                bool value;
+                if (!asset.Parameters.GetBoolParameterValue(name, out value))
+                    return LogParkCaptureFailure(root, name);
+                snapshot.Bools.Add(name, value);
+            }
+            foreach (string name in s_ParkIntParameters)
+            {
+                int value;
+                if (!asset.Parameters.GetIntParameterValue(name, out value))
+                    return LogParkCaptureFailure(root, name);
+                snapshot.Ints.Add(name, value);
+            }
+            foreach (string name in s_ParkFloatParameters)
+            {
+                float value;
+                if (!asset.Parameters.GetFloatParameterValue(name, out value))
+                    return LogParkCaptureFailure(root, name);
+                snapshot.Floats.Add(name, value);
+            }
+            foreach (string name in s_ParkStringParameters)
+            {
+                string value;
+                if (!asset.Parameters.GetStringParameterValue(name, out value))
+                    return LogParkCaptureFailure(root, name);
+                snapshot.Strings.Add(name, value);
+            }
+            return true;
+        }
+
+        private static bool LogParkCaptureFailure(
+            HEU_HoudiniAssetRoot root,
+            string parameterName)
+        {
+            Debug.LogErrorFormat(
+                root,
+                "CityRoad Safe Rebuild: failed to capture park parameter {0}.",
+                parameterName);
+            return false;
+        }
+
+        private static bool RestoreParkParameters(
+            HEU_HoudiniAssetRoot root,
+            HEU_HoudiniAsset asset,
+            ParkParameterSnapshot snapshot)
+        {
+            if (snapshot == null || !snapshot.IsPresent)
+                return true;
+            if (asset == null || asset.Parameters == null)
+                return false;
+
+            foreach (KeyValuePair<string, bool> item in snapshot.Bools)
+            {
+                if (!asset.Parameters.SetBoolParameterValue(
+                        item.Key, item.Value, bRecookAsset: false))
+                    return LogParkRestoreFailure(root, item.Key);
+            }
+            foreach (KeyValuePair<string, int> item in snapshot.Ints)
+            {
+                if (!asset.Parameters.SetIntParameterValue(
+                        item.Key, item.Value, bRecookAsset: false))
+                    return LogParkRestoreFailure(root, item.Key);
+            }
+            foreach (KeyValuePair<string, float> item in snapshot.Floats)
+            {
+                if (!asset.Parameters.SetFloatParameterValue(
+                        item.Key, item.Value, bRecookAsset: false))
+                    return LogParkRestoreFailure(root, item.Key);
+            }
+            foreach (KeyValuePair<string, string> item in snapshot.Strings)
+            {
+                if (!asset.Parameters.SetStringParameterValues(
+                        item.Key, new[] { item.Value }, bRecookAsset: false))
+                    return LogParkRestoreFailure(root, item.Key);
+            }
+            EditorUtility.SetDirty(asset.Parameters);
+            return true;
+        }
+
+        private static bool LogParkRestoreFailure(
+            HEU_HoudiniAssetRoot root,
+            string parameterName)
+        {
+            Debug.LogErrorFormat(
+                root,
+                "CityRoad Safe Rebuild: failed to restore park parameter {0}.",
+                parameterName);
+            return false;
+        }
+
+        private static Dictionary<string, GameObject[]> CaptureInputBindings(
+            HEU_HoudiniAsset asset)
+        {
+            var result = new Dictionary<string, GameObject[]>(StringComparer.Ordinal);
             if (asset == null || asset.InputNodes == null)
                 return result;
 
             foreach (HEU_InputNode inputNode in asset.InputNodes)
             {
-                result.Add(
-                    inputNode != null
-                        ? inputNode.GetInputEntryGameObjects()
-                        : Array.Empty<GameObject>());
+                if (inputNode == null || string.IsNullOrEmpty(inputNode.ParamName))
+                    continue;
+                result[inputNode.ParamName] = inputNode.GetInputEntryGameObjects()
+                    ?? Array.Empty<GameObject>();
             }
 
             return result;
@@ -384,7 +723,7 @@ namespace PCG.CityRoad.Editor
         private static bool ValidateInputContract(
             HEU_HoudiniAssetRoot root,
             HEU_HoudiniAsset asset,
-            List<GameObject[]> inputBindings)
+            Dictionary<string, GameObject[]> inputBindings)
         {
             int assetConnectorCount = asset != null
                 ? asset.NodeInfo.inputCount
@@ -404,15 +743,17 @@ namespace PCG.CityRoad.Editor
 
             if (asset == null
                 || asset.InputNodes == null
-                || asset.InputNodes.Count != ExpectedParameterInputCount
-                || inputBindings.Count != ExpectedParameterInputCount)
+                || asset.InputNodes.Count < MinimumPreReloadParameterInputCount
+                || asset.InputNodes.Count > ExpectedParameterInputCount
+                || inputBindings.Count != asset.InputNodes.Count)
             {
                 Debug.LogErrorFormat(
                     root,
-                    "CityRoad Safe Rebuild: {0} must expose exactly {1} "
-                    + "parameter input(s); found {2}. Rebuild was cancelled "
+                    "CityRoad Safe Rebuild: {0} must expose {1}-{2} named "
+                    + "parameter input(s) before reload; found {3}. Rebuild was cancelled "
                     + "without changing bindings.",
                     root.name,
+                    MinimumPreReloadParameterInputCount,
                     ExpectedParameterInputCount,
                     asset != null && asset.InputNodes != null
                         ? asset.InputNodes.Count
@@ -420,7 +761,9 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
-            HEU_InputNode roadNetworkInput = asset.InputNodes[0];
+            HEU_InputNode roadNetworkInput = FindParameterInput(
+                asset,
+                RoadNetworkParameterName);
             if (roadNetworkInput == null
                 || roadNetworkInput.NodeType
                     != HEU_InputNodeTypeWrapper.PARAMETER
@@ -448,9 +791,13 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
-            if (inputBindings[0] == null
-                || inputBindings[0].Length == 0
-                || inputBindings[0][0] == null)
+            GameObject[] roadBindings;
+            if (!inputBindings.TryGetValue(
+                    RoadNetworkParameterName,
+                    out roadBindings)
+                || roadBindings == null
+                || roadBindings.Length == 0
+                || roadBindings[0] == null)
             {
                 Debug.LogErrorFormat(
                     root,
@@ -461,17 +808,32 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
+            HEU_InputNode parkInput = FindParameterInput(asset, ParkAreasParameterName);
+            if (parkInput != null
+                && (parkInput.NodeType != HEU_InputNodeTypeWrapper.PARAMETER
+                    || (parkInput.ObjectType != HEU_InputObjectTypeWrapper.SPLINE
+                        && !(parkInput.ObjectType == HEU_InputObjectTypeWrapper.UNITY_MESH
+                            && parkInput.NumInputEntries() == 0))))
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: optional input {0} must be SPLINE, "
+                    + "or an empty newly-created UNITY_MESH input; found {1}.",
+                    ParkAreasParameterName,
+                    parkInput.ObjectType);
+                return false;
+            }
+
             return true;
         }
 
         private static bool RestoreInputBindings(
             HEU_HoudiniAssetRoot root,
             HEU_HoudiniAsset asset,
-            List<GameObject[]> bindings)
+            Dictionary<string, GameObject[]> bindings)
         {
             if (asset.InputNodes == null
-                || asset.InputNodes.Count != ExpectedParameterInputCount
-                || bindings.Count != ExpectedParameterInputCount)
+                || asset.InputNodes.Count != ExpectedParameterInputCount)
             {
                 Debug.LogErrorFormat(
                     root,
@@ -484,6 +846,7 @@ namespace PCG.CityRoad.Editor
             }
 
             HEU_InputNode roadNetworkInput = asset.InputNodes[0];
+            HEU_InputNode parkAreasInput = asset.InputNodes[1];
             if (roadNetworkInput == null
                 || roadNetworkInput.NodeType
                     != HEU_InputNodeTypeWrapper.PARAMETER
@@ -501,22 +864,36 @@ namespace PCG.CityRoad.Editor
                     RoadNetworkParameterName);
                 return false;
             }
-
-            for (int inputIndex = 0; inputIndex < bindings.Count; inputIndex++)
+            if (parkAreasInput == null
+                || parkAreasInput.NodeType != HEU_InputNodeTypeWrapper.PARAMETER
+                || parkAreasInput.ObjectType != HEU_InputObjectTypeWrapper.SPLINE
+                || !string.Equals(
+                    parkAreasInput.ParamName,
+                    ParkAreasParameterName,
+                    StringComparison.Ordinal))
             {
-                HEU_InputNode inputNode = asset.InputNodes[inputIndex];
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: input 1 must be the PARAMETER/SPLINE "
+                    + "input {0} after reload.",
+                    ParkAreasParameterName);
+                return false;
+            }
+
+            foreach (HEU_InputNode inputNode in asset.InputNodes)
+            {
                 if (inputNode == null)
                 {
-                    Debug.LogErrorFormat(
-                        root,
-                        "CityRoad Safe Rebuild: input {0} is null after reload on {1}.",
-                        inputIndex,
+                    Debug.LogErrorFormat(root,
+                        "CityRoad Safe Rebuild: a parameter input is null after reload on {0}.",
                         root.name);
                     return false;
                 }
 
-                GameObject[] expectedEntries =
-                    bindings[inputIndex] ?? Array.Empty<GameObject>();
+                GameObject[] expectedEntries;
+                if (!bindings.TryGetValue(inputNode.ParamName, out expectedEntries))
+                    expectedEntries = Array.Empty<GameObject>();
+                expectedEntries = expectedEntries ?? Array.Empty<GameObject>();
                 for (int entryIndex = 0;
                     entryIndex < expectedEntries.Length;
                     entryIndex++)
@@ -541,10 +918,10 @@ namespace PCG.CityRoad.Editor
                 }
             }
 
-            GameObject restoredRoadInput =
-                asset.InputNodes[0].GetInputEntryGameObject(0);
+            GameObject[] requiredRoadBindings = bindings[RoadNetworkParameterName];
+            GameObject restoredRoadInput = roadNetworkInput.GetInputEntryGameObject(0);
             if (restoredRoadInput == null
-                || restoredRoadInput != bindings[0][0])
+                || restoredRoadInput != requiredRoadBindings[0])
             {
                 Debug.LogErrorFormat(
                     root,
@@ -554,6 +931,48 @@ namespace PCG.CityRoad.Editor
             }
 
             return true;
+        }
+
+        private static bool NormalizeEmptyNewParkInput(
+            HEU_HoudiniAssetRoot root,
+            HEU_HoudiniAsset asset)
+        {
+            HEU_InputNode input = FindParameterInput(asset, ParkAreasParameterName);
+            if (input == null)
+            {
+                Debug.LogErrorFormat(
+                    root,
+                    "CityRoad Safe Rebuild: required new parameter input {0} is missing.",
+                    ParkAreasParameterName);
+                return false;
+            }
+            if (input.ObjectType == HEU_InputObjectTypeWrapper.UNITY_MESH
+                && input.NumInputEntries() == 0)
+            {
+                input.ChangeInputType(
+                    HEU_InputObjectTypeWrapper.SPLINE,
+                    bRecookAsset: false);
+                EditorUtility.SetDirty(input);
+            }
+            return input.ObjectType == HEU_InputObjectTypeWrapper.SPLINE;
+        }
+
+        private static HEU_InputNode FindParameterInput(
+            HEU_HoudiniAsset asset,
+            string parameterName)
+        {
+            if (asset == null || asset.InputNodes == null)
+                return null;
+            foreach (HEU_InputNode input in asset.InputNodes)
+            {
+                if (input != null
+                    && string.Equals(
+                        input.ParamName,
+                        parameterName,
+                        StringComparison.Ordinal))
+                    return input;
+            }
+            return null;
         }
 
         private static bool UploadAndCookInputNetworks(
@@ -604,6 +1023,13 @@ namespace PCG.CityRoad.Editor
                     inputIndex++)
                 {
                     HEU_InputNode inputNode = asset.InputNodes[inputIndex];
+                    bool requiredInput = inputNode != null
+                        && string.Equals(
+                            inputNode.ParamName,
+                            RoadNetworkParameterName,
+                            StringComparison.Ordinal);
+                    bool hasEntries = inputNode != null
+                        && inputNode.NumInputEntries() > 0;
                     int connectedMergeId = -1;
                     bool hasConnection = inputNode != null
                         && session.GetParamNodeValue(
@@ -611,6 +1037,12 @@ namespace PCG.CityRoad.Editor
                             inputNode.ParamName,
                             out connectedMergeId)
                         && connectedMergeId >= 0;
+                    if (!hasConnection && !requiredInput && !hasEntries)
+                    {
+                        // Empty park input is valid and the HDA switch avoids
+                        // cooking its object-merge branch entirely.
+                        continue;
+                    }
                     if (!hasConnection)
                     {
                         Debug.LogErrorFormat(
@@ -623,8 +1055,15 @@ namespace PCG.CityRoad.Editor
                         return false;
                     }
 
-                    if (!CookImmediateInputs(session, connectedMergeId)
-                        || !session.CookNode(connectedMergeId, false))
+                    if (!CookImmediateInputs(
+                            session,
+                            connectedMergeId,
+                            root.name)
+                        || !HEU_HAPIUtility.CookNodeInHoudini(
+                            session,
+                            connectedMergeId,
+                            false,
+                            root.name))
                     {
                         Debug.LogErrorFormat(
                             root,
@@ -651,7 +1090,11 @@ namespace PCG.CityRoad.Editor
                     if (!readerNodeIds.TryGetValue(
                             readerName,
                             out readerNodeId)
-                        || !session.CookNode(readerNodeId, false))
+                        || !HEU_HAPIUtility.CookNodeInHoudini(
+                            session,
+                            readerNodeId,
+                            false,
+                            root.name))
                     {
                         Debug.LogErrorFormat(
                             root,
@@ -661,13 +1104,32 @@ namespace PCG.CityRoad.Editor
                         return false;
                     }
 
-                    if (inputIndex == 0
+                    if (requiredInput
                         && !HasGeometry(session, readerNodeId))
                     {
                         Debug.LogError(
                             "CityRoad Safe Rebuild: input 0 was uploaded but "
                             + "IN_ROAD_NETWORK still contains no geometry.",
                             root);
+                        return false;
+                    }
+                }
+
+                foreach (string nodeName in s_PostInputCookNodeNames)
+                {
+                    int nodeId;
+                    if (!readerNodeIds.TryGetValue(nodeName, out nodeId)
+                        || !HEU_HAPIUtility.CookNodeInHoudini(
+                            session,
+                            nodeId,
+                            false,
+                            root.name))
+                    {
+                        Debug.LogErrorFormat(
+                            root,
+                            "CityRoad Safe Rebuild: failed to refresh post-input "
+                            + "park stage {0}.",
+                            nodeName);
                         return false;
                     }
                 }
@@ -708,6 +1170,7 @@ namespace PCG.CityRoad.Editor
             var wanted = new HashSet<string>(
                 s_InputReaderNodeNames,
                 StringComparer.Ordinal);
+            wanted.UnionWith(s_PostInputCookNodeNames);
             foreach (int nodeId in childNodeIds)
             {
                 string nodeName =
@@ -721,7 +1184,8 @@ namespace PCG.CityRoad.Editor
 
         private static bool CookImmediateInputs(
             HEU_SessionBase session,
-            int nodeId)
+            int nodeId,
+            string assetName)
         {
             const int MaxConsecutiveEmptyInputs = 8;
             int consecutiveEmptyInputs = 0;
@@ -746,7 +1210,11 @@ namespace PCG.CityRoad.Editor
                 }
 
                 consecutiveEmptyInputs = 0;
-                if (!session.CookNode(connectedNodeId, false))
+                if (!HEU_HAPIUtility.CookNodeInHoudini(
+                        session,
+                        connectedNodeId,
+                        false,
+                        assetName))
                     return false;
             }
 
@@ -844,51 +1312,54 @@ namespace PCG.CityRoad.Editor
                     continue;
                 }
 
-                HEU_InputNode roadNetworkInput =
-                    FindRoadNetworkParameterInput(root.HoudiniAsset);
-                GameObject inputObject = roadNetworkInput != null
-                    && roadNetworkInput.NumInputEntries() > 0
-                        ? roadNetworkInput.GetInputEntryGameObject(0)
-                        : null;
-                SplineContainer container = inputObject != null
-                    ? inputObject.GetComponent<SplineContainer>()
-                    : null;
-                if (!ContainsSpline(container, changedSpline))
-                    continue;
-
-                if (root.HoudiniAsset.Parameters.SetAssetRefParameterValue(
-                        CityRoadSafeRebuild.RoadNetworkParameterName,
-                        inputObject,
-                        0,
-                        bRecookAsset: false))
+                foreach (HEU_InputNode input in FindSplineParameterInputs(
+                    root.HoudiniAsset))
                 {
-                    EditorUtility.SetDirty(root.HoudiniAsset.Parameters);
-                    EditorUtility.SetDirty(root.HoudiniAsset);
+                    GameObject inputObject = input.NumInputEntries() > 0
+                        ? input.GetInputEntryGameObject(0)
+                        : null;
+                    SplineContainer container = inputObject != null
+                        ? inputObject.GetComponent<SplineContainer>()
+                        : null;
+                    if (!ContainsSpline(container, changedSpline))
+                        continue;
+
+                    if (root.HoudiniAsset.Parameters.SetAssetRefParameterValue(
+                            input.ParamName,
+                            inputObject,
+                            0,
+                            bRecookAsset: false))
+                    {
+                        EditorUtility.SetDirty(root.HoudiniAsset.Parameters);
+                        EditorUtility.SetDirty(root.HoudiniAsset);
+                    }
                 }
             }
         }
 
-        private static HEU_InputNode FindRoadNetworkParameterInput(
+        private static IEnumerable<HEU_InputNode> FindSplineParameterInputs(
             HEU_HoudiniAsset asset)
         {
             if (asset == null || asset.InputNodes == null)
-                return null;
+                yield break;
 
             foreach (HEU_InputNode input in asset.InputNodes)
             {
                 if (input != null
                     && input.NodeType == HEU_InputNodeTypeWrapper.PARAMETER
                     && input.ObjectType == HEU_InputObjectTypeWrapper.SPLINE
-                    && string.Equals(
-                        input.ParamName,
-                        CityRoadSafeRebuild.RoadNetworkParameterName,
-                        StringComparison.Ordinal))
+                    && (string.Equals(
+                            input.ParamName,
+                            CityRoadSafeRebuild.RoadNetworkParameterName,
+                            StringComparison.Ordinal)
+                        || string.Equals(
+                            input.ParamName,
+                            CityRoadSafeRebuild.ParkAreasParameterName,
+                            StringComparison.Ordinal)))
                 {
-                    return input;
+                    yield return input;
                 }
             }
-
-            return null;
         }
 
         private static bool ContainsSpline(

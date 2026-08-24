@@ -18,6 +18,7 @@ import importlib
 import json
 import os
 import math
+import re
 from pathlib import Path
 import sys
 from typing import Any
@@ -58,9 +59,9 @@ def require_node(core: hou.Node, name: str) -> hou.Node:
     for child in core.children():
         if child.type().name() != "subnet" or not child.name().startswith("CR_"):
             continue
-        candidate = child.node(name)
-        if candidate is not None:
-            matches.append(candidate)
+        matches.extend(
+            candidate for candidate in child.allSubChildren()
+            if candidate.name() == name)
     require(
         len(matches) == 1,
         f"Required CityRoad leaf must be unique: {name}, found "
@@ -68,7 +69,9 @@ def require_node(core: hou.Node, name: str) -> hou.Node:
     return matches[0]
 
 
-def _subnet_output_source(subnet: hou.Node, output_index: int) -> hou.Node | None:
+def _subnet_output_source(
+    subnet: hou.Node, output_index: int
+) -> tuple[hou.Node | None, int]:
     outputs = []
     for child in subnet.children():
         if child.type().name() != "output":
@@ -80,8 +83,10 @@ def _subnet_output_source(subnet: hou.Node, output_index: int) -> hou.Node | Non
         if index != output_index:
             continue
         connections = output.inputConnections()
-        return connections[0].inputNode() if connections else None
-    return None
+        if not connections:
+            return None, 0
+        return connections[0].inputNode(), connections[0].outputIndex()
+    return None, 0
 
 
 def logical_source_name(connection: hou.NodeConnection) -> str | None:
@@ -94,8 +99,7 @@ def logical_source_name(connection: hou.NodeConnection) -> str | None:
         if source.path() in visited:
             raise ContractFailure(f"Subnet output cycle at {source.path()}")
         visited.add(source.path())
-        source = _subnet_output_source(source, output_index)
-        output_index = 0
+        source, output_index = _subnet_output_source(source, output_index)
     return source.name() if source is not None else None
 
 
@@ -189,6 +193,7 @@ def _positions_overlap(nodes: list[hou.Node]) -> list[tuple[str, str]]:
 def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
     contract = load_layout_contract()
     expected_subnets = contract["subnets"]
+    expected_nested_subnets = contract.get("nested_subnets", {})
     direct = list(core.children())
     direct_names = {node.name() for node in direct}
     expected_direct = set(expected_subnets) | set(contract["preserved_top_level"])
@@ -210,9 +215,10 @@ def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
                 f"Missing authored CityRoad subnet: {subnet_name}")
         outputs = [node for node in subnet.children() if node.type().name() == "output"]
         members = [node for node in subnet.children() if node.type().name() != "output"]
-        require({node.name() for node in members} == set(expected_members),
+        expected_member_names = set(expected_members)
+        require({node.name() for node in members} == expected_member_names,
                 f"CityRoad subnet membership changed: {subnet_name}")
-        member_count += len(members)
+        authored_members = list(members)
         max_inputs = max(max_inputs, len(subnet.inputConnections()))
         max_outputs = max(max_outputs, len(outputs))
         require(len(subnet.inputConnections()) <= contract["max_subnet_inputs"],
@@ -245,12 +251,62 @@ def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
                     f"Duplicate CityRoad leaf name: {member.name()} at "
                     f"{previous} and {member.path()}")
             leaf_paths[member.name()] = member.path()
+        nested_prefix = subnet_name + "/"
+        for nested_path, expected_nested_members in expected_nested_subnets.items():
+            if not nested_path.startswith(nested_prefix):
+                continue
+            relative_path = nested_path[len(nested_prefix):]
+            nested = subnet.node(relative_path)
+            require(nested is not None and nested.type().name() == "subnet",
+                    f"Missing nested CityRoad subnet: {nested_path}")
+            nested_outputs = [
+                node for node in nested.children() if node.type().name() == "output"]
+            nested_members = [
+                node for node in nested.children() if node.type().name() != "output"]
+            require({node.name() for node in nested_members} == set(expected_nested_members),
+                    f"CityRoad nested subnet membership changed: {nested_path}")
+            require(nested.comment().strip(),
+                    f"CityRoad nested subnet comment is empty: {nested_path}")
+            max_inputs = max(max_inputs, len(nested.inputConnections()))
+            max_outputs = max(max_outputs, len(nested_outputs))
+            require(len(nested.inputConnections()) <= contract["max_subnet_inputs"],
+                    f"CityRoad nested subnet input limit exceeded: {nested_path}")
+            require(len(nested_outputs) <= contract["max_subnet_outputs"],
+                    f"CityRoad nested subnet output limit exceeded: {nested_path}")
+            for connection in nested.inputConnections():
+                label_parm = nested.parm(f"label{connection.inputIndex() + 1}")
+                require(label_parm is not None and label_parm.evalAsString().strip() and
+                        not label_parm.evalAsString().startswith("Sub-Network Input"),
+                        f"CityRoad nested subnet connector label is not authored: "
+                        f"{nested_path}[{connection.inputIndex()}]")
+            for output in nested_outputs:
+                require(output.name().startswith("SUBNET_OUT_") and output.comment().strip(),
+                        f"CityRoad nested subnet output is not explicitly named: {output.path()}")
+            require(not _positions_overlap(list(nested.children())),
+                    f"Overlapping nodes inside nested CityRoad subnet: {nested_path}")
+            for nested_node in nested.children():
+                position = nested_node.position()
+                require(not (abs(float(position.x())) < 1e-6 and
+                             abs(float(position.y())) < 1e-6),
+                        f"CityRoad nested node remains at origin: {nested_node.path()}")
+                if nested_node.type().name() in ("attribwrangle", "switch", "output"):
+                    require(nested_node.comment().strip(),
+                            f"CityRoad nested node comment is empty: {nested_node.path()}")
+            authored_members.extend(nested_members)
+            for nested_member in nested_members:
+                previous = leaf_paths.get(nested_member.name())
+                require(previous is None,
+                        f"Duplicate CityRoad leaf name: {nested_member.name()} at "
+                        f"{previous} and {nested_member.path()}")
+                leaf_paths[nested_member.name()] = nested_member.path()
+        member_count += len(authored_members)
         for connection in subnet.inputConnections():
             source = connection.inputNode()
             if source is not None and source.name() in dependencies:
                 dependencies[subnet_name].add(source.name())
 
-    require(member_count == contract["original_member_count"],
+    expected_member_count = contract["original_member_count"]
+    require(member_count == expected_member_count,
             f"CityRoad moved leaf count changed: {member_count}")
     require(not _positions_overlap(direct), "Overlapping nodes at CityRoadCore top level")
     for node in direct:
@@ -287,6 +343,47 @@ def validate_subnet_layout(core: hou.Node) -> dict[str, Any]:
         actual_members = {item.name() for item in box.items()}
         require(actual_members == set(expected_members),
                 f"CityRoad Network Box membership changed: {name}")
+
+    park = core.node("CR_CITY_PARK")
+    expected_park_boxes = {
+        "PARK_AREA_INPUT": {"CR_PARK_INPUT"},
+        "PARK_AREA_MASTERPLAN": {"CR_PARK_MASTERPLAN"},
+        "PARK_AREA_OUTPUT": {
+            "CR_PARK_OUTPUTS", "SUBNET_OUT_PARK_GROUND_0",
+            "SUBNET_OUT_PARK_PATHS_1", "SUBNET_OUT_PARK_WATER_2",
+            "SUBNET_OUT_PARK_COLLISION_3", "SUBNET_OUT_PARK_TREES_4",
+            "SUBNET_OUT_PARK_EXCLUSION_5"},
+    }
+    actual_park_boxes = {
+        box.name(): {item.name() for item in box.items()}
+        for box in park.networkBoxes()
+    }
+    require(actual_park_boxes == expected_park_boxes,
+            "CityRoad V45 Park Network Box membership changed")
+    require(any(note.name() == "NOTE_PARK_V45_README" and note.text().strip()
+                for note in park.stickyNotes()),
+            "CityRoad V45 Park learning note is missing")
+    park_input = park.node("CR_PARK_INPUT")
+    object_expression = park_input.node("IN_UNITY_PARK_AREAS").parm("objpath1").expression()
+    switch_expression = park_input.node("PARK_ENABLE_INPUT_SWITCH").parm("input").expression()
+    require("../../../../unity_park_areas" in object_expression,
+            "CityRoad V45 Park Object Merge relative parameter path changed")
+    require("../../../../enable_city_park" in switch_expression,
+            "CityRoad V45 Park input switch relative parameter path changed")
+    for channel_node_name in (
+            "PARK_BOUNDARY_ANALYZE_V41", "PARK_SURFACE_ZONES_V41",
+            "PARK_CONNECTED_PATHS_V41", "PARK_WOODLAND_LAYERS_V41",
+            "PARK_EXCLUSION_V41"):
+        snippet = park.node("CR_PARK_MASTERPLAN").node(
+            channel_node_name).parm("snippet").evalAsString()
+        references = re.findall(
+            r"(?:\"|')((?:\.\./)+(?:enable_|park_|tree_)[^\"']*)", snippet)
+        require(references and all(
+                    reference.startswith("../../../../") and
+                    not reference.startswith("../../../../../")
+                    for reference in references),
+                f"CityRoad V45 Park VEX asset channel path is missing: "
+                f"{channel_node_name}")
 
     return {
         "contract_id": contract["contract_id"],
@@ -423,7 +520,12 @@ def validate_outputs(core: hou.Node, contract: dict[str, Any]) -> dict[str, Any]
         require(not node.errors(), f"CityRoad output errors at {name}: {node.errors()}")
         require(not node.warnings(), f"CityRoad output warnings at {name}: {node.warnings()}")
         geometry = node.geometry()
-        if name.startswith("OUT_STREET_"):
+        if name.startswith("OUT_PARK_"):
+            # Park outputs are intentionally empty when the global toggle is
+            # off or no valid boundary is bound. validate_city_park exercises
+            # populated and invalid authoring fixtures separately.
+            pass
+        elif name.startswith("OUT_STREET_"):
             require(len(geometry.points()) > 0, f"CityRoad street output is empty: {name}")
             require(len(geometry.prims()) == 0,
                     f"CityRoad street output must contain points only: {name}")
@@ -669,6 +771,398 @@ def validate_street_furniture(asset: hou.Node, core: hou.Node) -> dict[str, Any]
         "tree_surface_skips": tree_surface_skips,
         "deterministic_signature": default_signature,
         "boundary": boundary,
+    }
+
+
+def validate_city_park(asset: hou.Node, core: hou.Node) -> dict[str, Any]:
+    output_names = (
+        "OUT_PARK_GROUND", "OUT_PARK_PATHS", "OUT_PARK_WATER",
+        "OUT_PARK_COLLISION", "OUT_PARK_TREES", "OUT_PARK_EXCLUSION")
+    outputs = {name: require_node(core, name) for name in output_names}
+    tracked_names = (
+        "enable_city_park", "unity_park_areas", "park_seed",
+        "enable_park_water", "enable_park_paths", "enable_park_trees")
+    tracked = {}
+    for name in tracked_names:
+        parm = asset.parm(name)
+        require(parm is not None, f"Missing City Park public parameter: {name}")
+        tracked[name] = parm.eval()
+
+    fixture_object = hou.node("/obj").createNode(
+        "geo", "__PCG_VERIFY_CITYROAD_PARK", exact_type_name=True)
+    for child in fixture_object.children():
+        child.destroy()
+    stash = fixture_object.createNode("stash", "OUT_PARK_BOUNDARIES")
+
+    def set_polygons(polygons, topologyless=False):
+        geometry = hou.Geometry()
+        for positions, closed in polygons:
+            points = []
+            for position in positions:
+                point = geometry.createPoint()
+                point.setPosition(position)
+                points.append(point)
+            primitive = geometry.createPolygon()
+            if not topologyless:
+                for point in points:
+                    primitive.addVertex(point)
+                primitive.setIsClosed(closed)
+        stash.parm("stash").set(geometry)
+        stash.cook(force=True)
+
+    def cook_all():
+        result = {}
+        for name, node in outputs.items():
+            node.cook(force=True)
+            require(not node.errors(), f"City Park output errors at {name}: {node.errors()}")
+            require(not node.warnings(), f"City Park output warnings at {name}: {node.warnings()}")
+            result[name] = node.geometry()
+        return result
+
+    def detail_int(geometry, name):
+        return int(detail_value(geometry, name, -1))
+
+    def primitive_centres(geometry):
+        centres = set()
+        for primitive in geometry.prims():
+            positions = [point.position() for point in primitive.points()]
+            if not positions:
+                continue
+            centre = sum(positions, hou.Vector3()) / len(positions)
+            centres.add((round(float(centre[0]), 4), round(float(centre[2]), 4)))
+        return centres
+
+    def point_y_levels(geometry):
+        return {round(float(point.position()[1]), 4) for point in geometry.points()}
+
+    def tree_signature(geometry):
+        records = []
+        for point in geometry.points():
+            records.append({
+                "position": tuple(round(float(value), 5) for value in point.position()),
+                "instance": str(point.attribValue("unity_instance")),
+                "variant": int(point.attribValue("pcg_variant")),
+                "scale": round(float(point.attribValue("pscale")), 5),
+                "orient": tuple(round(float(value), 5) for value in point.attribValue("orient")),
+            })
+        return hashlib.sha256(json.dumps(
+            records, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    rectangle = (
+        ((0, 0, 0), (60, 0, 0), (60, 0, 60), (0, 0, 60)), True)
+    second_rectangle = (
+        ((80, 0, 0), (130, 0, 0), (130, 0, 50), (80, 0, 50)), True)
+    invalid_results = {}
+    try:
+        asset.parm("enable_city_park").set(0)
+        asset.parm("unity_park_areas").set("")
+        disabled = cook_all()
+        for name, geometry in disabled.items():
+            require(len(geometry.points()) == 0 and len(geometry.prims()) == 0,
+                    f"Disabled City Park output is not empty: {name}")
+
+        set_polygons((rectangle,))
+        asset.parm("enable_city_park").set(1)
+        asset.parm("unity_park_areas").set(stash.path())
+        populated = cook_all()
+        ground = populated["OUT_PARK_GROUND"]
+        paths = populated["OUT_PARK_PATHS"]
+        water = populated["OUT_PARK_WATER"]
+        collision = populated["OUT_PARK_COLLISION"]
+        trees = populated["OUT_PARK_TREES"]
+        exclusion = populated["OUT_PARK_EXCLUSION"]
+        valid_count = detail_int(ground, "park_valid_count")
+        if valid_count != 1:
+            diagnostic_names = (
+                "IN_UNITY_PARK_AREAS", "PARK_ENABLE_INPUT_SWITCH",
+                "PARK_CONVERT_HAPI_CURVE_V32", "PARK_REBUILD_HAPI_TOPOLOGY_V29",
+                "PARK_BOUNDARY_ANALYZE_V41", "PARK_SURFACE_ZONES_V41",
+                "PARK_CONNECTED_PATHS_V41", "PARK_WOODLAND_LAYERS_V41",
+                "PARK_EXCLUSION_V41", "PARK_ASSEMBLE_V41", "PARK_CONTRACT_V41")
+            diagnostics = {}
+            for diagnostic_name in diagnostic_names:
+                diagnostic_node = require_node(core, diagnostic_name)
+                diagnostic_node.cook(force=True)
+                diagnostic_geometry = diagnostic_node.geometry()
+                detail_attributes = {}
+                for detail_name in (
+                        "park_valid_count", "park_input_count", "park_masterplan_version",
+                        "park_enable_paths", "park_enable_water", "park_enable_trees"):
+                    detail_attribute = diagnostic_geometry.findGlobalAttrib(detail_name)
+                    if detail_attribute is not None:
+                        detail_attributes[detail_name] = diagnostic_geometry.attribValue(
+                            detail_attribute)
+                diagnostics[diagnostic_name] = {
+                    "points": len(diagnostic_geometry.points()),
+                    "prims": len(diagnostic_geometry.prims()),
+                    "detail": detail_attributes,
+                    "errors": list(diagnostic_node.errors()),
+                    "warnings": list(diagnostic_node.warnings()),
+                }
+            raise ContractFailure(
+                "Single valid park fixture was not accepted: "
+                f"park_valid_count={valid_count}, diagnostics={diagnostics}")
+        require(len(ground.prims()) > 0 and len(paths.prims()) > 0
+                and len(water.prims()) > 0 and len(trees.points()) > 0,
+                "Default City Park fixture did not exercise every output")
+        require(len(collision.prims()) == len(paths.prims()),
+                "Park collision does not match the decorative path footprint")
+        require(len(exclusion.prims()) == 1,
+                "Single park must emit exactly one exclusion boundary")
+
+        roles = {
+            "OUT_PARK_GROUND": "ground", "OUT_PARK_PATHS": "paths",
+            "OUT_PARK_WATER": "water", "OUT_PARK_COLLISION": "collision",
+            "OUT_PARK_EXCLUSION": "park_exclusion"}
+        for name, expected_role in roles.items():
+            geometry = populated[name]
+            role_attribute = geometry.findPrimAttrib("output_role")
+            park_attribute = geometry.findPrimAttrib("park_id")
+            require(role_attribute is not None and park_attribute is not None,
+                    f"City Park metadata is missing at {name}")
+            for primitive in geometry.prims():
+                require(str(primitive.attribValue(role_attribute)) == expected_role,
+                        f"City Park output_role changed at {name}")
+                require(int(primitive.attribValue(park_attribute)) > 0,
+                        f"City Park park_id is invalid at {name}")
+        for primitive in exclusion.prims():
+            require(str(primitive.attribValue("pcg_site_type")) == "park"
+                    and int(primitive.attribValue("exclude_building")) == 1,
+                    "Park exclusion building contract changed")
+
+        ground_cells = primitive_centres(ground)
+        path_cells = primitive_centres(paths)
+        water_cells = primitive_centres(water)
+        require(not (ground_cells & path_cells)
+                and not (ground_cells & water_cells)
+                and not (path_cells & water_cells),
+                "Park surfaces overlap in XZ")
+
+        # V43/V44 surface lift: all authored park layers move together. Unity
+        # Bake measured the covering sidewalk plane at Y=0.5705, so V44 raises
+        # the park datum to 0.65 m. Relative layer offsets remain unchanged.
+        surface_lift = float(detail_value(ground, "park_surface_lift", -1.0))
+        require(surface_lift >= 0.12 - 1e-4,
+                f"V43 park surface lift regressed: {surface_lift}")
+        require(abs(surface_lift - 0.65) <= 1e-4,
+                f"V44 park visibility lift changed: {surface_lift}")
+        expected_y_levels = {
+            "ground": {0.65}, "paths": {0.67}, "water": {0.61},
+            "collision": {0.65}, "trees": {0.65}, "exclusion": {0.65},
+        }
+        actual_y_levels = {
+            "ground": point_y_levels(ground),
+            "paths": point_y_levels(paths),
+            "water": point_y_levels(water),
+            "collision": point_y_levels(collision),
+            "trees": point_y_levels(trees),
+            "exclusion": point_y_levels(exclusion),
+        }
+        for role, expected_levels in expected_y_levels.items():
+            require(actual_y_levels[role] == expected_levels,
+                    f"V43 park {role} Y levels changed: {sorted(actual_y_levels[role])}")
+        for geometry in (ground, paths, water, collision, exclusion):
+            for point in geometry.points():
+                x, y, z = (float(value) for value in point.position())
+                require(-1e-4 <= x <= 60.0001 and -1e-4 <= z <= 60.0001,
+                        "Park surface escaped the authored boundary")
+        require(len(ground.prims()) * 2 <= 8000
+                and len(paths.prims()) * 2 <= 8000,
+                "Single-park triangle budget exceeded")
+        require(len(trees.points()) <= 2048,
+                "Single-park tree budget exceeded")
+        default_counts = {
+            "ground": len(ground.prims()),
+            "paths": len(paths.prims()),
+            "water": len(water.prims()),
+            "trees": len(trees.points()),
+        }
+
+        # V41 masterplan: authored entrances must feed one raster-connected
+        # circulation network, while surfaces and vegetation expose stable
+        # semantic layers for Unity-side replacement and material overrides.
+        zone_attrib = ground.findPrimAttrib("park_zone")
+        path_class_attrib = paths.findPrimAttrib("park_path_class")
+        path_x_attrib = paths.findPrimAttrib("park_cell_x")
+        path_z_attrib = paths.findPrimAttrib("park_cell_z")
+        path_entry_attrib = paths.findPrimAttrib("park_entry_id")
+        vegetation_attrib = trees.findPointAttrib("park_vegetation_layer")
+        require(all(attrib is not None for attrib in (
+                    zone_attrib, path_class_attrib, path_x_attrib,
+                    path_z_attrib, path_entry_attrib, vegetation_attrib)),
+                "V41 park masterplan semantic attributes are missing")
+        zones = {str(primitive.attribValue(zone_attrib)) for primitive in ground.prims()}
+        path_classes = {
+            str(primitive.attribValue(path_class_attrib)) for primitive in paths.prims()}
+        vegetation_layers = {
+            str(point.attribValue(vegetation_attrib)) for point in trees.points()}
+        require({"entrance_lawn", "active_lawn", "quiet_lawn", "woodland_edge"} <= zones,
+                f"V41 park zoning layers changed: {sorted(zones)}")
+        require({"entrance", "primary", "loop", "plaza"} <= path_classes,
+                f"V41 park path classes changed: {sorted(path_classes)}")
+        require({"woodland_core", "woodland_edge"} <= vegetation_layers,
+                f"V41 park woodland layers changed: {sorted(vegetation_layers)}")
+
+        path_cells_by_park = {}
+        entrance_ids_by_park = {}
+        for primitive in paths.prims():
+            park_id = int(primitive.attribValue("park_id"))
+            cell = (
+                int(primitive.attribValue(path_x_attrib)),
+                int(primitive.attribValue(path_z_attrib)))
+            path_cells_by_park.setdefault(park_id, set()).add(cell)
+            entry_id = int(primitive.attribValue(path_entry_attrib))
+            if entry_id >= 0:
+                entrance_ids_by_park.setdefault(park_id, set()).add(entry_id)
+
+        component_counts = {}
+        for park_id, cells in path_cells_by_park.items():
+            remaining = set(cells)
+            components = 0
+            while remaining:
+                components += 1
+                frontier = [remaining.pop()]
+                while frontier:
+                    x, z = frontier.pop()
+                    for dx in (-1, 0, 1):
+                        for dz in (-1, 0, 1):
+                            if dx == 0 and dz == 0:
+                                continue
+                            candidate = (x + dx, z + dz)
+                            if candidate in remaining:
+                                remaining.remove(candidate)
+                                frontier.append(candidate)
+            component_counts[park_id] = components
+            require(components == 1,
+                    f"V41 park path network is disconnected: park={park_id} components={components}")
+            require(len(entrance_ids_by_park.get(park_id, set())) >= 2,
+                    f"V41 park has fewer than two connected entrances: park={park_id}")
+
+        masterplan_version = detail_int(ground, "park_masterplan_version")
+        require(masterplan_version == 41,
+                f"V41 park masterplan detail version changed: {masterplan_version}")
+        require(detail_int(ground, "park_zone_count") >= 4,
+                "V41 park zone count is below the masterplan contract")
+        require(detail_int(ground, "park_woodland_layer_count") >= 2,
+                "V41 park woodland layer count is below the masterplan contract")
+        require(detail_int(ground, "park_path_class_count") >= 4,
+                "V41 park path class count is below the masterplan contract")
+        masterplan_summary = {
+            "version": masterplan_version,
+            "surface_lift": surface_lift,
+            "y_levels": {
+                key: sorted(value) for key, value in actual_y_levels.items()},
+            "zones": sorted(zones),
+            "path_classes": sorted(path_classes),
+            "vegetation_layers": sorted(vegetation_layers),
+            "entrance_ids_by_park": {
+                str(key): sorted(value) for key, value in entrance_ids_by_park.items()},
+            "path_components_by_park": {
+                str(key): value for key, value in component_counts.items()},
+        }
+
+        minimum_spacing = float(asset.evalParm("park_tree_min_spacing"))
+        tree_points = [point.position() for point in trees.points()]
+        for left_index, left in enumerate(tree_points):
+            for right in tree_points[left_index + 1:]:
+                require((left - right).length() + 1e-4 >= minimum_spacing,
+                        "Park tree minimum spacing changed")
+        default_signature = tree_signature(trees)
+        repeated_signature = tree_signature(cook_all()["OUT_PARK_TREES"])
+        require(default_signature == repeated_signature,
+                "City Park output is not deterministic for an unchanged seed")
+        asset.parm("park_seed").set(int(tracked["park_seed"]) + 1)
+        changed_signature = tree_signature(cook_all()["OUT_PARK_TREES"])
+        require(changed_signature != default_signature,
+                "Changing park_seed did not change the tree layout")
+        asset.parm("park_seed").set(tracked["park_seed"])
+
+        # Houdini Engine Unity converts the 200 m authoring rectangle used by
+        # the scene to an 800-point curve.  It must remain valid while the
+        # generator consumes no more than the V1 512-sample budget.
+        high_resolution_positions = []
+        samples_per_side = 200
+        for index in range(samples_per_side):
+            t = float(index) / samples_per_side
+            high_resolution_positions.append((60.0 * t, 0, 0))
+        for index in range(samples_per_side):
+            t = float(index) / samples_per_side
+            high_resolution_positions.append((60, 0, 60.0 * t))
+        for index in range(samples_per_side):
+            t = float(index) / samples_per_side
+            high_resolution_positions.append((60.0 * (1.0 - t), 0, 60))
+        for index in range(samples_per_side):
+            t = float(index) / samples_per_side
+            high_resolution_positions.append((0, 0, 60.0 * (1.0 - t)))
+        # HEU 21's Unity spline input uses a non-periodic curve whose final
+        # point duplicates the first, rather than setting the closed intrinsic.
+        high_resolution_positions.append(high_resolution_positions[0])
+        set_polygons(
+            ((tuple(high_resolution_positions), False),),
+            topologyless=True)
+        high_resolution = cook_all()
+        high_resolution_ground = high_resolution["OUT_PARK_GROUND"]
+        require(detail_int(high_resolution_ground, "park_valid_count") == 1,
+                "800-point HEU-style park boundary was not accepted")
+        high_resolution_sample_count = detail_int(
+            high_resolution_ground, "park_boundary_sample_count_max")
+        require(3 <= high_resolution_sample_count <= 512,
+                "HEU-style park boundary exceeded the 512-sample budget: "
+                f"{high_resolution_sample_count}")
+        require(len(high_resolution_ground.prims()) > 0,
+                "800-point topologyless HEU-style park boundary emitted no ground")
+
+        topologyless_multi = []
+        for positions, _closed in (rectangle, second_rectangle):
+            topologyless_multi.append((tuple(positions) + (positions[0],), False))
+        set_polygons(tuple(topologyless_multi), topologyless=True)
+        topologyless_multi_result = cook_all()
+        require(detail_int(
+                    topologyless_multi_result["OUT_PARK_GROUND"],
+                    "park_valid_count") == 2,
+                "Multiple topologyless HEU-style park boundaries were not rebuilt")
+
+        set_polygons((rectangle, second_rectangle))
+        multi = cook_all()
+        require(detail_int(multi["OUT_PARK_GROUND"], "park_valid_count") == 2,
+                "Multiple park boundaries were not processed")
+        require(len(multi["OUT_PARK_TREES"].points()) <= 4096,
+                "CityRoad-wide park tree budget exceeded")
+
+        invalid_cases = {
+            "open": ((((0, 0, 0), (60, 0, 0), (60, 0, 60), (0, 0, 60)), False),),
+            "height": ((((0, 0, 0), (60, 0, 0), (60, 0.5, 60), (0, 0, 60)), True),),
+            "small": ((((0, 0, 0), (5, 0, 0), (5, 0, 5), (0, 0, 5)), True),),
+            "self_intersection": ((((0, 0, 0), (60, 0, 60), (0, 0, 60), (60, 0, 0)), True),),
+        }
+        for label, polygons in invalid_cases.items():
+            set_polygons(polygons)
+            invalid = cook_all()
+            invalid_results[label] = {
+                name: (len(geometry.points()), len(geometry.prims()))
+                for name, geometry in invalid.items()}
+            require(all(points == 0 and primitives == 0
+                        for points, primitives in invalid_results[label].values()),
+                    f"Invalid park boundary emitted geometry: {label}")
+            require(detail_int(invalid["OUT_PARK_GROUND"], "park_invalid_count") == 1,
+                    f"Invalid park boundary was not counted: {label}")
+    finally:
+        for name, value in tracked.items():
+            asset.parm(name).set(value)
+        fixture_object.destroy()
+        for node in outputs.values():
+            node.cook(force=True)
+
+    return {
+        "default_ground_primitives": default_counts["ground"],
+        "default_path_primitives": default_counts["paths"],
+        "default_water_primitives": default_counts["water"],
+        "default_tree_points": default_counts["trees"],
+        "deterministic_signature": default_signature,
+        "changed_seed_signature": changed_signature,
+        "heu_800_point_boundary_samples": high_resolution_sample_count,
+        "masterplan": masterplan_summary,
+        "invalid_cases": invalid_results,
     }
 
 
@@ -1425,6 +1919,7 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "network": validate_network(asset, core, contract),
         "outputs": validate_outputs(core, contract),
         "street_furniture": validate_street_furniture(asset, core),
+        "city_park": validate_city_park(asset, core),
         "v7_v8_v9": validate_v7_v8_v9(asset, core),
         "v10": validate_v10(core),
         "v11_v12_v13": validate_v11_v12_v13(core),

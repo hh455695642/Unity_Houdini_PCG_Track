@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -132,6 +134,15 @@ class CompareSnapshotsTests(unittest.TestCase):
         restricted["allow_output_changes"] = False
         violations = gate.compare_snapshots(before, after, restricted)
         self.assertTrue(any("Output changed" in item for item in violations))
+
+    def test_authoritative_live_scene_flag_must_be_boolean(self):
+        data = manifest()
+        data["authoritative_live_scene"] = "yes"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(gate.GateFailure):
+                gate.load_manifest(path, "CityRoad")
 
 
 if __name__ == "__main__":

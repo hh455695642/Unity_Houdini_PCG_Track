@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using HoudiniEngineUnity;
 using UnityEditor;
@@ -22,6 +23,11 @@ namespace PCG.CityRoad.Editor
     internal static class CityRoadLivePreviewController
     {
         private const double SubscriptionRefreshSeconds = 1.0;
+        // Houdini Engine can deliver Cooked/Reloaded callbacks several editor
+        // ticks after a project Bake, especially when AssetDatabase validation
+        // runs immediately afterwards. Keep the freshly baked state authoritative
+        // long enough for those callbacks to drain.
+        private const double BakeCallbackGuardSeconds = 30.0;
         private const string SessionPrefix = "PCG.CityRoad.LivePreview.";
 
         private sealed class Subscription
@@ -36,6 +42,8 @@ namespace PCG.CityRoad.Editor
             new Dictionary<int, Subscription>();
         private static readonly Dictionary<int, int> s_StateEpochs =
             new Dictionary<int, int>();
+        private static readonly Dictionary<int, double> s_IgnoreLivePreviewUntil =
+            new Dictionary<int, double>();
         private static double s_NextRefresh;
         private static bool s_ApplyingState;
 
@@ -43,6 +51,7 @@ namespace PCG.CityRoad.Editor
         {
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.hierarchyChanged += QueueRefresh;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
             AssemblyReloadEvents.beforeAssemblyReload += UnsubscribeAll;
             EditorSceneManager.sceneSaving += OnSceneSaving;
             EditorApplication.delayCall += RefreshSubscriptions;
@@ -52,28 +61,21 @@ namespace PCG.CityRoad.Editor
         {
             if (root == null || EditorUtility.IsPersistent(root) || !root.gameObject.scene.IsValid())
                 return;
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                MarkBaked(root);
+                return;
+            }
 
             s_ApplyingState = true;
             try
             {
+                CityRoadSafeRebuild.CleanupKnownHapiOrphanTreeRoots(root);
                 bool changed = false;
                 root.gameObject.tag = "EditorOnly";
                 foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
                 {
-                    bool visibleRole =
-                        CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
-                        || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
-                        || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
-                        || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform);
-                    bool collisionRole =
-                        CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_COLLISION");
-                    // HEU keeps a backing renderer under HDA_Data and a
-                    // presentation renderer for each topology piece. Both can
-                    // reference the same Mesh, so enabling by output role alone
-                    // creates a perfectly overlapping duplicate surface.
-                    bool presentationPiece = HasTopologyPieceName(renderer.transform);
-                    bool streetFurniture = CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform);
-                    bool expectedEnabled = visibleRole && (presentationPiece || streetFurniture) && !collisionRole;
+                    bool expectedEnabled = ShouldEnableLivePreviewRenderer(renderer);
                     if (renderer.enabled != expectedEnabled)
                     {
                         renderer.enabled = expectedEnabled;
@@ -81,6 +83,7 @@ namespace PCG.CityRoad.Editor
                     }
                 }
 
+                CityRoadBakeWorkflow.ApplyCollisionOutputContract(root.gameObject);
                 CityRoadBakeWorkflow.ApplyShadowContract(root.gameObject);
                 Transform bake = FindSibling(root, root.name + "_Bake");
                 if (bake != null && bake.gameObject.activeSelf)
@@ -111,18 +114,36 @@ namespace PCG.CityRoad.Editor
             // Bake completed. Otherwise a late HEU callback can immediately
             // switch the freshly baked scene back to Live Preview.
             AdvanceStateEpoch(root);
+            SetBakeCallbackGuard(root);
+            ApplyBakedVisualState(root);
+        }
+
+        private static void ApplyBakedVisualState(HEU_HoudiniAssetRoot root)
+        {
+            if (root == null)
+                return;
             s_ApplyingState = true;
             try
             {
+                CityRoadSafeRebuild.CleanupKnownHapiOrphanTreeRoots(root);
+                bool changed = false;
                 foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (!renderer.enabled)
+                        continue;
                     renderer.enabled = false;
+                    changed = true;
+                }
 
                 Transform bake = FindSibling(root, root.name + "_Bake");
-                if (bake != null)
+                if (bake != null && !bake.gameObject.activeSelf)
+                {
                     bake.gameObject.SetActive(true);
+                    changed = true;
+                }
 
                 SessionState.SetBool(GetSessionKey(root), false);
-                if (root.gameObject.scene.IsValid())
+                if (changed && root.gameObject.scene.IsValid())
                     EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
             }
             finally
@@ -146,6 +167,7 @@ namespace PCG.CityRoad.Editor
                 && (CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
                     || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
                     || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
+                    || CityRoadBakeWorkflow.IsUnderAnyParkVisibleOutput(renderer.transform)
                     || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform)));
             return sourceVisible || !hasActiveBake;
         }
@@ -201,6 +223,7 @@ namespace PCG.CityRoad.Editor
                 HEU_HoudiniAsset asset = root.HoudiniAsset;
                 if (asset == null)
                     continue;
+                CityRoadSafeRebuild.CleanupKnownHapiOrphanTreeRoots(root);
                 int id = root.GetInstanceID();
                 liveIds.Add(id);
                 if (s_Subscriptions.TryGetValue(id, out Subscription existing)
@@ -210,7 +233,9 @@ namespace PCG.CityRoad.Editor
                     // have been materialized. Normalize an existing Live Preview
                     // on the regular editor tick as well, so late-created backing,
                     // collision and metadata renderers cannot remain visible.
-                    if (IsLivePreview(root))
+                    if (IsBakeCallbackGuardActive(root))
+                        ApplyBakedVisualState(root);
+                    else if (IsLivePreview(root))
                         EnterLivePreview(root);
                     continue;
                 }
@@ -240,7 +265,11 @@ namespace PCG.CityRoad.Editor
                 HEU_HoudiniAssetRoot restoredRoot = root;
                 EditorApplication.delayCall += () =>
                 {
-                    if (restoredRoot != null && IsLivePreview(restoredRoot))
+                    if (restoredRoot == null)
+                        return;
+                    if (IsBakeCallbackGuardActive(restoredRoot))
+                        ApplyBakedVisualState(restoredRoot);
+                    else if (IsLivePreview(restoredRoot))
                         EnterLivePreview(restoredRoot);
                 };
             }
@@ -259,20 +288,80 @@ namespace PCG.CityRoad.Editor
                 subscription.Asset.ReloadDataEvent.RemoveListener(subscription.Reloaded);
             }
             s_Subscriptions.Remove(id);
+            s_IgnoreLivePreviewUntil.Remove(id);
         }
 
         private static void QueueLivePreview(HEU_HoudiniAssetRoot root)
         {
-            if (root == null)
+            if (root == null || EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
 
             int id = root.GetInstanceID();
+            if (IsBakeCallbackGuardActive(root))
+                return;
             int queuedEpoch = GetStateEpoch(id);
             EditorApplication.delayCall += () =>
             {
-                if (root != null && GetStateEpoch(id) == queuedEpoch)
+                if (root != null
+                    && GetStateEpoch(id) == queuedEpoch
+                    && !IsBakeCallbackGuardActive(root))
                     EnterLivePreview(root);
             };
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state != PlayModeStateChange.ExitingEditMode
+                && state != PlayModeStateChange.EnteredPlayMode)
+                return;
+
+            foreach (HEU_HoudiniAssetRoot root in
+                Resources.FindObjectsOfTypeAll<HEU_HoudiniAssetRoot>())
+            {
+                if (root == null
+                    || EditorUtility.IsPersistent(root)
+                    || !root.gameObject.scene.IsValid()
+                    || !root.gameObject.scene.isLoaded
+                    || !CityRoadSafeRebuild.IsCityRoad(root)
+                    || FindSibling(root, root.name + "_Bake") == null)
+                    continue;
+                MarkBaked(root);
+            }
+        }
+
+        private static void SetBakeCallbackGuard(HEU_HoudiniAssetRoot root)
+        {
+            double until = EditorApplication.timeSinceStartup
+                + BakeCallbackGuardSeconds;
+            s_IgnoreLivePreviewUntil[root.GetInstanceID()] = until;
+            SessionState.SetString(
+                GetBakeGuardKey(root),
+                until.ToString("R", CultureInfo.InvariantCulture));
+        }
+
+        private static bool IsBakeCallbackGuardActive(HEU_HoudiniAssetRoot root)
+        {
+            if (root == null)
+                return false;
+            int id = root.GetInstanceID();
+            if (!s_IgnoreLivePreviewUntil.TryGetValue(id, out double until))
+            {
+                string persisted = SessionState.GetString(
+                    GetBakeGuardKey(root),
+                    string.Empty);
+                if (!double.TryParse(
+                        persisted,
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out until))
+                    return false;
+                s_IgnoreLivePreviewUntil[id] = until;
+            }
+            if (EditorApplication.timeSinceStartup < until)
+                return true;
+            s_IgnoreLivePreviewUntil.Remove(id);
+            SessionState.SetString(GetBakeGuardKey(root), string.Empty);
+            return false;
         }
 
         private static int GetStateEpoch(int id)
@@ -329,9 +418,46 @@ namespace PCG.CityRoad.Editor
             return false;
         }
 
+        private static bool ShouldEnableLivePreviewRenderer(Renderer renderer)
+        {
+            if (renderer == null)
+                return false;
+
+            Transform transform = renderer.transform;
+            bool parkVisibleOutput =
+                CityRoadBakeWorkflow.IsUnderAnyParkVisibleOutput(transform);
+            bool streetFurniture =
+                CityRoadBakeWorkflow.IsStreetFurnitureOutput(transform);
+            bool visibleRole =
+                CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_SURFACE")
+                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_SIDEWALK_CURB")
+                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_MARKINGS")
+                || parkVisibleOutput
+                || streetFurniture;
+            bool collisionRole =
+                CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_COLLISION")
+                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_PARK_COLLISION")
+                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_PARK_EXCLUSION");
+
+            // HEU road outputs include a backing renderer and topology-piece
+            // renderers that reference the same Mesh, so roads still require a
+            // presentation-piece marker. Park outputs are emitted as their
+            // direct presentation geometry and must not depend on a CityPark_
+            // name that is absent from Ground/Paths/Water output hierarchies.
+            bool roadPresentationPiece = HasTopologyPieceName(transform);
+            return visibleRole
+                && (roadPresentationPiece || streetFurniture || parkVisibleOutput)
+                && !collisionRole;
+        }
+
         private static string GetSessionKey(HEU_HoudiniAssetRoot root)
         {
             return SessionPrefix + root.gameObject.scene.path + ":" + root.name;
+        }
+
+        private static string GetBakeGuardKey(HEU_HoudiniAssetRoot root)
+        {
+            return GetSessionKey(root) + ".BakeGuardUntil";
         }
     }
 

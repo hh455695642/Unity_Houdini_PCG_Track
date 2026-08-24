@@ -148,6 +148,8 @@ def load_manifest(path: Path, module: str) -> dict[str, Any]:
         raise GateFailure("Manifest allow_output_changes must be boolean")
     if not isinstance(data.get("allowed_warning_signatures", []), list):
         raise GateFailure("Manifest allowed_warning_signatures must be an array")
+    if not isinstance(data.get("authoritative_live_scene", False), bool):
+        raise GateFailure("Manifest authoritative_live_scene must be boolean")
     return data
 
 
@@ -504,6 +506,49 @@ def capture_disk(module: str, config: dict[str, Any], project_root: Path) -> dic
     return json.loads(namespace["_pcg_capture_live"](module, canonical_json(config)))
 
 
+def serialize_live_scene_backup(
+    config: dict[str, Any], backup_root: Path, host: str, port: int
+) -> Path:
+    """Serialize a dirty GUI scene without changing its current HIP path.
+
+    This is only used when a change manifest explicitly declares the Live
+    Scene authoritative.  ``saveAsBackup`` preserves the current scene name,
+    allowing Capture to protect approved unsaved work before any mutation.
+    """
+
+    backup_root.mkdir(parents=True, exist_ok=True)
+    connection = connect_live(host, port)
+    try:
+        connection.execute(
+            """
+import hou
+def _pcg_serialize_live_backup(backup_dir):
+    original_hip = hou.hipFile.path().replace('\\\\', '/')
+    old_backup_dir = hou.getenv('HOUDINI_BACKUP_DIR')
+    try:
+        hou.putenv('HOUDINI_BACKUP_DIR', backup_dir)
+        backup_path = hou.hipFile.saveAsBackup()
+    finally:
+        if old_backup_dir is None:
+            hou.unsetenv('HOUDINI_BACKUP_DIR')
+        else:
+            hou.putenv('HOUDINI_BACKUP_DIR', old_backup_dir)
+    current_hip = hou.hipFile.path().replace('\\\\', '/')
+    if current_hip.lower() != original_hip.lower():
+        raise RuntimeError('saveAsBackup changed current HIP path: {} -> {}'.format(
+            original_hip, current_hip))
+    return backup_path
+"""
+        )
+        backup_path = Path(str(connection.eval(
+            "_pcg_serialize_live_backup({!r})".format(normalize_path(backup_root)))))
+    finally:
+        connection.close()
+    if not backup_path.is_file():
+        raise GateFailure(f"Live Scene backup was not created: {backup_path}")
+    return backup_path.resolve()
+
+
 def assert_live_matches_disk(live: dict[str, Any], disk: dict[str, Any]) -> None:
     """Fail closed when a dirty Live Scene contains any structural edit."""
 
@@ -613,6 +658,9 @@ def write_capture(
     host: str,
     port: int,
 ) -> dict[str, Any]:
+    backup_root = snapshot_path.parent / "backup"
+    backup_root.mkdir(parents=True, exist_ok=True)
+    authoritative_live_backup: Path | None = None
     if config.get("isolated"):
         snapshot = isolated_snapshot(project_root, module, config)
         assert_identity(snapshot, project_root, config)
@@ -621,11 +669,19 @@ def write_capture(
         assert_identity(snapshot, project_root, config)
         if snapshot["houdini"].get("hip_unsaved_changes"):
             disk_snapshot = capture_disk(module, config, project_root)
-            assert_live_matches_disk(snapshot, disk_snapshot)
-            snapshot["houdini"]["unsaved_changes_verified_against_disk"] = True
+            if manifest.get("authoritative_live_scene", False):
+                authoritative_live_backup = serialize_live_scene_backup(
+                    config, backup_root, host, port)
+                snapshot["houdini"]["authoritative_live_scene"] = True
+                snapshot["houdini"]["live_backup"] = normalize_path(
+                    authoritative_live_backup.relative_to(project_root))
+            else:
+                assert_live_matches_disk(snapshot, disk_snapshot)
+                snapshot["houdini"]["unsaved_changes_verified_against_disk"] = True
         if (snapshot["houdini"].get("hip_unsaved_changes_after_capture")
                 and not snapshot["houdini"].get("capture_reloaded_clean")
-                and not snapshot["houdini"].get("unsaved_changes_verified_against_disk")):
+                and not snapshot["houdini"].get("unsaved_changes_verified_against_disk")
+                and not snapshot["houdini"].get("authoritative_live_scene")):
             raise GateFailure(
                 "Capture left an unverified dirty Live Scene; no baseline was written. "
                 "Reload the HIP and inspect the capture path.")
@@ -637,11 +693,12 @@ def write_capture(
     snapshot["manifest_sha256"] = sha256_bytes(canonical_json(manifest).encode("utf-8"))
 
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-    backup_root = snapshot_path.parent / "backup"
-    backup_root.mkdir(parents=True, exist_ok=True)
     backups: dict[str, str] = {}
+    backup_sha256: dict[str, str] = {}
     for relative in (config["definition"], config["hip"], *config.get("restore_files", [])):
         source = resolve_scoped_path(project_root, relative)
+        if relative == config["hip"] and authoritative_live_backup is not None:
+            source = authoritative_live_backup
         if not source.is_file() and config.get("isolated"):
             # A missing HDA/HIP pair is the valid baseline for a new isolated
             # asset. Restore will remove only these exact files if needed.
@@ -652,7 +709,9 @@ def write_capture(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         backups[relative] = normalize_path(destination.relative_to(project_root))
+        backup_sha256[relative] = sha256_file(destination)
     snapshot["backups"] = backups
+    snapshot["backup_sha256"] = backup_sha256
     snapshot_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
     return snapshot
 
@@ -870,7 +929,9 @@ def restore_baseline(
         destination = resolve_scoped_path(project_root, relative)
         if not source.is_file():
             raise GateFailure(f"Baseline backup is missing: {source}")
-        expected_hash = baseline.get("files", {}).get(relative, {}).get("sha256")
+        expected_hash = baseline.get("backup_sha256", {}).get(relative)
+        if expected_hash is None:
+            expected_hash = baseline.get("files", {}).get(relative, {}).get("sha256")
         if expected_hash and sha256_file(source) != expected_hash:
             raise GateFailure(f"Baseline backup hash mismatch: {source}")
         shutil.copy2(source, destination)
