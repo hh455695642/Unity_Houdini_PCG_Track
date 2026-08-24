@@ -34,6 +34,12 @@ RIDGE_POST_NODE = "BASE_ridge_post_rotate"
 RIDGE_SWITCH_NODE = "BASE_ridge_switch"
 
 TOUCHED_PARAMETERS = (
+    "track_geometry",
+    "auto_domain",
+    "manual_sizex",
+    "manual_sizey",
+    "padding",
+    "enable_adaptive_earthwork",
     "seed",
     "mountain_height_scale",
     "enable_macro",
@@ -48,8 +54,13 @@ TOUCHED_PARAMETERS = (
     "enable_ridge",
     "ridge_angle",
     "ridge_strength",
+    "ridge_amp",
+    "ridge_size",
     "enable_erosion",
     "erosion_iterations",
+    "material_layers_enabled",
+    "cliff_start",
+    "cliff_full",
 )
 
 
@@ -131,6 +142,28 @@ def all_distinct(values: Iterable[str]) -> bool:
     return len(set(values)) == len(values)
 
 
+def material_layer_snapshot(output: hou.Node) -> Dict[str, Any]:
+    """Hash Unity TerrainLayer weights and report their numeric ranges."""
+
+    output.cook(force=True)
+    require(not output.errors(), f"{output.path()} errors: {'; '.join(output.errors())}")
+    volumes = {
+        prim.attribValue("name"): prim
+        for prim in output.geometry().prims()
+        if isinstance(prim, hou.Volume)
+    }
+    expected = ("terrain_grass", "terrain_stone", "terrain_gravel", "terrain_dirt")
+    require(all(name in volumes for name in expected), "Unity material layer topology is incomplete")
+    digest = hashlib.sha256()
+    ranges = {}
+    for name in expected:
+        values = volumes[name].allVoxels()
+        require(all(math.isfinite(value) for value in values), f"{name} contains NaN/Inf")
+        digest.update(volume_bytes(volumes[name]))
+        ranges[name] = (min(values), max(values))
+    return {"hash": digest.hexdigest(), "ranges": ranges, "layer_names": tuple(volumes)}
+
+
 def check_topology(root: hou.Node, source: hou.Node) -> List[str]:
     messages: List[str] = []
     detail = source.node("BASE_detail_switch")
@@ -164,91 +197,134 @@ def check_topology(root: hou.Node, source: hou.Node) -> List[str]:
         "Ridge offsetz expression differs",
     )
     require(abs(noise.parm("elementscalex").eval() - 0.35) < 1e-7, "Ridge X scale changed")
+    require(
+        noise.parm("amp").expression()
+        == 'ch("../../../ridge_amp")*ch("../../../ridge_strength")',
+        "Ridge amplitude is coupled to Macro controls",
+    )
+    require(
+        noise.parm("elementsize").expression() == 'ch("../../../ridge_size")',
+        "Ridge size is coupled to Macro controls",
+    )
 
     boxes = {box.name() for box in source.networkBoxes()}
     require("Directional_Ridge_Frame" in boxes, "Directional Ridge network box is missing")
 
-    seed_conditions = root.type().definition().parmTemplateGroup().find("seed").conditionals()
-    expected_seed_condition = (
-        "{ enable_macro == 0 enable_mid == 0 enable_detail == 0 "
-        "enable_ridge == 0 enable_erosion == 0 }"
+    group = root.type().definition().parmTemplateGroup()
+    conditional_names: List[str] = []
+
+    def collect_conditionals(templates: Iterable[hou.ParmTemplate]) -> None:
+        for template in templates:
+            if hou.parmCondType.DisableWhen in template.conditionals():
+                conditional_names.append(template.name())
+            if template.type() == hou.parmTemplateType.Folder:
+                collect_conditionals(template.parmTemplates())
+
+    collect_conditionals(group.entries())
+    require(
+        not conditional_names,
+        f"Public DisableWhen rules remain and can desync in HEU: {conditional_names}",
+    )
+    guide_switch = root.node("TerrainCore/20_GUIDE_MESH/GUIDE_MESH_SWITCH")
+    lake_switch = root.node("TerrainCore/30_LAKE_CONSTRAINT/LAKE_SWITCH")
+    require(all((guide_switch, lake_switch)), "Guide/Lake switches are incomplete")
+    require(root.parm("enable_guide_mesh") is not None, "Enable Guide Mesh is missing")
+    require(root.parm("enable_lake") is not None, "Enable Lake is missing")
+    require(
+        "enable_guide_mesh" in guide_switch.parm("input").expression(),
+        "Guide Mesh switch ignores its explicit toggle",
     )
     require(
-        seed_conditions.get(hou.parmCondType.DisableWhen) == expected_seed_condition,
-        "Seed Disable When condition differs",
+        "enable_lake" in lake_switch.parm("input").expression(),
+        "Lake switch ignores its explicit toggle",
     )
-    ridge_conditions = root.type().definition().parmTemplateGroup().find("ridge_angle").conditionals()
-    require(
-        ridge_conditions.get(hou.parmCondType.DisableWhen) == "{ enable_ridge == 0 }",
-        "ridge_angle Disable When condition changed",
-    )
-    mountain_conditions = (
-        root.type().definition().parmTemplateGroup().find("mountain_height_scale").conditionals()
-    )
-    require(
-        mountain_conditions.get(hou.parmCondType.DisableWhen)
-        == "{ enable_macro == 0 enable_ridge == 0 }",
-        "mountain_height_scale Disable When condition changed",
-    )
-    messages.append("Topology, expressions, Sparse basis, and UI conditions")
+    messages.append("Topology, no HEU-hostile DisableWhen rules, and explicit module toggles")
     return messages
 
 
+def check_panel_bindings(root: hou.Node) -> List[str]:
+    """Every editable business parameter on all four tabs must reach the node network."""
+
+    raw_values: List[str] = []
+    for node in root.allSubChildren():
+        for parm in node.parms():
+            try:
+                value = parm.rawValue()
+            except Exception:
+                continue
+            if isinstance(value, str):
+                raw_values.append(value)
+    joined = "\n".join(raw_values)
+    group = root.type().definition().parmTemplateGroup()
+    missing: List[str] = []
+
+    def walk(templates: Iterable[hou.ParmTemplate], in_public_tab: bool = False) -> None:
+        for template in templates:
+            public = in_public_tab or template.name().startswith("terrain_overview_tab")
+            if template.type() == hou.parmTemplateType.Folder:
+                walk(template.parmTemplates(), public)
+            elif public and template.type() != hou.parmTemplateType.Label:
+                if template.name() not in joined:
+                    missing.append(template.name())
+
+    walk(group.entries())
+    require(not missing, f"Public Terrain parameters have no downstream binding: {missing}")
+    return ["All editable parameters across the four public tabs have downstream bindings"]
+
+
+def check_failsoft_and_material_contract(root: hou.Node) -> List[str]:
+    earthwork = root.node("TerrainCore/40_CONFORM_EARTHWORK")
+    material = root.node("TerrainCore/60_MATERIAL_LAYERS")
+    require(all((earthwork, material)), "Earthwork/Material networks are incomplete")
+    adaptive_switch = earthwork.node("ADAPTIVE_enable_switch")
+    adaptive_error = earthwork.node("ADAPT_validate_error")
+    weights = material.node("MATERIAL_generate_raw_weights")
+    material_switch = material.node("MATERIAL_enable_switch")
+    require(all((adaptive_switch, adaptive_error, weights, material_switch)),
+            "Fail-soft/material repair nodes are incomplete")
+    adaptive_expression = adaptive_switch.parm("input").expression()
+    for token in (
+        "terrain_constraint_conflict_count",
+        "terrain_max_generated_slope_deg",
+        "terrain_max_road_clearance_error",
+    ):
+        require(token in adaptive_expression, f"Adaptive fail-soft switch ignores {token}")
+    require(adaptive_error.parm("enable1").eval() == 0,
+            "Adaptive validation can still abort the entire HDA cook")
+    snippet = weights.parm("snippet").evalAsString()
+    require("material_layers_enabled" in snippet and "f@terrain_grass = 1.0" in snippet,
+            "Material-off state does not explicitly overwrite Unity weights")
+    require(material_switch.parm("input").eval() == 1,
+            "Unity TerrainLayer topology is still omitted when materials are disabled")
+    return ["Adaptive Earthwork fails soft; material-off uploads explicit all-grass weights"]
+
+
 def check_output_routing(root: hou.Node) -> List[str]:
-    """Protect the final HeightField/metadata split from connector-order drift."""
+    """Protect the current compact Terrain pipeline routing."""
 
     core = root.node("TerrainCore")
     require(core is not None, "TerrainCore is missing")
+    source = core.node("10_TERRAIN_SOURCE")
+    guide = core.node("20_GUIDE_MESH")
+    lake = core.node("30_LAKE_CONSTRAINT")
+    earthwork = core.node("40_CONFORM_EARTHWORK")
     layers = core.node("60_MATERIAL_LAYERS")
-    output_stage = core.node("70_OUTPUT")
     terrain_heightfield = core.node("OUT_TERRAIN_HEIGHTFIELD")
-    terrain_metadata = core.node("OUT_TERRAIN_METADATA")
-    validation = core.node("80_VALIDATION")
-    metadata_output = output_stage.node("OUT_METADATA") if output_stage else None
     require(
-        all(
-            (
-                layers,
-                output_stage,
-                terrain_heightfield,
-                terrain_metadata,
-                validation,
-                metadata_output,
-            )
-        ),
-        "Terrain final output nodes are incomplete",
+        all((source, guide, lake, earthwork, layers, terrain_heightfield)),
+        "Terrain compact output pipeline is incomplete",
     )
-
-    require(
-        core.node("70_OUTPUT/OUTPUT_material_layers") is None,
-        "Redundant final material Object Merge returned",
-    )
-    require(
-        core.node("70_OUTPUT/OUT_HEIGHTFIELD") is None,
-        "Redundant 70_OUTPUT HeightField connector returned",
-    )
-    require(
-        metadata_output.parm("outputidx").eval() == 0,
-        "70_OUTPUT metadata connector index changed",
-    )
+    require(guide.input(0) == source, "Terrain Source no longer feeds Guide Mesh")
+    require(lake.input(0) == guide, "Guide Mesh no longer feeds Lake Constraint")
+    require(earthwork.input(0) == lake, "Lake Constraint no longer feeds Earthwork")
+    require(layers.input(0) == earthwork, "Earthwork no longer feeds Material Layers")
     require(
         terrain_heightfield.input(0) == layers,
         "60_MATERIAL_LAYERS no longer feeds OUT_TERRAIN_HEIGHTFIELD",
     )
-    require(
-        terrain_metadata.input(0) == output_stage,
-        "70_OUTPUT metadata no longer feeds OUT_TERRAIN_METADATA",
-    )
-    metadata_connections = terrain_metadata.inputConnections()
-    require(
-        len(metadata_connections) == 1 and metadata_connections[0].outputIndex() == 0,
-        "OUT_TERRAIN_METADATA must consume 70_OUTPUT connector 0",
-    )
-    require(
-        validation.input(1) == terrain_heightfield,
-        "80_VALIDATION no longer consumes the final HeightField",
-    )
-    return ["Final HeightField/metadata routing and redundant branch removal"]
+    require(core.node("70_OUTPUT") is None, "Removed 70_OUTPUT subnet returned")
+    require(core.node("80_VALIDATION") is None, "Removed 80_VALIDATION subnet returned")
+    return ["Compact Source -> Guide -> Lake -> Earthwork -> Material output routing"]
 
 
 def check_mask_cleanup(root: hou.Node) -> List[str]:
@@ -360,7 +436,7 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         "Terrain top-level parameter tabs changed",
     )
 
-    overview, _, advanced, terrain_material = top_tabs
+    overview, terrain_shape, advanced, terrain_material = top_tabs
     require(
         [entry.name() for entry in overview.parmTemplates()]
         == [
@@ -372,6 +448,27 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
             "tile_resolution",
         ],
         "Overview must contain contract, domain, and resolution parameters directly",
+    )
+    padding_template = group.find("padding")
+    manual_template = group.find("manual_size")
+    mountain_template = group.find("mountain_height_scale")
+    require(padding_template.maxValue() >= 1.0e9, "Auto Padding still exposes the 1024 UI cap")
+    require(not padding_template.maxIsStrict(), "Auto Padding has a strict maximum")
+    require(manual_template.maxValue() >= 1.0e9, "Manual Domain still has the old UI cap")
+    require(tuple(mountain_template.defaultValue()) == (1.0,),
+            "Macro height multiplier default is not the meter-safe value 1")
+
+    shape_folders = {
+        entry.label(): entry
+        for entry in terrain_shape.parmTemplates()
+        if entry.type() == hou.parmTemplateType.Folder
+    }
+    ridge_folder = shape_folders.get("Directional Ridge / 方向山脊")
+    require(ridge_folder is not None, "Directional Ridge folder is missing")
+    require(
+        [entry.name() for entry in ridge_folder.parmTemplates()]
+        == ["enable_ridge", "ridge_angle", "ridge_strength", "ridge_amp", "ridge_size"],
+        "Directional Ridge public controls changed",
     )
 
     advanced_tabs = [
@@ -390,6 +487,33 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         "Advanced child tabs changed",
     )
     island = advanced_tabs[2]
+    guide = advanced_tabs[1]
+    lake = advanced_tabs[3]
+    require(
+        [entry.name() for entry in guide.parmTemplates()]
+        == [
+            "terrain_guide_meshes",
+            "enable_guide_mesh",
+            "guide_mesh_strength",
+            "guide_mesh_blend_width",
+            "guide_mesh_detail_preserve",
+            "guide_mesh_detail_scale",
+            "guide_mesh_transition_slope",
+        ],
+        "Guide Mesh controls changed",
+    )
+    require(
+        [entry.name() for entry in lake.parmTemplates()]
+        == [
+            "lake_curves",
+            "enable_lake",
+            "lake_depth",
+            "lake_bank_width",
+            "lake_shore_flatness",
+            "lake_strength",
+        ],
+        "Lake controls changed",
+    )
     require(
         [
             entry.label()
@@ -439,21 +563,41 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         require("use_bake_resolution" not in expression, f"{name} uses removed preview switch")
         require("bake_resolution" not in expression, f"{name} uses removed bake resolution")
         require("tile_resolution" in expression, f"{name} no longer uses Terrain Resolution")
+        require('max(ch("../../../padding")' not in expression,
+                f"{name} restored the dead Auto Padding max() range")
+    require("manual_sizex" in domain.parm("sizex").expression(),
+            "Manual X size is not bound independently")
+    require("manual_sizey" not in domain.parm("sizex").expression(),
+            "Manual X size still consumes Manual Z")
+    require("manual_sizey" in domain.parm("sizey").expression(),
+            "Manual Z size is not bound independently")
+    require("manual_sizex" not in domain.parm("sizey").expression(),
+            "Manual Z size still consumes Manual X")
+    require("auto_domain" not in domain.parm("tx").expression(),
+            "Manual Domain X center no longer follows Track")
+    require("auto_domain" not in domain.parm("tz").expression(),
+            "Manual Domain Z center no longer follows Track")
 
-    return ["Four-tab Terrain interface, material-only slope controls, no dead parameters"]
+    return ["Four-tab interface, unlimited numeric domain inputs, independent X/Z and controls"]
 
 
 def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[str, Any]:
     passed = check_topology(root, source)
     passed.extend(check_output_routing(root))
-    passed.extend(check_mask_cleanup(root))
     passed.extend(check_interface_contract(root, source))
+    passed.extend(check_panel_bindings(root))
+    passed.extend(check_failsoft_and_material_contract(root))
     original = {name: root.parm(name).eval() for name in TOUCHED_PARAMETERS}
 
     # Stable values shared by sensitivity tests. Individual modules are isolated.
     isolated = {
+        "auto_domain": 0,
+        "manual_sizex": 512.0,
+        "manual_sizey": 512.0,
+        "padding": 128.0,
+        "enable_adaptive_earthwork": 0,
         "seed": 1,
-        "mountain_height_scale": 8.0,
+        "mountain_height_scale": 1.0,
         "enable_macro": 0,
         "enable_mid": 0,
         "enable_detail": 0,
@@ -464,9 +608,48 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
     set_values(root, isolated)
     reference = heightfield_snapshot(output)
 
+    probe_geo = None
     try:
+        probe_geo = hou.node("/obj").createNode(
+            "geo", "__terrain_domain_validation_probe__", run_init_scripts=False
+        )
+        box = probe_geo.createNode("box", "TRACK_SURFACE_PROBE")
+        box.parmTuple("size").set((1000.0, 10.0, 700.0))
+        box.parmTuple("t").set((125.0, 0.0, -75.0))
+        tag = probe_geo.createNode("attribwrangle", "TAG_UNITY_MESH")
+        tag.setInput(0, box)
+        tag.parm("class").set(1)
+        tag.parm("snippet").set('s@unity_input_mesh_name = "terrain-domain-probe";')
+        root.parm("track_geometry").set(tag.path())
+        track_validate = root.node("TerrainCore/00_TRACK_INPUT/TRACK_validate_contract")
+        track_validate.cook(force=True)
+        require(
+            track_validate.geometry().intAttribValue("terrain_input_valid") == 1,
+            "Synthetic Track probe was rejected by Terrain input contract",
+        )
+
+        domain = source.node("HF_DOMAIN")
+        set_values(root, {"auto_domain": 0, "manual_sizex": 640.0, "manual_sizey": 960.0})
+        require(abs(domain.parm("sizex").eval() - 640.0) < 1e-5,
+                "Manual Domain X does not evaluate independently")
+        require(abs(domain.parm("sizey").eval() - 960.0) < 1e-5,
+                "Manual Domain Z does not evaluate independently")
+        manual_center = (domain.parm("tx").eval(), domain.parm("tz").eval())
+        set_values(root, {"auto_domain": 1, "enable_adaptive_earthwork": 0, "padding": 128.0})
+        size_128 = (domain.parm("sizex").eval(), domain.parm("sizey").eval())
+        auto_center = (domain.parm("tx").eval(), domain.parm("tz").eval())
+        set_values(root, {"padding": 2048.0})
+        size_2048 = (domain.parm("sizex").eval(), domain.parm("sizey").eval())
+        expected_delta = 2.0 * (2048.0 - 128.0)
+        require(all(abs((b - a) - expected_delta) < 1e-4
+                    for a, b in zip(size_128, size_2048)),
+                "Auto Padding above 1024 does not expand both axes numerically")
+        require(all(abs(a - b) < 1e-5 for a, b in zip(manual_center, auto_center)),
+                "Manual and Auto Domain centers differ with a valid Track")
+        passed.append("Domain: independent X/Z, Track-centered manual mode, Padding 2048 sensitivity")
+
         ridge = dict(isolated)
-        ridge.update(enable_ridge=1, ridge_strength=0.5)
+        ridge.update(enable_ridge=1, ridge_strength=0.5, ridge_amp=80.0, ridge_size=300.0)
         angle_hashes = [
             hash_for(root, output, ridge, {"ridge_angle": angle}, reference)
             for angle in (0.0, 45.0, 90.0, 360.0)
@@ -486,6 +669,20 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
         ]
         require(strength_hashes[0] != strength_hashes[1], "Ridge strength 0.5/1.0 is not sensitive")
         passed.append("Ridge strength: 0 is bypass-equivalent; 0.5 != 1.0")
+
+        ridge_amp_hashes = [
+            hash_for(root, output, ridge, {"ridge_amp": value}, reference)
+            for value in (40.0, 80.0)
+        ]
+        require(ridge_amp_hashes[0] != ridge_amp_hashes[1],
+                "Ridge Amplitude is not sensitive")
+        ridge_size_hashes = [
+            hash_for(root, output, ridge, {"ridge_size": value}, reference)
+            for value in (180.0, 360.0)
+        ]
+        require(ridge_size_hashes[0] != ridge_size_hashes[1],
+                "Ridge Element Size is not sensitive")
+        passed.append("Ridge: independent Amplitude and Element Size change output")
 
         seed_hashes = [
             hash_for(root, output, ridge, {"seed": seed, "ridge_angle": 0.0}, reference)
@@ -560,15 +757,65 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
         macro_scale.update(enable_macro=1, macro_amp=80.0)
         macro_scale_hashes = [
             hash_for(root, output, macro_scale, {"mountain_height_scale": value}, reference)
-            for value in (4.0, 8.0)
+            for value in (0.5, 1.5)
         ]
         require(macro_scale_hashes[0] != macro_scale_hashes[1], "Macro ignores mountain height scale")
         ridge_scale_hashes = [
             hash_for(root, output, ridge, {"mountain_height_scale": value}, reference)
-            for value in (4.0, 8.0)
+            for value in (0.5, 1.5)
         ]
-        require(ridge_scale_hashes[0] != ridge_scale_hashes[1], "Ridge ignores mountain height scale")
-        passed.append("mountain_height_scale affects Macro and Ridge; UI disable condition is intact")
+        require(ridge_scale_hashes[0] == ridge_scale_hashes[1],
+                "Ridge still consumes Macro mountain height scale")
+        ridge_macro_hashes = [
+            hash_for(
+                root,
+                output,
+                ridge,
+                {"macro_amp": amp, "macro_size": size},
+                reference,
+            )
+            for amp, size in ((20.0, 120.0), (400.0, 900.0))
+        ]
+        require(ridge_macro_hashes[0] == ridge_macro_hashes[1],
+                "Ridge still consumes disabled Macro amplitude/size")
+        passed.append("Macro scale affects Macro only; Ridge is fully decoupled")
+
+        material_output = root.node(
+            "TerrainCore/60_MATERIAL_LAYERS/OUT_UNITY_TERRAIN_LAYERS"
+        )
+        require(material_output is not None, "Unity material output is missing")
+        material_probe = dict(isolated)
+        material_probe.update(
+            enable_macro=1,
+            macro_amp=40.0,
+            macro_size=300.0,
+            mountain_height_scale=1.0,
+            enable_ridge=0,
+            ridge_amp=80.0,
+            ridge_size=300.0,
+            ridge_strength=0.5,
+            cliff_start=1.0,
+            cliff_full=4.0,
+        )
+        set_values(root, dict(material_probe, material_layers_enabled=0))
+        material_off = material_layer_snapshot(material_output)
+        grass_min, grass_max = material_off["ranges"]["terrain_grass"]
+        require(grass_min >= 0.99999 and grass_max <= 1.00001,
+                "Material disabled state is not all grass")
+        for name in ("terrain_stone", "terrain_gravel", "terrain_dirt"):
+            minimum, maximum = material_off["ranges"][name]
+            require(abs(minimum) <= 1e-6 and abs(maximum) <= 1e-6,
+                    f"Material disabled state retains stale {name} weights")
+
+        set_values(root, dict(material_probe, material_layers_enabled=1))
+        material_on = material_layer_snapshot(material_output)
+        require(material_on["layer_names"] == material_off["layer_names"],
+                "Material toggle changes Unity TerrainLayer topology")
+        require(material_on["hash"] != material_off["hash"],
+                "Material toggle does not change Unity alphamap weights")
+        passed.append(
+            "Material: toggle rewrites weights with stable 4-layer topology"
+        )
 
         # Alternating values dirty the dependency chain, producing meaningful Cook timings.
         timings: List[float] = []
@@ -588,6 +835,8 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
         }
     finally:
         set_values(root, original)
+        if probe_geo is not None:
+            probe_geo.destroy()
         output.cook(force=True)
 
 
