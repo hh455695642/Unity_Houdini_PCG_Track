@@ -39,6 +39,7 @@ TOUCHED_PARAMETERS = (
     "manual_sizex",
     "manual_sizey",
     "padding",
+    "tile_resolution",
     "enable_adaptive_earthwork",
     "seed",
     "mountain_height_scale",
@@ -452,11 +453,35 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
     padding_template = group.find("padding")
     manual_template = group.find("manual_size")
     mountain_template = group.find("mountain_height_scale")
-    require(padding_template.maxValue() >= 1.0e9, "Auto Padding still exposes the 1024 UI cap")
-    require(not padding_template.maxIsStrict(), "Auto Padding has a strict maximum")
+    require(padding_template.maxValue() == 4096.0, "Auto Padding maximum is not 4096")
+    require(padding_template.maxIsStrict(), "Auto Padding maximum is not enforced")
     require(manual_template.maxValue() >= 1.0e9, "Manual Domain still has the old UI cap")
     require(tuple(mountain_template.defaultValue()) == (1.0,),
             "Macro height multiplier default is not the meter-safe value 1")
+    resolution_template = group.find("tile_resolution")
+    require(
+        tuple(resolution_template.menuItems()) == ("129", "257", "513", "1025", "2049"),
+        "Terrain Resolution no longer exposes only Unity-safe 2^n+1 values",
+    )
+
+    expected_noise_maxima = {
+        "seed": 200000.0,
+        "mountain_height_scale": 24.0,
+        "macro_amp": 1000.0,
+        "macro_size": 4000.0,
+        "mid_amp": 400.0,
+        "mid_size": 1000.0,
+        "detail_amp": 100.0,
+        "detail_size": 200.0,
+        "ridge_strength": 4.0,
+        "ridge_amp": 4000.0,
+        "ridge_size": 20000.0,
+    }
+    for name, expected_maximum in expected_noise_maxima.items():
+        template = group.find(name)
+        require(template is not None, f"Missing Terrain Shape control: {name}")
+        require(abs(float(template.maxValue()) - expected_maximum) <= 1e-6,
+                f"Terrain Shape range changed for {name}")
 
     shape_folders = {
         entry.label(): entry
@@ -565,20 +590,26 @@ def check_interface_contract(root: hou.Node, source: hou.Node) -> List[str]:
         require("tile_resolution" in expression, f"{name} no longer uses Terrain Resolution")
         require('max(ch("../../../padding")' not in expression,
                 f"{name} restored the dead Auto Padding max() range")
-    require("manual_sizex" in domain.parm("sizex").expression(),
-            "Manual X size is not bound independently")
-    require("manual_sizey" not in domain.parm("sizex").expression(),
-            "Manual X size still consumes Manual Z")
-    require("manual_sizey" in domain.parm("sizey").expression(),
-            "Manual Z size is not bound independently")
-    require("manual_sizex" not in domain.parm("sizey").expression(),
-            "Manual Z size still consumes Manual X")
+    size_expressions = (domain.parm("sizex").expression(), domain.parm("sizey").expression())
+    require(size_expressions[0] == size_expressions[1],
+            "Terrain HeightField domain is no longer square")
+    for expression in size_expressions:
+        require("manual_sizex" in expression and "manual_sizey" in expression,
+                "Manual X/Z controls no longer contribute to the square domain")
+        require("D_XSIZE" in expression and "D_ZSIZE" in expression,
+                "Auto Track X/Z extents no longer contribute to the square domain")
     require("auto_domain" not in domain.parm("tx").expression(),
             "Manual Domain X center no longer follows Track")
     require("auto_domain" not in domain.parm("tz").expression(),
             "Manual Domain Z center no longer follows Track")
+    grid_expression = domain.parm("gridsamples").expression()
+    for token in ("129", "257", "513", "1025", "2049"):
+        require(token in grid_expression,
+                f"Terrain Resolution guard is missing supported value {token}")
 
-    return ["Four-tab interface, unlimited numeric domain inputs, independent X/Z and controls"]
+    return [
+        "Four-tab interface, square Unity domain, Padding max 4096, widened noise ranges"
+    ]
 
 
 def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[str, Any]:
@@ -595,6 +626,7 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
         "manual_sizex": 512.0,
         "manual_sizey": 512.0,
         "padding": 128.0,
+        "tile_resolution": 513,
         "enable_adaptive_earthwork": 0,
         "seed": 1,
         "mountain_height_scale": 1.0,
@@ -629,14 +661,25 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
         )
 
         domain = source.node("HF_DOMAIN")
+        set_values(root, {"tile_resolution": 512})
+        require(domain.parm("gridsamples").evalAsInt() == 513,
+                "Legacy Terrain Resolution 512 does not snap to 513")
+        set_values(root, {"tile_resolution": 2048})
+        require(domain.parm("gridsamples").evalAsInt() == 2049,
+                "Legacy Terrain Resolution 2048 does not snap to 2049")
+        set_values(root, {"tile_resolution": 513})
+        passed.append("Resolution: legacy 512/2048 snap to Unity-safe 513/2049")
+
         set_values(root, {"auto_domain": 0, "manual_sizex": 640.0, "manual_sizey": 960.0})
-        require(abs(domain.parm("sizex").eval() - 640.0) < 1e-5,
-                "Manual Domain X does not evaluate independently")
+        require(abs(domain.parm("sizex").eval() - 960.0) < 1e-5,
+                "Manual Domain does not use the larger X/Z extent")
         require(abs(domain.parm("sizey").eval() - 960.0) < 1e-5,
-                "Manual Domain Z does not evaluate independently")
+                "Manual HeightField domain is not square")
         manual_center = (domain.parm("tx").eval(), domain.parm("tz").eval())
         set_values(root, {"auto_domain": 1, "enable_adaptive_earthwork": 0, "padding": 128.0})
         size_128 = (domain.parm("sizex").eval(), domain.parm("sizey").eval())
+        require(abs(size_128[0] - size_128[1]) < 1e-5,
+                "Auto HeightField domain is not square")
         auto_center = (domain.parm("tx").eval(), domain.parm("tz").eval())
         set_values(root, {"padding": 2048.0})
         size_2048 = (domain.parm("sizex").eval(), domain.parm("sizey").eval())
@@ -646,7 +689,11 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
                 "Auto Padding above 1024 does not expand both axes numerically")
         require(all(abs(a - b) < 1e-5 for a, b in zip(manual_center, auto_center)),
                 "Manual and Auto Domain centers differ with a valid Track")
-        passed.append("Domain: independent X/Z, Track-centered manual mode, Padding 2048 sensitivity")
+        set_values(root, {"padding": 4096.0})
+        size_4096 = (domain.parm("sizex").eval(), domain.parm("sizey").eval())
+        require(all(b > a for a, b in zip(size_2048, size_4096)),
+                "Auto Padding 4096 does not expand both axes")
+        passed.append("Domain: square X/Z, Track-centered manual mode, Padding 4096 sensitivity")
 
         ridge = dict(isolated)
         ridge.update(enable_ridge=1, ridge_strength=0.5, ridge_amp=80.0, ridge_size=300.0)
@@ -813,8 +860,13 @@ def run_validation(root: hou.Node, source: hou.Node, output: hou.Node) -> Dict[s
                 "Material toggle changes Unity TerrainLayer topology")
         require(material_on["hash"] != material_off["hash"],
                 "Material toggle does not change Unity alphamap weights")
+        require(
+            max(material_on["ranges"][name][1]
+                for name in ("terrain_stone", "terrain_gravel", "terrain_dirt")) > 0.01,
+            "Enabled material output remains visually all grass",
+        )
         passed.append(
-            "Material: toggle rewrites weights with stable 4-layer topology"
+            "Material: toggle restores visible non-grass weights with stable 4-layer topology"
         )
 
         # Alternating values dirty the dependency chain, producing meaningful Cook timings.
