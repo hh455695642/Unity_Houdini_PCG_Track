@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "task": "terrain-v1-domain-noise-controls-20260824",
+  "module": "Terrain",
+  "allowed_files": [
+    "Assets/PCG/HDA/Terrain.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_Terrain.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/terrain_v1_domain_noise_controls_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_terrain_domain_noise_controls_v1_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_terrain_shape_params.py"
+  ],
+  "allowed_nodes": [
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN",
+    "TerrainCore/10_TERRAIN_SOURCE/BASE_directional_ridge",
+    "TerrainCore/20_GUIDE_MESH/GUIDE_MESH_SWITCH",
+    "TerrainCore/30_LAKE_CONSTRAINT/LAKE_SWITCH"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:sizex",
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:sizey",
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:tx",
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:tz",
+    "TerrainCore/10_TERRAIN_SOURCE/BASE_directional_ridge:amp",
+    "TerrainCore/10_TERRAIN_SOURCE/BASE_directional_ridge:elementsize",
+    "TerrainCore/20_GUIDE_MESH/GUIDE_MESH_SWITCH:input",
+    "TerrainCore/30_LAKE_CONSTRAINT/LAKE_SWITCH:input"
+  ],
+  "allowed_public_parameters": [
+    "terrain_overview_tab/manual_size",
+    "terrain_overview_tab/padding",
+    "terrain_overview_tab_1/mountain_height_scale",
+    "terrain_overview_tab_1/terrain_ridge_folder2/ridge_amp",
+    "terrain_overview_tab_1/terrain_ridge_folder2/ridge_size",
+    "terrain_overview_tab_2/terrain_track_earthwork_tab_1/enable_guide_mesh",
+    "terrain_overview_tab_2/terrain_track_earthwork_tab_3/enable_lake"
+  ],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "Terrain.All"
+  ]
+}

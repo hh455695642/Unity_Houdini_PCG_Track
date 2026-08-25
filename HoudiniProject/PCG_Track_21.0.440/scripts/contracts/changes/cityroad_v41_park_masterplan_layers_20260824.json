@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v41-park-masterplan-layers-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v41_park_masterplan_layers_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_park_masterplan_v41_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "Assets/PCG/Generated/Road/CityRoad/**",
+    "Assets/PCG/Scenes/PCG_City.unity"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CR_CITY_PARK/PARK_BOUNDARY_ANALYZE_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_SURFACE_ZONES_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_CONNECTED_PATHS_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_WOODLAND_LAYERS_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_EXCLUSION_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_ASSEMBLE_V41",
+    "CityRoadCore/CR_CITY_PARK/PARK_CONTRACT_V41"
+  ],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_CITY_PARK/PARK_LAYOUT_AND_SCATTER_V20"
+  ],
+  "allowed_connections": [
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/CR_CITY_PARK/*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": true,
+  "authoritative_live_scene": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V38.CoreReadability"
+  ]
+}

@@ -121,8 +121,13 @@ __pycache__/
 *.pyc
 /[Hh]oudini[Pp]roject/**/[Bb]ackups/
 /[Hh]oudini[Pp]roject/**/backup/
+/[Hh]oudini[Pp]roject/**/[Tt]emp/
 *.hip~
 *.bak
+
+# Houdini Engine and ReferenceFinder local diagnostics/cache
+/cook_logs_file.txt
+/xdfdf
 
 /[Aa]ssets/Plugins/NuGet
 Assets/PCG/HDA/backup/

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "asset_type": "pcgbike::CityPark::1.0",
+  "marker": "CITYPARK_V1_RANGE_TERRAIN_MULTI_ROAD",
+  "parameters": {
+    "enable_ground": 1,
+    "unity_park_areas": "",
+    "unity_park_roads": "",
+    "terrain_mesh_size": 5.0,
+    "terrain_height_amplitude": 0.6,
+    "terrain_noise_wavelength": 45.0,
+    "terrain_edge_fade": 8.0,
+    "terrain_seed": 1,
+    "road_ground_sink": 0.25,
+    "road_ground_blend": 1.5,
+    "enable_road": 1,
+    "road_width": 4.0,
+    "sample_spacing": 2.0,
+    "enable_shoulders": 1,
+    "shoulder_width": 0.75,
+    "shoulder_drop": 0.12,
+    "road_surface_offset": 0.05,
+    "uv_tile_length": 4.0,
+    "ground_unity_material": "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Grass.mat",
+    "road_unity_material": "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Path.mat",
+    "shoulder_unity_material": "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Path.mat"
+  },
+  "outputs": [
+    "OUT_PARK_GROUND",
+    "OUT_PARK_ROAD",
+    "OUT_PARK_SHOULDERS"
+  ],
+  "contract_ids": [
+    "CityPark.Interface.Public",
+    "CityPark.Network.Outputs",
+    "CityPark.V1.RangeTerrain",
+    "CityPark.V1.MultiCurveRoad",
+    "CityPark.V1.NoVegetationOrWater"
+  ]
+}

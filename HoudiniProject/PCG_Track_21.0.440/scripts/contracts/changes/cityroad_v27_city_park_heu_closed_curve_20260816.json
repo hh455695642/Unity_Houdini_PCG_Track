@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v27-city-park-heu-closed-curve-20260816",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "Assets/PCG/Editor/CityRoad/CityRoadSafeRebuild.cs",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_city_park_v27_heu_closed_curve.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v27_city_park_heu_closed_curve_20260816.json"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CR_CITY_PARK/PARK_LAYOUT_AND_SCATTER_V20"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [
+    "CityRoadCore/CR_CITY_PARK/PARK_LAYOUT_AND_SCATTER_V20:snippet"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation"
+  ]
+}

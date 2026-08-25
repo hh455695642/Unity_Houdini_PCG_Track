@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "contract_id": "CityRoad.V49.RemoveDeadCollisionAndShellBranches",
+  "absent_nodes": [
+    "CR_MAIN_PIPELINE/CR_COLLISION_AUDIT",
+    "CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_UNION_BOUNDARY_WALLS",
+    "CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_WALL_METADATA",
+    "CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_MERGE_VISIBLE_SHELL"
+  ],
+  "protected_nodes": [
+    "CR_MAIN_PIPELINE/CR_ROAD_SHELL_AUDIT",
+    "CR_MAIN_PIPELINE/CR_SIDEWALK_SITE_OPEN_ENDS/SIDEWALK_OPEN_END_SEAM_SHATTER",
+    "CR_MAIN_PIPELINE/CR_STREET_FURNITURE/CITYROAD_STREET_FURNITURE_V1"
+  ],
+  "collision_output": {
+    "main_output_index": 1,
+    "source_node": "CR_ROAD_OUTPUT_CLASSIFY",
+    "source_output_index": 1
+  }
+}

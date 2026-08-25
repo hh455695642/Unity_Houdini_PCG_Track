@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v46-three-level-readability-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "authoritative_live_scene": true,
+  "path_rewrites": [
+    {"from": "CityRoadCore/IN_LAB_ROAD_TOP_UNITY_READY", "to": "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_ROAD_TOP_UNITY_READY"},
+    {"from": "CityRoadCore/IN_LAB_SIDEWALK_CANDIDATE", "to": "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_SIDEWALK_CANDIDATE"},
+    {"from": "CityRoadCore/IN_LAB_TRUE_OUTER_BOUNDARY", "to": "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_TRUE_OUTER_BOUNDARY"},
+    {"from": "CityRoadCore/CR_ROAD_MATERIAL_CONTRACT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_ROAD_MATERIAL_CONTRACT"},
+    {"from": "CityRoadCore/CR_INPUT_CONTRACT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_INPUT_CONTRACT"},
+    {"from": "CityRoadCore/CR_GRAPH_INDEX", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_GRAPH_INDEX"},
+    {"from": "CityRoadCore/CR_JUNCTION_INDEX", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_JUNCTION_INDEX"},
+    {"from": "CityRoadCore/CR_CORRIDOR_SURFACE", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_CORRIDOR_SURFACE"},
+    {"from": "CityRoadCore/CR_MARKING_HELPERS", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_MARKING_HELPERS"},
+    {"from": "CityRoadCore/CR_MARKING_POINTS", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_MARKING_POINTS"},
+    {"from": "CityRoadCore/CR_UNION_BOUNDARY", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_BOUNDARY"},
+    {"from": "CityRoadCore/CR_SIDEWALK_SITE_OPEN_ENDS", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_SITE_OPEN_ENDS"},
+    {"from": "CityRoadCore/CR_UNION_FINALIZE", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE"},
+    {"from": "CityRoadCore/CR_JUNCTION_STRIP_EXTRACT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_JUNCTION_STRIP_EXTRACT"},
+    {"from": "CityRoadCore/CR_SIDEWALK_CONSTRAINT_BUILD", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_CONSTRAINT_BUILD"},
+    {"from": "CityRoadCore/CR_JUNCTION_METADATA", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_JUNCTION_METADATA"},
+    {"from": "CityRoadCore/CR_ROAD_CORNER_REBUILD", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_ROAD_CORNER_REBUILD"},
+    {"from": "CityRoadCore/CR_LOCAL_TOPOLOGY", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_LOCAL_TOPOLOGY"},
+    {"from": "CityRoadCore/CR_ROAD_SHELL_AUDIT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_ROAD_SHELL_AUDIT"},
+    {"from": "CityRoadCore/CR_ROAD_FINALIZE", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_ROAD_FINALIZE"},
+    {"from": "CityRoadCore/CR_ROAD_OUTPUT_CLASSIFY", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_ROAD_OUTPUT_CLASSIFY"},
+    {"from": "CityRoadCore/CR_SIDEWALK_CLASSIFY", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_CLASSIFY"},
+    {"from": "CityRoadCore/CR_COLLISION_AUDIT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT"},
+    {"from": "CityRoadCore/CR_SIDEWALK_SEAMS", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_SEAMS"},
+    {"from": "CityRoadCore/CR_STATIC_MARKING_MESH", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_STATIC_MARKING_MESH"},
+    {"from": "CityRoadCore/CR_STREET_FURNITURE", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_STREET_FURNITURE"},
+    {"from": "CityRoadCore/CR_MARKING_APPROACH", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_MARKING_APPROACH"},
+    {"from": "CityRoadCore/CR_SIDEWALK_AUDIT_OUTPUT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_AUDIT_OUTPUT"},
+    {"from": "CityRoadCore/CR_CURB_SIDEWALK_FINAL", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_CURB_SIDEWALK_FINAL"},
+    {"from": "CityRoadCore/CR_MARKING_FINAL", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_MARKING_FINAL"},
+    {"from": "CityRoadCore/CR_SIDEWALK_OUTPUT", "to": "CityRoadCore/CR_MAIN_PIPELINE/CR_SIDEWALK_OUTPUT"}
+  ],
+  "moved_parameter_exceptions": [
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_*:label*",
+    "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_*:objpath1"
+  ],
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v46_three_level_readability_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_three_level_readability_v46_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/pcg_regression_gate.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tests/test_pcg_regression_gate.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore",
+    "CityRoadCore/CR_MAIN_PIPELINE",
+    "CityRoadCore/CR_MAIN_PIPELINE/*",
+    "CityRoadCore/OUT_*"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CR_MAIN_PIPELINE",
+    "CityRoadCore/CR_MAIN_PIPELINE/*"
+  ],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_INPUT_CONTRACT",
+    "CityRoadCore/CR_GRAPH_INDEX",
+    "CityRoadCore/CR_JUNCTION_INDEX",
+    "CityRoadCore/CR_CORRIDOR_SURFACE",
+    "CityRoadCore/CR_UNION_*",
+    "CityRoadCore/CR_JUNCTION_*",
+    "CityRoadCore/CR_ROAD_*",
+    "CityRoadCore/CR_LOCAL_TOPOLOGY",
+    "CityRoadCore/CR_SIDEWALK_*",
+    "CityRoadCore/CR_CURB_SIDEWALK_FINAL",
+    "CityRoadCore/CR_MARKING_*",
+    "CityRoadCore/CR_STATIC_MARKING_MESH",
+    "CityRoadCore/CR_COLLISION_AUDIT",
+    "CityRoadCore/CR_STREET_FURNITURE",
+    "CityRoadCore/IN_LAB_*"
+  ],
+  "allowed_connections": [
+    "CityRoadCore/CR_MAIN_PIPELINE",
+    "CityRoadCore/CR_MAIN_PIPELINE/*",
+    "CityRoadCore/OUT_*"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/CR_MAIN_PIPELINE:*",
+    "CityRoadCore/CR_MAIN_PIPELINE/*:*",
+    "CityRoadCore/OUT_*:*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V19.SubnetLayout",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation",
+    "CityRoad.V38.CoreReadability",
+    "CityRoad.V41.ParkMasterplan",
+    "CityRoad.V43.ParkSurfaceLift",
+    "CityRoad.V44.ParkVisibleAboveSidewalk",
+    "CityRoad.V45.ParkReadability",
+    "CityRoad.V46.ThreeLevelReadability"
+  ]
+}

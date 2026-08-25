@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v42-unity-park-stage-compat-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v42_unity_park_stage_compat_20260824.json",
+    "Assets/PCG/Editor/CityRoad/CityRoadSafeRebuild.cs",
+    "Assets/PCG/Scripts/Tests/Editor/CityRoad/CityRoadParkTests.cs",
+    "Assets/PCG/Generated/Road/CityRoad/**",
+    "Assets/PCG/Scenes/PCG_City.unity"
+  ],
+  "allowed_nodes": [],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "authoritative_live_scene": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation",
+    "CityRoad.V41.ParkMasterplan"
+  ]
+}

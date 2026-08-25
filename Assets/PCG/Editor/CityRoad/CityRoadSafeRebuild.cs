@@ -22,10 +22,13 @@ namespace PCG.CityRoad.Editor
         private const string CityRoadAssetPath =
             "Assets/PCG/HDA/City/CityRoad.hda";
         private const int ExpectedAssetConnectorCount = 0;
-        private const int ExpectedParameterInputCount = 2;
+        private const int ExpectedParameterInputCount = 1;
         private const int MinimumPreReloadParameterInputCount = 1;
+        // Migration compatibility: a loaded pre-V50 scene can still carry the
+        // removed unity_park_areas parameter input until RequestReload applies
+        // the decoupled definition. Post-reload validation remains exactly 1.
+        private const int MaximumPreReloadParameterInputCount = 2;
         internal const string RoadNetworkParameterName = "unity_road_network";
-        internal const string ParkAreasParameterName = "unity_park_areas";
         private const string RoadNetworkSourceParameterName =
             "road_network_source";
         private const int ExternalRoadNetworkSource = 0;
@@ -42,77 +45,12 @@ namespace PCG.CityRoad.Editor
                 "Assets/PCG/Materials/M_PCG_CityRoad_Curb.mat"),
             new KeyValuePair<string, string>(
                 "marking_unity_material",
-                "Assets/PCG/Materials/M_PCG_CityRoad_Marking.mat"),
-            new KeyValuePair<string, string>(
-                "park_ground_unity_material",
-                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Grass.mat"),
-            new KeyValuePair<string, string>(
-                "park_path_unity_material",
-                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Path.mat"),
-            new KeyValuePair<string, string>(
-                "park_water_unity_material",
-                "Assets/PCG/Materials/CityPark/M_PCG_CityPark_Water.mat")
+                "Assets/PCG/Materials/M_PCG_CityRoad_Marking.mat")
         };
         private static readonly string[] s_InputReaderNodeNames =
         {
-            "IN_ROAD_NETWORK",
-            "IN_UNITY_PARK_AREAS"
+            "IN_ROAD_NETWORK"
         };
-        // HEU uploads parameter-input geometry after the HDA's first cook.
-        // Cook the dependent park stages explicitly so their cached empty
-        // result cannot survive a Safe Rebuild.
-        private static readonly string[] s_PostInputCookNodeNames =
-        {
-            "PARK_ENABLE_INPUT_SWITCH",
-            "PARK_CONVERT_HAPI_CURVE_V32",
-            "PARK_REBUILD_HAPI_TOPOLOGY_V29",
-            // V41 contract pulls every modular park branch (surface zones,
-            // connected paths, woodland layers and exclusion) after HEU has
-            // uploaded the Unity spline parameter input.
-            "PARK_CONTRACT_V41"
-        };
-        private static readonly string[] s_ParkBoolParameters =
-        {
-            "enable_city_park",
-            "enable_park_water",
-            "enable_park_paths",
-            "enable_park_trees"
-        };
-        private static readonly string[] s_ParkIntParameters =
-        {
-            "park_seed",
-            "park_lake_count",
-            "park_path_branch_count"
-        };
-        private static readonly string[] s_ParkFloatParameters =
-        {
-            "park_boundary_inset",
-            "park_lake_area_ratio",
-            "park_path_width",
-            "park_path_jitter",
-            "park_tree_density_per_hectare",
-            "park_tree_min_spacing",
-            "park_tree_clearance"
-        };
-        private static readonly string[] s_ParkStringParameters =
-        {
-            "park_ground_unity_material",
-            "park_path_unity_material",
-            "park_water_unity_material"
-        };
-
-        private sealed class ParkParameterSnapshot
-        {
-            internal bool IsPresent;
-            internal readonly Dictionary<string, bool> Bools =
-                new Dictionary<string, bool>(StringComparer.Ordinal);
-            internal readonly Dictionary<string, int> Ints =
-                new Dictionary<string, int>(StringComparer.Ordinal);
-            internal readonly Dictionary<string, float> Floats =
-                new Dictionary<string, float>(StringComparer.Ordinal);
-            internal readonly Dictionary<string, string> Strings =
-                new Dictionary<string, string>(StringComparer.Ordinal);
-        }
 
         private static bool s_RebuildQueued;
         private static readonly Type[] s_UploadInputNodesParameterTypes =
@@ -224,10 +162,6 @@ namespace PCG.CityRoad.Editor
             if (!ValidateInputContract(root, asset, inputBindings))
                 return false;
 
-            ParkParameterSnapshot parkParameters;
-            if (!CaptureParkParameters(root, asset, out parkParameters))
-                return false;
-
             bool roadMarkingsEnabled;
             bool crosswalksEnabled;
             if (!CaptureGenerationToggles(
@@ -260,8 +194,6 @@ namespace PCG.CityRoad.Editor
             // RequestReload can refresh the component reference, so fetch it
             // again before forcing a cook/input upload.
             asset = root.HoudiniAsset;
-            if (asset == null || !NormalizeEmptyNewParkInput(root, asset))
-                return false;
             if (asset == null || !RestoreInputBindings(root, asset, inputBindings))
                 return false;
 
@@ -270,9 +202,6 @@ namespace PCG.CityRoad.Editor
                     asset,
                     roadMarkingsEnabled,
                     crosswalksEnabled))
-                return false;
-
-            if (!RestoreParkParameters(root, asset, parkParameters))
                 return false;
 
             if (!ApplyRoadNetworkSourceContract(root, asset))
@@ -318,22 +247,13 @@ namespace PCG.CityRoad.Editor
                 && roadBindings[0] != null
                 ? roadBindings[0].name
                 : "<missing>";
-            GameObject[] parkBindings;
-            inputBindings.TryGetValue(ParkAreasParameterName, out parkBindings);
-            string parkInputName = parkBindings != null
-                && parkBindings.Length > 0
-                && parkBindings[0] != null
-                ? parkBindings[0].name
-                : "<empty>";
                 Debug.LogFormat(
                     root,
                     "CityRoad Safe Rebuild: {0} reloaded and cooked successfully; "
-                    + "named Spline inputs were restored: {1}={2}, {3}={4}.",
+                    + "named Spline input was restored: {1}={2}.",
                     root.name,
                     RoadNetworkParameterName,
-                    inputZeroName,
-                    ParkAreasParameterName,
-                    parkInputName);
+                    inputZeroName);
                 return true;
             }
             finally
@@ -595,113 +515,6 @@ namespace PCG.CityRoad.Editor
             return true;
         }
 
-        private static bool CaptureParkParameters(
-            HEU_HoudiniAssetRoot root,
-            HEU_HoudiniAsset asset,
-            out ParkParameterSnapshot snapshot)
-        {
-            snapshot = new ParkParameterSnapshot();
-            if (asset == null || asset.Parameters == null)
-                return false;
-
-            // Existing scenes legitimately have no park parameters before the
-            // HDA definition is reloaded for the first time. In that case the
-            // new definition defaults are preserved.
-            if (asset.Parameters.GetParameter("enable_city_park") == null)
-                return true;
-
-            snapshot.IsPresent = true;
-            foreach (string name in s_ParkBoolParameters)
-            {
-                bool value;
-                if (!asset.Parameters.GetBoolParameterValue(name, out value))
-                    return LogParkCaptureFailure(root, name);
-                snapshot.Bools.Add(name, value);
-            }
-            foreach (string name in s_ParkIntParameters)
-            {
-                int value;
-                if (!asset.Parameters.GetIntParameterValue(name, out value))
-                    return LogParkCaptureFailure(root, name);
-                snapshot.Ints.Add(name, value);
-            }
-            foreach (string name in s_ParkFloatParameters)
-            {
-                float value;
-                if (!asset.Parameters.GetFloatParameterValue(name, out value))
-                    return LogParkCaptureFailure(root, name);
-                snapshot.Floats.Add(name, value);
-            }
-            foreach (string name in s_ParkStringParameters)
-            {
-                string value;
-                if (!asset.Parameters.GetStringParameterValue(name, out value))
-                    return LogParkCaptureFailure(root, name);
-                snapshot.Strings.Add(name, value);
-            }
-            return true;
-        }
-
-        private static bool LogParkCaptureFailure(
-            HEU_HoudiniAssetRoot root,
-            string parameterName)
-        {
-            Debug.LogErrorFormat(
-                root,
-                "CityRoad Safe Rebuild: failed to capture park parameter {0}.",
-                parameterName);
-            return false;
-        }
-
-        private static bool RestoreParkParameters(
-            HEU_HoudiniAssetRoot root,
-            HEU_HoudiniAsset asset,
-            ParkParameterSnapshot snapshot)
-        {
-            if (snapshot == null || !snapshot.IsPresent)
-                return true;
-            if (asset == null || asset.Parameters == null)
-                return false;
-
-            foreach (KeyValuePair<string, bool> item in snapshot.Bools)
-            {
-                if (!asset.Parameters.SetBoolParameterValue(
-                        item.Key, item.Value, bRecookAsset: false))
-                    return LogParkRestoreFailure(root, item.Key);
-            }
-            foreach (KeyValuePair<string, int> item in snapshot.Ints)
-            {
-                if (!asset.Parameters.SetIntParameterValue(
-                        item.Key, item.Value, bRecookAsset: false))
-                    return LogParkRestoreFailure(root, item.Key);
-            }
-            foreach (KeyValuePair<string, float> item in snapshot.Floats)
-            {
-                if (!asset.Parameters.SetFloatParameterValue(
-                        item.Key, item.Value, bRecookAsset: false))
-                    return LogParkRestoreFailure(root, item.Key);
-            }
-            foreach (KeyValuePair<string, string> item in snapshot.Strings)
-            {
-                if (!asset.Parameters.SetStringParameterValues(
-                        item.Key, new[] { item.Value }, bRecookAsset: false))
-                    return LogParkRestoreFailure(root, item.Key);
-            }
-            EditorUtility.SetDirty(asset.Parameters);
-            return true;
-        }
-
-        private static bool LogParkRestoreFailure(
-            HEU_HoudiniAssetRoot root,
-            string parameterName)
-        {
-            Debug.LogErrorFormat(
-                root,
-                "CityRoad Safe Rebuild: failed to restore park parameter {0}.",
-                parameterName);
-            return false;
-        }
-
         private static Dictionary<string, GameObject[]> CaptureInputBindings(
             HEU_HoudiniAsset asset)
         {
@@ -744,7 +557,7 @@ namespace PCG.CityRoad.Editor
             if (asset == null
                 || asset.InputNodes == null
                 || asset.InputNodes.Count < MinimumPreReloadParameterInputCount
-                || asset.InputNodes.Count > ExpectedParameterInputCount
+                || asset.InputNodes.Count > MaximumPreReloadParameterInputCount
                 || inputBindings.Count != asset.InputNodes.Count)
             {
                 Debug.LogErrorFormat(
@@ -754,7 +567,7 @@ namespace PCG.CityRoad.Editor
                     + "without changing bindings.",
                     root.name,
                     MinimumPreReloadParameterInputCount,
-                    ExpectedParameterInputCount,
+                    MaximumPreReloadParameterInputCount,
                     asset != null && asset.InputNodes != null
                         ? asset.InputNodes.Count
                         : 0);
@@ -808,22 +621,6 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
-            HEU_InputNode parkInput = FindParameterInput(asset, ParkAreasParameterName);
-            if (parkInput != null
-                && (parkInput.NodeType != HEU_InputNodeTypeWrapper.PARAMETER
-                    || (parkInput.ObjectType != HEU_InputObjectTypeWrapper.SPLINE
-                        && !(parkInput.ObjectType == HEU_InputObjectTypeWrapper.UNITY_MESH
-                            && parkInput.NumInputEntries() == 0))))
-            {
-                Debug.LogErrorFormat(
-                    root,
-                    "CityRoad Safe Rebuild: optional input {0} must be SPLINE, "
-                    + "or an empty newly-created UNITY_MESH input; found {1}.",
-                    ParkAreasParameterName,
-                    parkInput.ObjectType);
-                return false;
-            }
-
             return true;
         }
 
@@ -846,7 +643,6 @@ namespace PCG.CityRoad.Editor
             }
 
             HEU_InputNode roadNetworkInput = asset.InputNodes[0];
-            HEU_InputNode parkAreasInput = asset.InputNodes[1];
             if (roadNetworkInput == null
                 || roadNetworkInput.NodeType
                     != HEU_InputNodeTypeWrapper.PARAMETER
@@ -864,22 +660,6 @@ namespace PCG.CityRoad.Editor
                     RoadNetworkParameterName);
                 return false;
             }
-            if (parkAreasInput == null
-                || parkAreasInput.NodeType != HEU_InputNodeTypeWrapper.PARAMETER
-                || parkAreasInput.ObjectType != HEU_InputObjectTypeWrapper.SPLINE
-                || !string.Equals(
-                    parkAreasInput.ParamName,
-                    ParkAreasParameterName,
-                    StringComparison.Ordinal))
-            {
-                Debug.LogErrorFormat(
-                    root,
-                    "CityRoad Safe Rebuild: input 1 must be the PARAMETER/SPLINE "
-                    + "input {0} after reload.",
-                    ParkAreasParameterName);
-                return false;
-            }
-
             foreach (HEU_InputNode inputNode in asset.InputNodes)
             {
                 if (inputNode == null)
@@ -931,30 +711,6 @@ namespace PCG.CityRoad.Editor
             }
 
             return true;
-        }
-
-        private static bool NormalizeEmptyNewParkInput(
-            HEU_HoudiniAssetRoot root,
-            HEU_HoudiniAsset asset)
-        {
-            HEU_InputNode input = FindParameterInput(asset, ParkAreasParameterName);
-            if (input == null)
-            {
-                Debug.LogErrorFormat(
-                    root,
-                    "CityRoad Safe Rebuild: required new parameter input {0} is missing.",
-                    ParkAreasParameterName);
-                return false;
-            }
-            if (input.ObjectType == HEU_InputObjectTypeWrapper.UNITY_MESH
-                && input.NumInputEntries() == 0)
-            {
-                input.ChangeInputType(
-                    HEU_InputObjectTypeWrapper.SPLINE,
-                    bRecookAsset: false);
-                EditorUtility.SetDirty(input);
-            }
-            return input.ObjectType == HEU_InputObjectTypeWrapper.SPLINE;
         }
 
         private static HEU_InputNode FindParameterInput(
@@ -1028,8 +784,6 @@ namespace PCG.CityRoad.Editor
                             inputNode.ParamName,
                             RoadNetworkParameterName,
                             StringComparison.Ordinal);
-                    bool hasEntries = inputNode != null
-                        && inputNode.NumInputEntries() > 0;
                     int connectedMergeId = -1;
                     bool hasConnection = inputNode != null
                         && session.GetParamNodeValue(
@@ -1037,12 +791,6 @@ namespace PCG.CityRoad.Editor
                             inputNode.ParamName,
                             out connectedMergeId)
                         && connectedMergeId >= 0;
-                    if (!hasConnection && !requiredInput && !hasEntries)
-                    {
-                        // Empty park input is valid and the HDA switch avoids
-                        // cooking its object-merge branch entirely.
-                        continue;
-                    }
                     if (!hasConnection)
                     {
                         Debug.LogErrorFormat(
@@ -1115,25 +863,6 @@ namespace PCG.CityRoad.Editor
                     }
                 }
 
-                foreach (string nodeName in s_PostInputCookNodeNames)
-                {
-                    int nodeId;
-                    if (!readerNodeIds.TryGetValue(nodeName, out nodeId)
-                        || !HEU_HAPIUtility.CookNodeInHoudini(
-                            session,
-                            nodeId,
-                            false,
-                            root.name))
-                    {
-                        Debug.LogErrorFormat(
-                            root,
-                            "CityRoad Safe Rebuild: failed to refresh post-input "
-                            + "park stage {0}.",
-                            nodeName);
-                        return false;
-                    }
-                }
-
                 return true;
             }
             catch (TargetInvocationException exception)
@@ -1170,7 +899,6 @@ namespace PCG.CityRoad.Editor
             var wanted = new HashSet<string>(
                 s_InputReaderNodeNames,
                 StringComparer.Ordinal);
-            wanted.UnionWith(s_PostInputCookNodeNames);
             foreach (int nodeId in childNodeIds)
             {
                 string nodeName =
@@ -1348,14 +1076,10 @@ namespace PCG.CityRoad.Editor
                 if (input != null
                     && input.NodeType == HEU_InputNodeTypeWrapper.PARAMETER
                     && input.ObjectType == HEU_InputObjectTypeWrapper.SPLINE
-                    && (string.Equals(
-                            input.ParamName,
-                            CityRoadSafeRebuild.RoadNetworkParameterName,
-                            StringComparison.Ordinal)
-                        || string.Equals(
-                            input.ParamName,
-                            CityRoadSafeRebuild.ParkAreasParameterName,
-                            StringComparison.Ordinal)))
+                    && string.Equals(
+                        input.ParamName,
+                        CityRoadSafeRebuild.RoadNetworkParameterName,
+                        StringComparison.Ordinal))
                 {
                     yield return input;
                 }

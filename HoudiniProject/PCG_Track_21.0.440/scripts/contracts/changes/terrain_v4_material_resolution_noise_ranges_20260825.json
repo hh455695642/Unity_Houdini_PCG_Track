@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "task": "terrain-v4-material-resolution-noise-ranges-20260825",
+  "module": "Terrain",
+  "allowed_files": [
+    "Assets/PCG/HDA/Terrain.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_Terrain.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/terrain_v4_material_resolution_noise_ranges_20260825.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_terrain_material_resolution_ranges_v4_20260825.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_terrain_shape_params.py"
+  ],
+  "allowed_nodes": [
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:gridsamples",
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:sizex",
+    "TerrainCore/10_TERRAIN_SOURCE/HF_DOMAIN:sizey"
+  ],
+  "allowed_public_parameters": [
+    "terrain_overview_tab/padding",
+    "terrain_overview_tab/tile_resolution",
+    "terrain_overview_tab_1/seed",
+    "terrain_overview_tab_1/mountain_height_scale",
+    "terrain_overview_tab_1/terrain_macro_folder2/macro_amp",
+    "terrain_overview_tab_1/terrain_macro_folder2/macro_size",
+    "terrain_overview_tab_1/terrain_mid_folder2/mid_amp",
+    "terrain_overview_tab_1/terrain_mid_folder2/mid_size",
+    "terrain_overview_tab_1/terrain_detail_folder2/detail_amp",
+    "terrain_overview_tab_1/terrain_detail_folder2/detail_size",
+    "terrain_overview_tab_1/terrain_ridge_folder2/ridge_strength",
+    "terrain_overview_tab_1/terrain_ridge_folder2/ridge_amp",
+    "terrain_overview_tab_1/terrain_ridge_folder2/ridge_size"
+  ],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "Terrain.All"
+  ]
+}

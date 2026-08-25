@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v49-remove-dead-collision-shell-branches-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "authoritative_live_scene": true,
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_dead_branch_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v49_remove_dead_collision_shell_branches_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_remove_dead_collision_shell_branches_v49_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore",
+    "CityRoadCore/CR_MAIN_PIPELINE",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT/*",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/SUBNET_OUT_ROAD_UNION_CLEAR_ORIENT_HELPER_0",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_UNION_BOUNDARY_WALLS",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_WALL_METADATA",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_MERGE_VISIBLE_SHELL"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT/*",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_UNION_BOUNDARY_WALLS",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_WALL_METADATA",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_MERGE_VISIBLE_SHELL"
+  ],
+  "allowed_connections": [
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_COLLISION_AUDIT/*",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_UNION_BOUNDARY_WALLS",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_WALL_METADATA",
+    "CityRoadCore/CR_MAIN_PIPELINE/CR_UNION_FINALIZE/ROAD_MERGE_VISIBLE_SHELL"
+  ],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V19.SubnetLayout",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation",
+    "CityRoad.V38.CoreReadability",
+    "CityRoad.V41.ParkMasterplan",
+    "CityRoad.V43.ParkSurfaceLift",
+    "CityRoad.V44.ParkVisibleAboveSidewalk",
+    "CityRoad.V45.ParkReadability",
+    "CityRoad.V46.ThreeLevelReadability",
+    "CityRoad.V47.AnnotationClarity",
+    "CityRoad.V48.DeadNodeCleanup",
+    "CityRoad.V49.RemoveDeadCollisionAndShellBranches"
+  ]
+}

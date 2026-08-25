@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v48-dead-node-cleanup-20260824",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "authoritative_live_scene": true,
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_dead_node_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v48_dead_node_cleanup_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_dead_node_cleanup_v48_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore",
+    "CityRoadCore/CR_MAIN_PIPELINE",
+    "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_SIDEWALK_CANDIDATE"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_MAIN_PIPELINE/IN_LAB_SIDEWALK_CANDIDATE"
+  ],
+  "allowed_connections": [],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V19.SubnetLayout",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation",
+    "CityRoad.V38.CoreReadability",
+    "CityRoad.V41.ParkMasterplan",
+    "CityRoad.V43.ParkSurfaceLift",
+    "CityRoad.V44.ParkVisibleAboveSidewalk",
+    "CityRoad.V45.ParkReadability",
+    "CityRoad.V46.ThreeLevelReadability",
+    "CityRoad.V47.AnnotationClarity",
+    "CityRoad.V48.DeadNodeCleanup"
+  ]
+}

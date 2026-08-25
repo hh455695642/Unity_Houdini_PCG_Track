@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v38-core-readability-20260822",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "authoritative_live_scene": true,
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v38_core_readability_20260822.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_core_readability_v38_20260822.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_contract.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_cityroad_short_curve_markings_v24.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/pcg_regression_gate.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tests/test_pcg_regression_gate.py"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CR_*",
+    "CityRoadCore/CR_STATIC_MARKING_MESH/*",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD/*",
+    "CityRoadCore/CR_STREET_FURNITURE/*",
+    "CityRoadCore/OUT_*"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CR_STATIC_MARKING_MESH/CITYROAD_BUILD_STATIC_MARKING_MESH",
+    "CityRoadCore/CR_STATIC_MARKING_MESH/CITYROAD_VALIDATE_STATIC_MARKING_JUNCTION_CLIP_V24",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD/CITYROAD_REPLACE_CORNER_WITH_QUAD_STRIPS_V11"
+  ],
+  "allowed_removed_nodes": [
+    "CityRoadCore/CR_STATIC_MARKING_MESH/BUILD_STATIC_MARKING_MESH",
+    "CityRoadCore/CR_STATIC_MARKING_MESH/VALIDATE_STATIC_MARKING_JUNCTION_CLIP_V24",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD/REPLACE_CORNER_WITH_QUAD_STRIPS_V11"
+  ],
+  "allowed_connections": [
+    "CityRoadCore/CR_STATIC_MARKING_MESH",
+    "CityRoadCore/CR_STATIC_MARKING_MESH/*",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD/*",
+    "CityRoadCore/CR_STREET_FURNITURE",
+    "CityRoadCore/CR_STREET_FURNITURE/*",
+    "CityRoadCore/CR_MARKING_*",
+    "CityRoadCore/CR_COLLISION_AUDIT",
+    "CityRoadCore/CR_SIDEWALK_OUTPUT",
+    "CityRoadCore/OUT_ROAD_CENTERLINE_GRAPH"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/CR_*:label*",
+    "CityRoadCore/CR_STATIC_MARKING_MESH/*:*",
+    "CityRoadCore/CR_ROAD_CORNER_REBUILD/*:*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V19.SubnetLayout",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation",
+    "CityRoad.V38.CoreReadability"
+  ]
+}

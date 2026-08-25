@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "task": "cityroad-v32-city-park-hapi-convert-20260816",
+  "module": "CityRoad",
+  "asset_path": "/obj/CityRoad_DEV",
+  "allowed_files": [
+    "Assets/PCG/HDA/City/CityRoad.hda",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_CityRoad.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_cityroad_city_park_v32_hapi_convert.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/cityroad_subnet_layout_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/cityroad_v32_city_park_hapi_convert_20260816.json",
+    "Assets/PCG/Editor/CityRoad/CityRoadSafeRebuild.cs"
+  ],
+  "allowed_nodes": [
+    "CityRoadCore/CR_CITY_PARK/PARK_ENABLE_INPUT_SWITCH",
+    "CityRoadCore/CR_CITY_PARK/PARK_CONVERT_HAPI_CURVE_V32",
+    "CityRoadCore/CR_CITY_PARK/PARK_REBUILD_HAPI_TOPOLOGY_V29"
+  ],
+  "allowed_added_nodes": [
+    "CityRoadCore/CR_CITY_PARK/PARK_CONVERT_HAPI_CURVE_V32"
+  ],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [
+    "CityRoadCore/CR_CITY_PARK/PARK_CONVERT_HAPI_CURVE_V32",
+    "CityRoadCore/CR_CITY_PARK/PARK_REBUILD_HAPI_TOPOLOGY_V29"
+  ],
+  "allowed_parameters": [
+    "CityRoadCore/CR_CITY_PARK/PARK_CONVERT_HAPI_CURVE_V32:*"
+  ],
+  "allowed_public_parameters": [],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "CityRoad.Interface.Public",
+    "CityRoad.Network.Outputs",
+    "CityRoad.V20.CityPark",
+    "CityRoad.V24.PostCommitMarkingValidation"
+  ]
+}

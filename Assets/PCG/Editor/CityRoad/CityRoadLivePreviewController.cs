@@ -165,10 +165,9 @@ namespace PCG.CityRoad.Editor
                 renderer.enabled
                 && renderer.gameObject.activeInHierarchy
                 && (CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
-                    || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
-                    || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
-                    || CityRoadBakeWorkflow.IsUnderAnyParkVisibleOutput(renderer.transform)
-                    || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform)));
+                     || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
+                     || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
+                     || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform)));
             return sourceVisible || !hasActiveBake;
         }
 
@@ -424,29 +423,22 @@ namespace PCG.CityRoad.Editor
                 return false;
 
             Transform transform = renderer.transform;
-            bool parkVisibleOutput =
-                CityRoadBakeWorkflow.IsUnderAnyParkVisibleOutput(transform);
             bool streetFurniture =
                 CityRoadBakeWorkflow.IsStreetFurnitureOutput(transform);
             bool visibleRole =
                 CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_SURFACE")
                 || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_SIDEWALK_CURB")
                 || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_MARKINGS")
-                || parkVisibleOutput
                 || streetFurniture;
             bool collisionRole =
-                CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_COLLISION")
-                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_PARK_COLLISION")
-                || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_PARK_EXCLUSION");
+                CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_COLLISION");
 
             // HEU road outputs include a backing renderer and topology-piece
             // renderers that reference the same Mesh, so roads still require a
-            // presentation-piece marker. Park outputs are emitted as their
-            // direct presentation geometry and must not depend on a CityPark_
-            // name that is absent from Ground/Paths/Water output hierarchies.
+            // presentation-piece marker.
             bool roadPresentationPiece = HasTopologyPieceName(transform);
             return visibleRole
-                && (roadPresentationPiece || streetFurniture || parkVisibleOutput)
+                && (roadPresentationPiece || streetFurniture)
                 && !collisionRole;
         }
 

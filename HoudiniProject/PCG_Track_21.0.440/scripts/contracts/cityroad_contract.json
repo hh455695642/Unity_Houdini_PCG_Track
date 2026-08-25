@@ -2,8 +2,8 @@
   "schema_version": 1,
   "asset_type": "pcgbike::CityRoad::1.0",
   "max_inputs": 0,
-  "public_interface_sha256": "408bd642613842797ff4cb417242ebc838edcacd371b396ecc8126fe33a8c5c8",
-  "live_public_interface_sha256": "408bd642613842797ff4cb417242ebc838edcacd371b396ecc8126fe33a8c5c8",
+  "public_interface_sha256": "326b3b34356b6b17b6fd3b98d7ef9d77adecebeb236c7a8f25daee04c1b8f660",
+  "live_public_interface_sha256": "326b3b34356b6b17b6fd3b98d7ef9d77adecebeb236c7a8f25daee04c1b8f660",
   "required_nodes": {
     "CITYROAD_SHADING_VERTEX_CONTRACT": "attribwrangle",
     "CITYROAD_ROAD_MATERIAL_ASSIGN": "attribwrangle",
@@ -53,61 +53,21 @@
     "CITYROAD_STREET_FURNITURE_V1": "null",
     "OUT_STREET_LAMPS": "output",
     "OUT_STREET_TREES": "output",
-    "OUT_STREET_TREE_PITS": "output"
-    ,"GRAPH_SEGMENT_INDEX_V2": "attribwrangle"
-    ,"CITYROAD_GRAPH_V1_V2": "switch"
-    ,"JUNCTION_APPROACH_INDEX_V2": "attribwrangle"
-    ,"CORRIDOR_INTERVAL_INDEX_V2": "attribwrangle"
-    ,"CITYROAD_SIDEWALK_AUDIT_V1_V2": "switch"
-    ,"JUNCTION_CENTER_INDEX_V2": "attribwrangle"
-    ,"ROAD_BUILD_SURFACE_V2": "attribwrangle"
-    ,"ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2": "attribwrangle"
-    ,"CITYROAD_ROAD_SURFACE_V1_V2": "switch"
-    ,"CITYROAD_ADAPTIVE_SURFACE_V1_V2": "switch"
-    ,"CITYROAD_CROSSWALK_ENABLE_V2": "switch"
-    ,"CITYROAD_MARKING_ENABLE_V2": "switch"
-    ,"CITYROAD_STREET_LAMP_ENABLE_V2": "switch"
-    ,"CITYROAD_STREET_TREE_ENABLE_V2": "switch"
-    ,"CR_CITY_PARK": "subnet"
-    ,"EMPTY_PARK_AREAS": "null"
-    ,"IN_UNITY_PARK_AREAS": "object_merge"
-    ,"PARK_ENABLE_INPUT_SWITCH": "switch"
-    ,"PARK_CONVERT_HAPI_CURVE_V32": "convert"
-    ,"PARK_REBUILD_HAPI_TOPOLOGY_V29": "attribwrangle"
-    ,"PARK_BOUNDARY_ANALYZE_V41": "attribwrangle"
-    ,"PARK_SURFACE_ZONES_V41": "attribwrangle"
-    ,"PARK_CONNECTED_PATHS_V41": "attribwrangle"
-    ,"PARK_WOODLAND_LAYERS_V41": "attribwrangle"
-    ,"PARK_EXCLUSION_V41": "attribwrangle"
-    ,"PARK_ASSEMBLE_V41": "merge"
-    ,"PARK_CONTRACT_V41": "attribwrangle"
-    ,"PARK_GROUND_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_PATHS_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_WATER_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_COLLISION_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_TREES_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_EXCLUSION_OUTPUT_CONTRACT": "attribwrangle"
-    ,"PARK_KEEP_GROUND": "blast"
-    ,"PARK_KEEP_PATHS": "blast"
-    ,"PARK_KEEP_WATER": "blast"
-    ,"PARK_KEEP_COLLISION": "blast"
-    ,"PARK_KEEP_TREES": "blast"
-    ,"PARK_KEEP_EXCLUSION": "blast"
-    ,"PARK_GROUND_NORMALS": "normal"
-    ,"PARK_PATHS_NORMALS": "normal"
-    ,"PARK_WATER_NORMALS": "normal"
-    ,"SUBNET_OUT_PARK_GROUND_0": "output"
-    ,"SUBNET_OUT_PARK_PATHS_1": "output"
-    ,"SUBNET_OUT_PARK_WATER_2": "output"
-    ,"SUBNET_OUT_PARK_COLLISION_3": "output"
-    ,"SUBNET_OUT_PARK_TREES_4": "output"
-    ,"SUBNET_OUT_PARK_EXCLUSION_5": "output"
-    ,"OUT_PARK_GROUND": "output"
-    ,"OUT_PARK_PATHS": "output"
-    ,"OUT_PARK_WATER": "output"
-    ,"OUT_PARK_COLLISION": "output"
-    ,"OUT_PARK_TREES": "output"
-    ,"OUT_PARK_EXCLUSION": "output"
+    "OUT_STREET_TREE_PITS": "output",
+    "GRAPH_SEGMENT_INDEX_V2": "attribwrangle",
+    "CITYROAD_GRAPH_V1_V2": "switch",
+    "JUNCTION_APPROACH_INDEX_V2": "attribwrangle",
+    "CORRIDOR_INTERVAL_INDEX_V2": "attribwrangle",
+    "CITYROAD_SIDEWALK_AUDIT_V1_V2": "switch",
+    "JUNCTION_CENTER_INDEX_V2": "attribwrangle",
+    "ROAD_BUILD_SURFACE_V2": "attribwrangle",
+    "ROAD_BUILD_ADAPTIVE_CORNER_SURFACE_V2": "attribwrangle",
+    "CITYROAD_ROAD_SURFACE_V1_V2": "switch",
+    "CITYROAD_ADAPTIVE_SURFACE_V1_V2": "switch",
+    "CITYROAD_CROSSWALK_ENABLE_V2": "switch",
+    "CITYROAD_MARKING_ENABLE_V2": "switch",
+    "CITYROAD_STREET_LAMP_ENABLE_V2": "switch",
+    "CITYROAD_STREET_TREE_ENABLE_V2": "switch"
   },
   "required_connections": {
     "CITYROAD_BUILD_JUNCTION_PARTITION_CUTS_V7": {
@@ -287,94 +247,6 @@
     "CITYROAD_STREET_TREE_ENABLE_V2": {
       "0": "CITYROAD_STREET_TREE_EMPTY_V2",
       "1": "CITYROAD_STREET_BUILD_TREES_V1"
-    },
-    "PARK_ENABLE_INPUT_SWITCH": {
-      "0": "EMPTY_PARK_AREAS",
-      "1": "IN_UNITY_PARK_AREAS"
-    },
-    "PARK_BOUNDARY_ANALYZE_V41": {
-      "0": "PARK_REBUILD_HAPI_TOPOLOGY_V29"
-    },
-    "PARK_SURFACE_ZONES_V41": {
-      "0": "PARK_BOUNDARY_ANALYZE_V41"
-    },
-    "PARK_CONNECTED_PATHS_V41": {
-      "0": "PARK_BOUNDARY_ANALYZE_V41"
-    },
-    "PARK_WOODLAND_LAYERS_V41": {
-      "0": "PARK_BOUNDARY_ANALYZE_V41"
-    },
-    "PARK_EXCLUSION_V41": {
-      "0": "PARK_BOUNDARY_ANALYZE_V41"
-    },
-    "PARK_ASSEMBLE_V41": {
-      "0": "PARK_SURFACE_ZONES_V41",
-      "1": "PARK_CONNECTED_PATHS_V41",
-      "2": "PARK_WOODLAND_LAYERS_V41",
-      "3": "PARK_EXCLUSION_V41"
-    },
-    "PARK_CONTRACT_V41": {
-      "0": "PARK_ASSEMBLE_V41"
-    },
-    "PARK_KEEP_GROUND": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_KEEP_PATHS": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_KEEP_WATER": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_KEEP_COLLISION": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_KEEP_TREES": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_KEEP_EXCLUSION": {
-      "0": "PARK_CONTRACT_V41"
-    },
-    "PARK_REBUILD_HAPI_TOPOLOGY_V29": {
-      "0": "PARK_CONVERT_HAPI_CURVE_V32"
-    },
-    "PARK_CONVERT_HAPI_CURVE_V32": {
-      "0": "PARK_ENABLE_INPUT_SWITCH"
-    },
-    "PARK_GROUND_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_GROUND"
-    },
-    "PARK_PATHS_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_PATHS"
-    },
-    "PARK_WATER_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_WATER"
-    },
-    "PARK_COLLISION_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_COLLISION"
-    },
-    "PARK_TREES_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_TREES"
-    },
-    "PARK_EXCLUSION_OUTPUT_CONTRACT": {
-      "0": "PARK_KEEP_EXCLUSION"
-    },
-    "OUT_PARK_GROUND": {
-      "0": "PARK_GROUND_NORMALS"
-    },
-    "OUT_PARK_PATHS": {
-      "0": "PARK_PATHS_NORMALS"
-    },
-    "OUT_PARK_WATER": {
-      "0": "PARK_WATER_NORMALS"
-    },
-    "OUT_PARK_COLLISION": {
-      "0": "PARK_COLLISION_OUTPUT_CONTRACT"
-    },
-    "OUT_PARK_TREES": {
-      "0": "PARK_TREES_OUTPUT_CONTRACT"
-    },
-    "OUT_PARK_EXCLUSION": {
-      "0": "PARK_EXCLUSION_OUTPUT_CONTRACT"
     }
   },
   "snippet_markers": {
@@ -469,61 +341,6 @@
     ],
     "CITYROAD_TOPOLOGY_CLASSIFY_ROAD": [
       "CITYROAD_COOK_OPTIMIZATION_V18"
-    ],
-    "PARK_BOUNDARY_ANALYZE_V41": [
-      "CITYROAD_V41_PARK_BOUNDARY_ANALYZE"
-    ],
-    "PARK_SURFACE_ZONES_V41": [
-      "CITYROAD_V41_PARK_SURFACE_ZONES",
-      "CITYROAD_V43_PARK_SURFACE_LIFT",
-      "CITYROAD_V44_PARK_VISIBLE_ABOVE_SIDEWALK"
-    ],
-    "PARK_CONNECTED_PATHS_V41": [
-      "CITYROAD_V41_PARK_CONNECTED_PATHS",
-      "CITYROAD_V43_PARK_SURFACE_LIFT",
-      "CITYROAD_V44_PARK_VISIBLE_ABOVE_SIDEWALK"
-    ],
-    "PARK_WOODLAND_LAYERS_V41": [
-      "CITYROAD_V41_PARK_WOODLAND_LAYERS",
-      "CITYROAD_V43_PARK_SURFACE_LIFT",
-      "CITYROAD_V44_PARK_VISIBLE_ABOVE_SIDEWALK"
-    ],
-    "PARK_EXCLUSION_V41": [
-      "CITYROAD_V41_PARK_EXCLUSION",
-      "CITYROAD_V43_PARK_SURFACE_LIFT",
-      "CITYROAD_V44_PARK_VISIBLE_ABOVE_SIDEWALK"
-    ],
-    "PARK_CONTRACT_V41": [
-      "CITYROAD_V41_PARK_MASTERPLAN_CONTRACT",
-      "CITYROAD_V43_PARK_SURFACE_LIFT",
-      "CITYROAD_V44_PARK_VISIBLE_ABOVE_SIDEWALK"
-    ],
-    "PARK_REBUILD_HAPI_TOPOLOGY_V29": [
-      "CITYROAD_V29_CITY_PARK_HAPI_TOPOLOGY_REBUILD"
-    ],
-    "PARK_GROUND_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_OUTPUT_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_OUTPUT_CONTRACT"
-    ],
-    "PARK_PATHS_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_OUTPUT_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_OUTPUT_CONTRACT"
-    ],
-    "PARK_WATER_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_OUTPUT_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_OUTPUT_CONTRACT"
-    ],
-    "PARK_COLLISION_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_OUTPUT_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_OUTPUT_CONTRACT"
-    ],
-    "PARK_TREES_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_TREE_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_TREE_CONTRACT"
-    ],
-    "PARK_EXCLUSION_OUTPUT_CONTRACT": [
-      "CITYROAD_V20_CITY_PARK_OUTPUT_CONTRACT",
-      "CITYROAD_V41_PARK_MASTERPLAN_OUTPUT_CONTRACT"
     ]
   },
   "output_nodes": [
@@ -533,13 +350,7 @@
     "OUT_ROAD_MARKINGS",
     "OUT_STREET_LAMPS",
     "OUT_STREET_TREES",
-    "OUT_STREET_TREE_PITS",
-    "OUT_PARK_GROUND",
-    "OUT_PARK_PATHS",
-    "OUT_PARK_WATER",
-    "OUT_PARK_COLLISION",
-    "OUT_PARK_TREES",
-    "OUT_PARK_EXCLUSION"
+    "OUT_STREET_TREE_PITS"
   ],
   "contract_ids": [
     "CityRoad.Interface.Public",
@@ -570,15 +381,12 @@
     "CityRoad.V19.SubnetLayout",
     "CityRoad.V22.ZeroCornerTolerance",
     "CityRoad.V24.PostCommitMarkingValidation",
-    "CityRoad.V20.CityPark",
     "CityRoad.V38.CoreReadability",
-    "CityRoad.V41.ParkMasterplan",
-    "CityRoad.V43.ParkSurfaceLift",
-    "CityRoad.V44.ParkVisibleAboveSidewalk",
-    "CityRoad.V45.ParkReadability",
     "CityRoad.V46.ThreeLevelReadability",
     "CityRoad.V47.AnnotationClarity",
     "CityRoad.V48.DeadNodeCleanup",
-    "CityRoad.V49.RemoveDeadCollisionAndShellBranches"
+    "CityRoad.V49.RemoveDeadCollisionAndShellBranches",
+    "CityRoad.V50.CityParkDecoupled",
+    "CityRoad.V51.RestoreGeneration"
   ]
 }

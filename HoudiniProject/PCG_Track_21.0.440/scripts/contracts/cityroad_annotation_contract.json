@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "contract_id": "CityRoad.V47.AnnotationClarity",
+  "top_level": {
+    "note_name": "NOTE_V47_OVERVIEW",
+    "note_count": 1,
+    "max_note_width": 34.0,
+    "max_note_height": 6.0,
+    "required_text": ["CityRoadCore", "CR_MAIN_PIPELINE", "CityPark HDA", "01→05"],
+    "visible_comment_nodes": [],
+    "network_box_labels": {
+      "OVERVIEW_LAB_PORTALS": "LAB DEBUG PORTALS｜教程与算法验证"
+    }
+  },
+  "main_pipeline": {
+    "note_name": "NOTE_V47_READING_GUIDE",
+    "note_count": 1,
+    "max_note_width": 40.0,
+    "max_note_height": 6.0,
+    "required_text": ["01→02→03→04→05", "CR_*", "Comment", "IN_LAB_*", "Network Dot"],
+    "visible_comment_nodes": [],
+    "network_box_labels": {
+      "AREA_STAGE_01_CONTEXT": "01 CONTEXT｜输入与索引",
+      "AREA_STAGE_02_SURFACE_CONSTRAINTS": "02 SURFACE｜路面与约束",
+      "AREA_STAGE_03_FINALIZE": "03 FINALIZE｜最终化与并行内容",
+      "AREA_STAGE_04_CONTENT_OUTPUTS": "04 OUTPUTS｜标线与人行道",
+      "AREA_MAIN_PUBLISH": "05 PUBLISH｜9 路正式接口"
+    }
+  }
+}

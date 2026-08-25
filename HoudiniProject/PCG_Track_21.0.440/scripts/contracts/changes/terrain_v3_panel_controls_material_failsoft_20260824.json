@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "task": "terrain-v3-panel-controls-material-failsoft-20260824",
+  "module": "Terrain",
+  "allowed_files": [
+    "Assets/PCG/HDA/Terrain.hda",
+    "Assets/PCG/Scenes/PCG.unity",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_Terrain.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/terrain_v3_panel_controls_material_failsoft_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_terrain_panel_controls_v3_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_terrain_shape_params.py"
+  ],
+  "allowed_nodes": [
+    "TerrainCore/40_CONFORM_EARTHWORK/ADAPTIVE_enable_switch",
+    "TerrainCore/40_CONFORM_EARTHWORK/ADAPT_validate_error",
+    "TerrainCore/60_MATERIAL_LAYERS/MATERIAL_generate_raw_weights",
+    "TerrainCore/60_MATERIAL_LAYERS/MATERIAL_enable_switch"
+  ],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [
+    "TerrainCore/40_CONFORM_EARTHWORK/ADAPTIVE_enable_switch:input",
+    "TerrainCore/40_CONFORM_EARTHWORK/ADAPT_validate_error:enable1",
+    "TerrainCore/60_MATERIAL_LAYERS/MATERIAL_generate_raw_weights:snippet",
+    "TerrainCore/60_MATERIAL_LAYERS/MATERIAL_enable_switch:input"
+  ],
+  "allowed_public_parameters": ["*"],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "Terrain.All"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "contract_id": "CityRoad.V48.DeadNodeCleanup",
+  "absent_nodes": [
+    "CR_MAIN_PIPELINE/IN_LAB_SIDEWALK_CANDIDATE"
+  ],
+  "protected_unwired_debug_portals": [
+    {
+      "name": "OUT_LAB_GRAPH",
+      "dependent": "/obj/CityRoad_DEV/CityRoadTutorialLab/IN_CORE_GRAPH"
+    },
+    {
+      "name": "OUT_LAB_ROAD_CENTERLINES",
+      "dependent": "/obj/CityRoad_DEV/CityRoadTutorialLab/IN_CORE_ROAD_CENTERLINES"
+    },
+    {
+      "name": "OUT_LAB_ROAD_OUTLINES",
+      "dependent": "/obj/CityRoad_DEV/CityRoadTutorialLab/IN_CORE_ROAD_OUTLINES"
+    }
+  ],
+  "protected_lab_returns": [
+    "CR_MAIN_PIPELINE/IN_LAB_ROAD_TOP_UNITY_READY",
+    "CR_MAIN_PIPELINE/IN_LAB_TRUE_OUTER_BOUNDARY"
+  ]
+}

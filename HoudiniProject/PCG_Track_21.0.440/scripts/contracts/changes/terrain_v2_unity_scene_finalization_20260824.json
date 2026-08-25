@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "task": "terrain-v2-unity-scene-finalization-20260824",
+  "module": "Terrain",
+  "allowed_files": [
+    "Assets/PCG/HDA/Terrain.hda",
+    "Assets/PCG/Scenes/PCG.unity",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_Terrain.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/terrain_v1_domain_noise_controls_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/terrain_v2_unity_scene_finalization_20260824.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_terrain_domain_noise_controls_v1_20260824.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_terrain_shape_params.py"
+  ],
+  "allowed_nodes": [],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "Terrain.All"
+  ]
+}
