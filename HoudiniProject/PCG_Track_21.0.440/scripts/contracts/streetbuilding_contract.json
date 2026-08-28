@@ -127,6 +127,9 @@
     "StreetBuilding.V4.FrontFacadeOnly",
     "StreetBuilding.V4.OriginalAssetPaths",
     "StreetBuilding.V4.SingleEntrance",
-    "StreetBuilding.V4.EdgeColumns"
+    "StreetBuilding.V4.EdgeColumns",
+    "StreetBuilding.ArtAuthoring.CatalogSchema",
+    "StreetBuilding.ArtAuthoring.DeterministicPayload",
+    "StreetBuilding.ArtAuthoring.MegaKitCompatibility"
   ]
 }

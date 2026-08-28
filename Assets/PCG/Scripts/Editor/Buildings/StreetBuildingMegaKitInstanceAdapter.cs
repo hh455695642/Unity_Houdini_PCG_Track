@@ -110,7 +110,18 @@ namespace PCGBike.Editor.Buildings
                     catalog = ScriptableObject.CreateInstance<StreetBuildingInstanceModuleCatalog>();
                     AssetDatabase.CreateAsset(catalog, CatalogPath);
                 }
-                catalog.SetEditorData(StyleId, SourceModels, sourceHashBefore, recipes);
+                catalog.SetEditorData(
+                    StreetBuildingInstanceModuleCatalog.CurrentSchemaVersion,
+                    "North American Brick Mixed Use 01 (MegaKit Validation)",
+                    StreetBuildingAssetSourceKind.ExternalReadOnly,
+                    StyleId,
+                    SourceModels,
+                    sourceHashBefore,
+                    new[] { SourceModels },
+                    2.0f,
+                    4.0f,
+                    3.0f,
+                    recipes);
                 EditorUtility.SetDirty(catalog);
                 AssetDatabase.SaveAssets();
                 ValidateCatalog(catalog);
@@ -142,54 +153,13 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingInstanceModuleCatalog catalog =
                     AssetDatabase.LoadAssetAtPath<StreetBuildingInstanceModuleCatalog>(CatalogPath);
                 ValidateCatalog(catalog);
-                string payload = CompilePayload(catalog);
-                HEU_HoudiniAsset asset = root.HoudiniAsset;
-
-                // Stage the old definition in its valid internal mode before reload;
-                // this prevents the removed geometry-library input from producing noise.
-                RequireParameter(asset.Parameters.SetIntParameterValue("module_source", 0), "module_source");
-                SetSerializedStringParameter(asset.Parameters, "wall_unity_material",
-                    "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Wall.mat");
-                SetSerializedStringParameter(asset.Parameters, "trim_unity_material",
-                    "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Trim.mat");
-                SetSerializedStringParameter(asset.Parameters, "window_unity_material",
-                    "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Window.mat");
-                if (!asset.RequestCook(false, false, true, true)
-                    || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
-                    throw new InvalidOperationException("Could not stage Internal Proxy before REV4.1 reload.");
-
-                HEU_SessionBase session = asset.GetAssetSession(false);
-                if (session != null && session.IsSessionValid())
-                    session.DisconnectNodeInput(asset.AssetID, 2, false);
-                CleanLegacySceneObjects(root.transform);
-                if (!asset.RequestReload(false) || !asset.IsAssetValid())
-                    throw new InvalidOperationException("Houdini Engine could not reload StreetBuilding REV4.1.");
-
-                HEU_Parameters parameters = asset.Parameters;
-                RequireParameter(parameters.SetIntParameterValue("site_source", 0), "site_source");
-                RequireParameter(parameters.SetIntParameterValue("module_source", 1), "module_source");
-                SetStringParameter(parameters, "unity_instance_catalog", payload);
-                SetStringParameter(parameters, "style_id", StyleId);
-                RequireParameter(parameters.SetFloatParameterValue("internal_width", 12.0f), "internal_width");
-                RequireParameter(parameters.SetFloatParameterValue("target_bay_width", 2.0f), "target_bay_width");
-                RequireParameter(parameters.SetFloatParameterValue("ground_floor_height", 4.0f), "ground_floor_height");
-                RequireParameter(parameters.SetFloatParameterValue("typical_floor_height", 3.0f), "typical_floor_height");
-                RequireParameter(parameters.SetIntParameterValue("floor_count", 4), "floor_count");
-                RequireParameter(parameters.SetIntParameterValue("ground_use", 3), "ground_use");
-                RequireParameter(parameters.SetIntParameterValue("facade_rhythm", 4), "facade_rhythm");
-                RequireParameter(parameters.SetIntParameterValue("rear_mode", 0), "rear_mode");
-                RequireParameter(parameters.SetIntParameterValue("side_mode", 1), "side_mode");
-                RequireParameter(parameters.SetBoolParameterValue("corner_building", false), "corner_building");
-                RequireParameter(parameters.SetBoolParameterValue("generate_roof", false), "generate_roof");
-                RequireParameter(parameters.SetBoolParameterValue("generate_lods", false), "generate_lods");
-                RequireParameter(parameters.SetBoolParameterValue("generate_attachments", false), "generate_attachments");
-                RequireParameter(parameters.SetBoolParameterValue("generate_architectural_trim", false),
-                    "generate_architectural_trim");
-
-                if (!asset.RequestCook(false, false, true, true)
-                    || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
-                    throw new InvalidOperationException("StreetBuilding REV4.1 direct-instance cook failed: "
-                                                        + asset.LastCookResult);
+                StreetBuildingAuthoring authoring = root.GetComponent<StreetBuildingAuthoring>();
+                if (authoring == null)
+                    authoring = Undo.AddComponent<StreetBuildingAuthoring>(root.gameObject);
+                authoring.SetEditorCatalog(catalog);
+                EditorUtility.SetDirty(authoring);
+                StreetBuildingCompiledCatalog compiled =
+                    StreetBuildingModuleCatalogApplier.Apply(root, authoring);
 
                 DirectInstanceAudit audit = AuditGeneratedInstances(root);
                 root.gameObject.tag = "EditorOnly";
@@ -197,7 +167,8 @@ namespace PCGBike.Editor.Buildings
                 report = $"Cooked original MegaKit instances: {audit.InstanceRoots} point roots, "
                          + $"{audit.MeshFilters} MeshFilters, {audit.Renderers} Renderers, "
                          + $"{audit.UniqueMeshes} original FBX meshes, {audit.UniqueMaterials} original materials. "
-                         + "LOD/collider/side/rear/roof outputs are disabled.";
+                         + $"Payload SHA-256 {compiled.Sha256}. "
+                         + "Only Catalog parameters changed; structural HDA parameters were preserved.";
                 return true;
             }
             catch (Exception exception)
@@ -209,26 +180,7 @@ namespace PCGBike.Editor.Buildings
 
         public static string CompilePayload(StreetBuildingInstanceModuleCatalog catalog)
         {
-            ValidateCatalog(catalog);
-            var rows = new List<string>();
-            foreach (StreetBuildingInstanceModuleRecipe recipe in catalog.Modules)
-            {
-                for (int index = 0; index < recipe.Parts.Count; index++)
-                {
-                    StreetBuildingInstancePart part = recipe.Parts[index];
-                    string path = AssetDatabase.GetAssetPath(part.SourceFbx);
-                    Vector3 p = part.LocalPosition;
-                    Vector3 r = part.LocalEulerRotation;
-                    rows.Add(string.Join("|",
-                        recipe.ModuleRole,
-                        recipe.VariantId,
-                        index.ToString(CultureInfo.InvariantCulture),
-                        path,
-                        F(p.x), F(p.y), F(p.z),
-                        F(r.x), F(r.y), F(r.z)));
-                }
-            }
-            return string.Join("\n", rows);
+            return StreetBuildingModuleCatalogCompiler.Compile(catalog).Payload;
         }
 
         public static bool CleanLegacyGeneratedAssets(out string report)
@@ -312,33 +264,15 @@ namespace PCGBike.Editor.Buildings
 
         private static void ValidateCatalog(StreetBuildingInstanceModuleCatalog catalog)
         {
-            if (catalog == null)
-                throw new InvalidOperationException("Direct instance catalog is missing: " + CatalogPath);
-            if (catalog.StyleId != StyleId || catalog.SourceRoot != SourceModels)
-                throw new InvalidOperationException("Catalog style/source contract mismatch.");
+            StreetBuildingCatalogValidationReport validation =
+                StreetBuildingModuleCatalogValidator.Validate(catalog);
+            if (!validation.IsValid)
+                throw new InvalidOperationException(validation.ToString());
+            if (catalog.StyleId != StyleId || catalog.SourceRoot != SourceModels
+                || catalog.SourceKind != StreetBuildingAssetSourceKind.ExternalReadOnly)
+                throw new InvalidOperationException("MegaKit validation Catalog identity mismatch.");
             if (catalog.Modules.Count != 8 || catalog.Modules.Sum(item => item.Parts.Count) != 9)
                 throw new InvalidOperationException("REV4.1 catalog must contain 8 recipes / 9 source parts.");
-            var keys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (StreetBuildingInstanceModuleRecipe recipe in catalog.Modules)
-            {
-                if (!keys.Add(recipe.ModuleRole + "|" + recipe.VariantId))
-                    throw new InvalidOperationException("Duplicate catalog key: " + recipe.ModuleRole + "|" + recipe.VariantId);
-                if (Mathf.Abs(recipe.CellWidth - 2.0f) > .001f || recipe.Parts.Count == 0)
-                    throw new InvalidOperationException("Invalid native 2m recipe: " + recipe.VariantId);
-                foreach (StreetBuildingInstancePart part in recipe.Parts)
-                {
-                    string path = AssetDatabase.GetAssetPath(part.SourceFbx);
-                    if (!path.StartsWith(SourceModels + "/", StringComparison.Ordinal)
-                        || !path.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidOperationException("Catalog part is not an original Unity FBX: " + path);
-                    if (part.SourceFbx.transform.localPosition != Vector3.zero
-                        || part.SourceFbx.transform.localEulerAngles != Vector3.zero
-                        || part.SourceFbx.transform.localScale != Vector3.one)
-                        throw new InvalidOperationException("Imported FBX root has a non-unit transform: " + path);
-                    if (part.LocalEulerRotation != Vector3.zero)
-                        throw new InvalidOperationException("REV4.1 first pass only accepts identity part rotations: " + path);
-                }
-            }
         }
 
         private static DirectInstanceAudit AuditGeneratedInstances(HEU_HoudiniAssetRoot root)

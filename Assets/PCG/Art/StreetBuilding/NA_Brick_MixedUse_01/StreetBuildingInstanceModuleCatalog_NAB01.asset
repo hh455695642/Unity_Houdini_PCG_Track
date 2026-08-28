@@ -12,9 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e8393ae5e35b8c45a7478881b7786ae, type: 3}
   m_Name: StreetBuildingInstanceModuleCatalog_NAB01
   m_EditorClassIdentifier: 
+  _schemaVersion: 1
+  _displayName: North American Brick Mixed Use 01 (MegaKit Validation)
+  _sourceKind: 1
   _styleId: na_brick_mixeduse_01
   _sourceRoot: Assets/PCG/Art/Downtown City MegaKit[Standard]/Exports/FBX (Unity)
   _sourceSha256: 3cb8b581b271288307dfb39335153af41598459221f986b678f420b7dc071e9d
+  _allowedAssetRoots:
+  - Assets/PCG/Art/Downtown City MegaKit[Standard]/Exports/FBX (Unity)
+  _cellWidth: 2
+  _groundFloorHeight: 4
+  _typicalFloorHeight: 3
   _modules:
   - _moduleRole: 3
     _variantId: entrance_metal
@@ -22,11 +30,11 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: da0ee79a3cc006e469cc12630f43d6df,
+    - _sourceAsset: {fileID: 919132149155446097, guid: da0ee79a3cc006e469cc12630f43d6df,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
-    - _sourceFbx: {fileID: 919132149155446097, guid: a7ccaf30425753f4bb088c43e181c464,
+    - _sourceAsset: {fileID: 919132149155446097, guid: a7ccaf30425753f4bb088c43e181c464,
         type: 3}
       _localPosition: {x: -0.5, y: 0, z: -0.12}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -36,7 +44,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: eb3d0c0c039e0c345ae69c6e16b67312,
+    - _sourceAsset: {fileID: 919132149155446097, guid: eb3d0c0c039e0c345ae69c6e16b67312,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -46,7 +54,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: 6725c4258f26f78448606fb81c406878,
+    - _sourceAsset: {fileID: 919132149155446097, guid: 6725c4258f26f78448606fb81c406878,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -56,7 +64,7 @@ MonoBehaviour:
     _cellHeight: 1
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: 5067267da526c64439d756ef95859968,
+    - _sourceAsset: {fileID: 919132149155446097, guid: 5067267da526c64439d756ef95859968,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -66,7 +74,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: f90c12bf9e141de41b3ddf3ec700e1c5,
+    - _sourceAsset: {fileID: 919132149155446097, guid: f90c12bf9e141de41b3ddf3ec700e1c5,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -76,7 +84,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: ed1ce166e7a0f4449bb908aa52bfb2e6,
+    - _sourceAsset: {fileID: 919132149155446097, guid: ed1ce166e7a0f4449bb908aa52bfb2e6,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -86,7 +94,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: f0cadb64322831a4caf7bca975a10dcc,
+    - _sourceAsset: {fileID: 919132149155446097, guid: f0cadb64322831a4caf7bca975a10dcc,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -96,7 +104,7 @@ MonoBehaviour:
     _cellHeight: 3
     _weight: 1
     _parts:
-    - _sourceFbx: {fileID: 919132149155446097, guid: 9c46601fdd199a14d879b55c5d4c4588,
+    - _sourceAsset: {fileID: 919132149155446097, guid: 9c46601fdd199a14d879b55c5d4c4588,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}

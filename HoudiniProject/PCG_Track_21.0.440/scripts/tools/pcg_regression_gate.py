@@ -854,10 +854,40 @@ def persist_isolated(
     expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
-    for relative in (config["definition"], config["hip"]):
-        if not matches(relative, manifest["allowed_files"]):
+    definition = config["definition"]
+    hip = config["hip"]
+    definition_allowed = matches(definition, manifest["allowed_files"])
+    hip_allowed = matches(hip, manifest["allowed_files"])
+    if definition_allowed != hip_allowed:
+        raise GateFailure(
+            "Isolated persistence must authorize both HDA and HIP, or neither")
+
+    # Unity-only authoring tasks deliberately leave the persisted Houdini files
+    # outside the modification whitelist. Verify their exact Capture hashes and
+    # run the remaining cumulative validators without needlessly re-saving the
+    # binary HIP through the historical builder.
+    if not definition_allowed:
+        states = file_state(project_root, (definition, hip))
+        changed = [
+            relative
+            for relative, state in states.items()
+            if state.get("sha256")
+            != baseline.get("files", {}).get(relative, {}).get("sha256")
+        ]
+        if changed:
             raise GateFailure(
-                f"VerifyFull persistence requires allowed_files to include {relative}")
+                "Unity-only VerifyFull detected unauthorized Houdini file changes: "
+                + ", ".join(changed))
+        return {
+            "status": "PASS",
+            "module": module,
+            "stage": "Persist",
+            "persistence": "not-required",
+            "snapshot": normalize_path(snapshot_path),
+            "files": states,
+            "houdini": {"isolated_process": True, "live_scene_untouched": True},
+        }
+
     builder = resolve_scoped_path(project_root, config["builder"])
     result = subprocess.run(
         [
@@ -890,6 +920,7 @@ def persist_isolated(
         "status": "PASS",
         "module": module,
         "stage": "Persist",
+        "persistence": "completed",
         "snapshot": normalize_path(snapshot_path),
         "files": states,
         "houdini": {"isolated_process": True, "live_scene_untouched": True},

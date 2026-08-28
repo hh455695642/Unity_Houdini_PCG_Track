@@ -21,7 +21,7 @@
   "properties": {
     "schema_version": { "const": 1 },
     "task": { "type": "string", "minLength": 1 },
-    "module": { "enum": ["CityRoad", "Track", "Terrain"] },
+    "module": { "enum": ["CityRoad", "Track", "Terrain", "StreetBuilding"] },
     "asset_path": {
       "type": "string",
       "pattern": "^/obj/",

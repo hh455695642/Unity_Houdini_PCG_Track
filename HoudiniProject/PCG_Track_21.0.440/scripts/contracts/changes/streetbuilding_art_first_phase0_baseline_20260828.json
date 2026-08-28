@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task": "streetbuilding-art-first-phase0-baseline-20260828",
+  "module": "StreetBuilding",
+  "asset_path": "/obj/StreetBuilding_DEV",
+  "allowed_files": [],
+  "allowed_nodes": [],
+  "allowed_added_nodes": [],
+  "allowed_removed_nodes": [],
+  "allowed_connections": [],
+  "allowed_parameters": [],
+  "allowed_public_parameters": [],
+  "allow_output_changes": false,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "StreetBuilding.Interface.Inputs",
+    "StreetBuilding.Interface.PublicParameters",
+    "StreetBuilding.Network.Readable",
+    "StreetBuilding.Output.StableNames",
+    "StreetBuilding.Output.NoBottom",
+    "StreetBuilding.Output.Deterministic",
+    "StreetBuilding.Output.GeometrySanity",
+    "StreetBuilding.Output.NoCookDiagnostics",
+    "StreetBuilding.V4.DirectUnityInstances",
+    "StreetBuilding.V4.FrontFacadeOnly",
+    "StreetBuilding.V4.OriginalAssetPaths",
+    "StreetBuilding.V4.SingleEntrance",
+    "StreetBuilding.V4.EdgeColumns"
+  ]
+}
