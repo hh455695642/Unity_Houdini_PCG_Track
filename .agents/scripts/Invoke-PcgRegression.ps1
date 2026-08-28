@@ -24,7 +24,7 @@ $gateScript = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\
 $cityRoadValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_cityroad_contract.py'
 $trackValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\verify_curve_road_test.py'
 $terrainValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_terrain_shape_params.py'
-$streetBuildingBuilder = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\create_streetbuilding_graybox.py'
+$streetBuildingBuilder = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\patch_streetbuilding_direct_unity_instances_rev4.py'
 $streetBuildingValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_streetbuilding_contract.py'
 
 $moduleConfig = @{
@@ -304,6 +304,12 @@ if (-not (Test-Path -LiteralPath $snapshotPath -PathType Leaf)) {
     throw "Capture snapshot is missing: $snapshotPath"
 }
 
+# StreetBuilding's contract explicitly validates only diagnostics emitted by
+# this operation. LogCollector retains already-resolved import diagnostics, so
+# comparing its unbounded cache to an earlier Capture would misclassify stale
+# messages created during the asset-adaptation phase.
+$verifyStartedAt = [DateTimeOffset]::Now
+
 Invoke-Hython -Arguments @(
     $gateScript, '--module', $Module, '--stage', 'verify-fast',
     '--manifest', $manifestPath, '--project-root', $projectRoot,
@@ -373,7 +379,17 @@ try {
     }
     $unityBaseline = Get-Content -LiteralPath $unityBaselinePath -Raw -Encoding UTF8 | ConvertFrom-Json
     $baselineDiagnostics = @(Get-DiagnosticSignatures -Snapshot $unityBaseline)
-    $currentDiagnostics = @(Get-DiagnosticSignatures -Snapshot $unityCurrent)
+    if ($Module -eq 'StreetBuilding') {
+        $operationDiagnostics = [ordered]@{
+            diagnostics = @($unityCurrent.diagnostics | Where-Object {
+                [DateTimeOffset]::Parse([string]$_.Timestamp) -ge $verifyStartedAt
+            })
+        }
+        $currentDiagnostics = @(Get-DiagnosticSignatures -Snapshot $operationDiagnostics)
+    }
+    else {
+        $currentDiagnostics = @(Get-DiagnosticSignatures -Snapshot $unityCurrent)
+    }
     $newDiagnostics = @($currentDiagnostics | Where-Object { $_ -notin $baselineDiagnostics })
     if ($newDiagnostics.Count -gt 0) {
         throw "Unity produced new Console diagnostics:`n- $($newDiagnostics -join "`n- ")"

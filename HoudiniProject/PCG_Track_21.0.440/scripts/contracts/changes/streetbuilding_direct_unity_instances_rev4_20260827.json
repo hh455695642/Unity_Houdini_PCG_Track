@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "task": "streetbuilding-direct-unity-instances-rev4-20260827",
+  "module": "StreetBuilding",
+  "asset_path": "/obj/StreetBuilding_DEV",
+  "allowed_files": [
+    ".agents/scripts/Invoke-PcgRegression.ps1",
+    "Assets/PCG/HDA/City/StreetBuilding.hda",
+    "Assets/PCG/Scenes/PCG_Building.unity",
+    "Assets/PCG/Scripts/Buildings/StreetBuildingInstanceModuleCatalog.cs",
+    "Assets/PCG/Scripts/Editor/Buildings/StreetBuildingMegaKitInstanceAdapter.cs",
+    "Assets/PCG/Scripts/Editor/Buildings/StreetBuildingMegaKitAdapter.cs",
+    "Assets/PCG/Scripts/Editor/Buildings/StreetBuildingMegaKitNativeAdapter.cs",
+    "Assets/PCG/Scripts/Tests/Editor/Buildings/StreetBuildingMegaKitAdapterTests.cs",
+    "Assets/PCG/Scripts/Tests/Editor/Buildings/StreetBuildingMegaKitNativeAdapterEditModeTests.cs",
+    "Assets/PCG/Scripts/Tests/Editor/Buildings/StreetBuildingMegaKitInstanceAdapterEditModeTests.cs",
+    "Assets/PCG/Art/StreetBuilding/NA_Brick_MixedUse_01",
+    "Assets/PCG/Materials/Buildings/NAB01",
+    "Assets/PCG/Texture/StreetBuilding/NAB01",
+    "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/streetbuilding_contract.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/changes/streetbuilding_direct_unity_instances_rev4_20260827.json",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_direct_unity_instances_rev4.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/pcg_regression_gate.py",
+    "HoudiniProject/PCG_Track_21.0.440/scripts/tools/validate_streetbuilding_contract.py"
+  ],
+  "allowed_nodes": [
+    "StreetBuildingCore/BUILD_LOD0",
+    "StreetBuildingCore/NORMAL_LOD0",
+    "StreetBuildingCore/BUILD_LOD1",
+    "StreetBuildingCore/NORMAL_LOD1",
+    "StreetBuildingCore/BUILD_LOD2",
+    "StreetBuildingCore/NORMAL_LOD2",
+    "StreetBuildingCore/OUT_BUILDING_LOD0",
+    "StreetBuildingCore/OUT_BUILDING_LOD1",
+    "StreetBuildingCore/OUT_BUILDING_LOD2",
+    "StreetBuildingCore/OUT_DETAIL_INSTANCES",
+    "StreetBuildingCore/OUT_BUILDING_COLLISION",
+    "StreetBuildingCore/OUT_BUILDING_METADATA"
+  ],
+  "allowed_added_nodes": [
+    "StreetBuildingCore/DIRECT_UNITY_INSTANCE_FACADE",
+    "StreetBuildingCore/LOD0_MODULE_SOURCE_SWITCH"
+  ],
+  "allowed_removed_nodes": [
+    "StreetBuildingCore/FIX_EXTERNAL_NORMALS_LOD0",
+    "StreetBuildingCore/FIX_EXTERNAL_NORMALS_LOD1",
+    "StreetBuildingCore/FIX_EXTERNAL_NORMALS_LOD2"
+  ],
+  "allowed_connections": [
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/DIRECT_UNITY_INSTANCE_FACADE[0]",
+    "StreetBuildingCore/NORMAL_LOD0->StreetBuildingCore/LOD0_MODULE_SOURCE_SWITCH[0]",
+    "StreetBuildingCore/DIRECT_UNITY_INSTANCE_FACADE->StreetBuildingCore/LOD0_MODULE_SOURCE_SWITCH[1]",
+    "StreetBuildingCore/LOD0_MODULE_SOURCE_SWITCH->StreetBuildingCore/OUT_BUILDING_LOD0[0]",
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/OUT_BUILDING_LOD1[0]",
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/OUT_BUILDING_LOD2[0]",
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/OUT_DETAIL_INSTANCES[0]",
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/OUT_BUILDING_COLLISION[0]",
+    "StreetBuildingCore/EMPTY_GEOMETRY->StreetBuildingCore/OUT_BUILDING_METADATA[0]"
+  ],
+  "allowed_parameters": [
+    "StreetBuildingCore/DIRECT_UNITY_INSTANCE_FACADE:class",
+    "StreetBuildingCore/DIRECT_UNITY_INSTANCE_FACADE:snippet",
+    "StreetBuildingCore/LOD0_MODULE_SOURCE_SWITCH:input"
+  ],
+  "allowed_public_parameters": [
+    "module_source",
+    "unity_instance_catalog"
+  ],
+  "allow_output_changes": true,
+  "allowed_warning_signatures": [],
+  "required_contracts": [
+    "StreetBuilding.Interface.Inputs",
+    "StreetBuilding.Interface.PublicParameters",
+    "StreetBuilding.Output.StableNames",
+    "StreetBuilding.Output.NoBottom",
+    "StreetBuilding.Output.Deterministic",
+    "StreetBuilding.Output.NoCookDiagnostics",
+    "StreetBuilding.V4.DirectUnityInstances",
+    "StreetBuilding.V4.FrontFacadeOnly",
+    "StreetBuilding.V4.OriginalAssetPaths"
+  ]
+}
