@@ -1,4 +1,4 @@
-# StreetBuilding 美术资产制作规范（阶段 3.1 / Catalog V2）
+# StreetBuilding 美术资产制作规范（阶段 5 / Catalog V2）
 
 本规范定义 StreetBuilding 模块化立面资产的长期自建标准。Downtown City MegaKit 仅作为只读验证源，不是项目正式资产模板。
 
@@ -13,7 +13,7 @@
 | 验证细节 Prefab | `Assets/PCG/Art/StreetBuilding/<StyleId>/Prefabs/ValidationDetails/` |
 | Catalog | `Assets/PCG/Art/StreetBuilding/<StyleId>/` |
 | 材质 | `Assets/PCG/Materials/Buildings/<StyleId>/` |
-| 纹理 | `Assets/PCG/Texture/StreetBuilding/<StyleId>/` |
+| 纹理 | `Assets/PCG/Art/StreetBuilding/<StyleId>/Textures/` |
 
 - 模型：`SM_SB_<Style>_<Role>_<Variant>`
 - Prefab：`PF_SB_<Style>_<Role>_<Variant>`
@@ -28,7 +28,7 @@
 - 一个逻辑模块可以由 Prefab 内多个 FBX 子节点组成，例如门框与门扇。
 - Catalog 只保存资产引用、逻辑角色、Variant、尺寸、权重和局部偏移，不复制 Mesh、Material 或 Texture。
 - Prefab 根只允许 `Transform`；可见子节点只允许 `Transform`、`MeshFilter`、`MeshRenderer`。
-- 阶段 3 验证 Prefab 禁止脚本、Collider、LODGroup、Light、Animator 和其他运行时行为。
+- 当前效果验证 Prefab 禁止脚本、Collider、LODGroup、Light、Animator 和其他运行时行为。
 
 ## 3. 坐标、Pivot 与尺寸
 
@@ -117,10 +117,41 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 - 支持 GPU Instancing 的材质应开启 Instancing。
 - 透明材质仅用于玻璃等必要区域，避免大面积透明叠层和过度 Overdraw。
 - 单模块不超过 3 个材质槽；项目自有资产超出时 Authoring Validator 必须阻断。
-- 贴图尺寸、三角形数、透明面积和材质槽在阶段 3 记录为警告，不阻断效果验证。
-- LOD、Collider、合批与运行时 GPU 渲染不属于阶段 3，由后续 Bake/Runtime 阶段处理。
+- 正式贴图尺寸、三角形数和透明面积在当前阶段记录为审计信息，不阻断效果验证。
+- LOD、Collider、合批与运行时 GPU 渲染不属于阶段 5，由后续 Bake/Runtime 阶段处理。
 
-## 7. Authoring 流程
+## 7. 阶段 5 Style Kit 交付基线
+
+阶段 5 的目标不是把某个第三方包“改成可用”，而是验证一套可持续自建的模块语言。项目内
+`urban_brick_mixeduse_01` 与 `urban_stucco_residential_01` 是可替换参考实现，不是最终美术锁定稿。
+
+每个正式 Style Kit 至少满足：
+
+| 项目 | 最低要求 |
+|---|---:|
+| Catalog | 1 个，`SchemaVersion=2`、`SourceKind=ProjectOwned` |
+| 基础/外壳/细节 Role | 覆盖当前 17 个必需 Role |
+| 参考 Recipe | 40 个；新增 Variant 只能追加稳定键 |
+| DesignPreset | Compact / Standard / Corner Tall 各 1 个 |
+| 共享材质 | 5 个：Wall / Accent / Roof / Glass / Metal |
+| 参考贴图 | 5 张 128×128 可平铺程序纹理，仅用于验证色彩、节奏与材质分层 |
+
+参考几何需要主动表现以下视觉层次：首层商业或住宅入口、标准层窗型变化、空白墙节奏、檐口、
+边缘立柱、完整侧背立面、连续女儿墙，以及独立输出的雨棚、招牌、消防梯、墙面设备和屋顶设备。
+同一风格内不能只靠随机颜色制造差异；至少要通过多个稳定 Variant 改变开窗、分格、挑檐、
+阳台/凹槽、后勤门和屋顶轮廓。
+
+参考贴图仅是占位质量基线。正式美术可替换为外部 DCC 导出的 FBX 和正式 PBR 贴图，但 Prefab
+路径、Role + VariantId、Pivot、声明尺寸与 Catalog 结构必须保持稳定，或通过显式版本迁移升级。
+
+提交前运行：
+
+1. `PCG/StreetBuilding/Project Owned/Build Rich Styles + Six Building Showcase`，重建两套参考 Style Kit，重新 Cook 六栋展示建筑并直接保存场景。
+2. `PCG/StreetBuilding/Project Owned/Audit Reference Style Kits`，确认依赖只来自当前 Style、对应材质目录、项目 Authoring 脚本与 URP Package。
+3. 检查 `PCG_Building` 的正面、侧背面与屋顶；六栋建筑应在体量、层数、首层用途、立面节奏和细节密度上可辨识。
+4. 运行 StreetBuilding `VerifyFast` 与 `VerifyFull`，确保 HDA/HIP 累计合同没有变化。
+
+## 8. Authoring 流程
 
 1. 美术按本规范创建 FBX 与 Prefab。
 2. 在 `StreetBuildingInstanceModuleCatalog` 中登记 Style、允许目录和模块槽位。
@@ -130,4 +161,4 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 6. 检查前、后、左、右和鸟瞰视图，确认墙顶不越过 roofY、屋面完整覆盖 footprint、
    女儿墙连续，并能看到不同密度的雨棚、招牌、消防梯、墙面 AC 与落地屋顶设备。
 
-任何校验或 Cook 失败都不得保存场景；Applier 会尝试恢复原参数与原 Payload。程序化地块、CityRoad 相邻遮挡、LOD、Collider 和运行时 Cook 均不属于阶段 3。
+任何校验或 Cook 失败都不得保存场景；Applier 会尝试恢复原参数与原 Payload。程序化地块、CityRoad 相邻遮挡、LOD、Collider 和运行时 Cook 均不属于阶段 5。

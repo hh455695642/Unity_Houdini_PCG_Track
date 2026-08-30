@@ -163,6 +163,12 @@
     "StreetBuilding.V6_1.ParapetContinuity",
     "StreetBuilding.V6_1.RoofDetailGrounding",
     "StreetBuilding.V6_1.RoofDetailSemantics",
-    "StreetBuilding.V6_1.CatalogBounds"
+    "StreetBuilding.V6_1.CatalogBounds",
+    "StreetBuilding.ArtAuthoring.ProjectOwnedStyleCoverage",
+    "StreetBuilding.ArtAuthoring.DesignPresetSchema",
+    "StreetBuilding.ArtAuthoring.PresetDeterminism",
+    "StreetBuilding.ArtAuthoring.NoExternalAssetDependency",
+    "StreetBuilding.ArtAuthoring.DirectSaveRollback",
+    "StreetBuilding.ArtAuthoring.UnityVariationShowcase"
   ]
 }

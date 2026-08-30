@@ -24,7 +24,6 @@ $gateScript = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\
 $cityRoadValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_cityroad_contract.py'
 $trackValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\verify_curve_road_test.py'
 $terrainValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_terrain_shape_params.py'
-$streetBuildingBuilder = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\patch_streetbuilding_modular_details_v6.py'
 $streetBuildingValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_streetbuilding_contract.py'
 
 $moduleConfig = @{
@@ -273,6 +272,31 @@ else {
     & (Join-Path $projectRoot '.agents\scripts\Ensure-HoudiniMcp.ps1') | Out-Host
 }
 
+function Invoke-StreetBuildingContractTests {
+    $response = Invoke-UnityTool -Tool 'reflection-method-call' -InputObject @{
+        filter = @{
+            namespace = 'PCGBike.Tests.Editor.Buildings'
+            typeName = 'StreetBuildingPhase4ContractBridge'
+            methodName = 'Run'
+            inputParameters = @()
+        }
+        knownNamespace = $true
+        typeNameMatchLevel = 6
+        methodNameMatchLevel = 6
+        parametersMatchLevel = 2
+        executeInMainThread = $true
+    }
+    $result = $response.structured.result
+    if (-not $result) {
+        throw 'StreetBuilding EditMode contract bridge returned no result.'
+    }
+    $value = [string]$result.value
+    if (-not $value.StartsWith('PASS|6|')) {
+        throw "StreetBuilding EditMode contract bridge returned an invalid result: $value"
+    }
+    Write-Step 'PASS' 'StreetBuilding EditMode contracts: 6 passed'
+}
+
 if ($Stage -eq 'Capture') {
     $taskSlug = (($manifest.task -replace '[^A-Za-z0-9_-]', '-') -replace '-+', '-').Trim('-')
     if ([string]::IsNullOrWhiteSpace($taskSlug)) { $taskSlug = 'task' }
@@ -320,11 +344,6 @@ Invoke-Hython -Arguments @(
     '--manifest', $manifestPath, '--project-root', $projectRoot,
     '--snapshot', $snapshotPath, '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
 
-if ($Module -eq 'StreetBuilding') {
-    Invoke-Hython -Arguments @(
-        $streetBuildingBuilder, '--project-root', $projectRoot, '--save', 'false')
-}
-
 if ($Stage -eq 'VerifyFast') {
     Write-Step 'PASS' "VerifyFast complete: $snapshotPath"
     exit 0
@@ -337,11 +356,6 @@ try {
             $cityRoadValidator, '--source', 'live', '--host', $HoudiniHost,
             '--port', [string]$HoudiniPort)
     }
-    elseif ($Module -eq 'StreetBuilding') {
-        Invoke-Hython -Arguments @(
-            $streetBuildingBuilder, '--project-root', $projectRoot, '--save', 'false')
-    }
-
     Invoke-Hython -Arguments @(
         $gateScript, '--module', $Module, '--stage', 'persist',
         '--manifest', $manifestPath, '--project-root', $projectRoot,
@@ -373,6 +387,8 @@ try {
     Assert-UnityReady -Snapshot $unityCurrent
     if ($Module -eq 'StreetBuilding') {
         Assert-UnityAssetOnly -Snapshot $unityCurrent
+        Invoke-StreetBuildingContractTests
+        $unityCurrent = Wait-UnityReady
     }
     else {
         Assert-UnityAssetAndSceneReference -Snapshot $unityCurrent

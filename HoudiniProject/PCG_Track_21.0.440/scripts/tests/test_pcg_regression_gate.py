@@ -9,6 +9,7 @@ import unittest
 
 
 TOOLS_DIR = Path(__file__).resolve().parents[1] / "tools"
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SPEC = importlib.util.spec_from_file_location(
     "pcg_regression_gate", TOOLS_DIR / "pcg_regression_gate.py")
 gate = importlib.util.module_from_spec(SPEC)
@@ -86,6 +87,28 @@ def snapshot():
 
 
 class CompareSnapshotsTests(unittest.TestCase):
+    def test_streetbuilding_phase4_contract_ids_are_cumulative(self):
+        contract_path = (PROJECT_ROOT / "HoudiniProject" / "PCG_Track_21.0.440"
+                         / "scripts" / "contracts" / "streetbuilding_contract.json")
+        contract_ids = set(json.loads(contract_path.read_text(encoding="utf-8"))["contract_ids"])
+        required = {
+            "StreetBuilding.ArtAuthoring.ProjectOwnedStyleCoverage",
+            "StreetBuilding.ArtAuthoring.DesignPresetSchema",
+            "StreetBuilding.ArtAuthoring.PresetDeterminism",
+            "StreetBuilding.ArtAuthoring.NoExternalAssetDependency",
+            "StreetBuilding.ArtAuthoring.DirectSaveRollback",
+            "StreetBuilding.ArtAuthoring.UnityVariationShowcase",
+        }
+        self.assertTrue(required.issubset(contract_ids))
+
+    def test_streetbuilding_verifyfull_runs_unity_contract_tests(self):
+        entrypoint = (PROJECT_ROOT / ".agents" / "scripts"
+                      / "Invoke-PcgRegression.ps1").read_text(encoding="utf-8")
+        self.assertIn("Invoke-StreetBuildingContractTests", entrypoint)
+        self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
+        self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
+        self.assertIn("reflection-method-call", entrypoint)
+
     def test_unchanged_snapshot_passes(self):
         before = snapshot()
         self.assertEqual([], gate.compare_snapshots(before, copy.deepcopy(before), manifest()))

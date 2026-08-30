@@ -20,6 +20,13 @@ namespace PCGBike.Editor.Buildings
     /// </summary>
     public static class StreetBuildingDesignPresetApplier
     {
+        // Editor-only seams used by the contract tests to prove that a failed
+        // save never persists the Scene and that the parameter transaction is
+        // rolled back. Production callers always use the defaults.
+        internal static Func<HEU_HoudiniAsset, bool> RequestCook = DefaultRequestCook;
+        internal static Func<UnityEngine.SceneManagement.Scene, bool> SaveScene =
+            EditorSceneManager.SaveScene;
+
         private static readonly string[] IntParameters =
         {
             "module_source", "floor_count", "ground_use", "facade_rhythm",
@@ -91,13 +98,14 @@ namespace PCGBike.Editor.Buildings
             HEU_HoudiniAsset asset = root.HoudiniAsset;
             HEU_Parameters parameters = asset.Parameters;
             ParameterSnapshot snapshot = ParameterSnapshot.Capture(parameters);
+            StreetBuildingInstanceModuleCatalog oldCatalog = authoring.Catalog;
             string oldPayloadSha = authoring.LastAppliedPayloadSha256;
             string oldDesignSha = authoring.LastAppliedDesignSha256;
+            string oldTag = root.gameObject.tag;
             try
             {
                 Write(parameters, preset, authoring.VariationSeed, compiled.Payload);
-                if (!asset.RequestCook(true, false, true, true)
-                    || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
+                if (!RequestCook(asset))
                     throw new InvalidOperationException("DesignPreset cook failed: " + asset.LastCookResult);
 
                 string designSha = ComputeDesignSha(preset, authoring.VariationSeed, compiled.Sha256);
@@ -107,7 +115,7 @@ namespace PCGBike.Editor.Buildings
                 root.gameObject.tag = "EditorOnly";
                 EditorUtility.SetDirty(authoring);
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
-                if (!EditorSceneManager.SaveScene(root.gameObject.scene))
+                if (!SaveScene(root.gameObject.scene))
                     throw new InvalidOperationException("DesignPreset Scene save failed.");
                 return compiled;
             }
@@ -117,11 +125,12 @@ namespace PCGBike.Editor.Buildings
                 try
                 {
                     snapshot.Restore(parameters);
+                    authoring.SetEditorCatalog(oldCatalog);
                     authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
                     authoring.SetEditorAppliedDesignSha256(oldDesignSha);
+                    root.gameObject.tag = oldTag;
                     EditorUtility.SetDirty(authoring);
-                    if (!asset.RequestCook(true, false, true, true)
-                        || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
+                    if (!RequestCook(asset))
                         throw new InvalidOperationException("rollback cook failed: " + asset.LastCookResult);
                 }
                 catch (Exception exception)
@@ -202,6 +211,18 @@ namespace PCGBike.Editor.Buildings
             data._stringValues[0] = value ?? string.Empty;
         }
         private static string F(float value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+        internal static void ResetTestHooks()
+        {
+            RequestCook = DefaultRequestCook;
+            SaveScene = EditorSceneManager.SaveScene;
+        }
+
+        private static bool DefaultRequestCook(HEU_HoudiniAsset asset)
+        {
+            return asset.RequestCook(true, false, true, true)
+                   && asset.LastCookResult == HEU_AssetCookResultWrapper.SUCCESS;
+        }
 
         private sealed class ParameterSnapshot
         {

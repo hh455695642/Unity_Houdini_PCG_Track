@@ -34,6 +34,16 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 3
+    _variantId: entrance_glass
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.45
+    _parts:
+    - _sourceAsset: {fileID: 6370016066608996344, guid: c010bb052cd16c9488c5264ddb9f2f06,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 0
     _variantId: shop_metal
     _cellWidth: 2
@@ -51,6 +61,16 @@ MonoBehaviour:
     _weight: 0.65
     _parts:
     - _sourceAsset: {fileID: 2115228737020647468, guid: 8f661e2caea06014bad8c7f99fcc588d,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 0
+    _variantId: shop_arcade
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.55
+    _parts:
+    - _sourceAsset: {fileID: 3270426431276137335, guid: 43a4aa264d31a5549bfc4c6c4901548c,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -104,6 +124,26 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 4
+    _variantId: balcony
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.45
+    _parts:
+    - _sourceAsset: {fileID: 240821458922664702, guid: 24a3c1d1d54526745b89c58de3e5967b,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 4
+    _variantId: narrow_pair
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.55
+    _parts:
+    - _sourceAsset: {fileID: 6261661837821192227, guid: 8300d055b0ff1214badb2879b9cebf7d,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 5
     _variantId: plain_a
     _cellWidth: 2
@@ -121,6 +161,16 @@ MonoBehaviour:
     _weight: 0.55
     _parts:
     - _sourceAsset: {fileID: 4357193879988287293, guid: b258ed2ada21f9f44abaae96892c81d1,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 5
+    _variantId: panel
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.4
+    _parts:
+    - _sourceAsset: {fileID: 5624033334315930480, guid: 580d4050748ea314d84f9215371da86c,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -154,6 +204,16 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 10
+    _variantId: upper_c
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.35
+    _parts:
+    - _sourceAsset: {fileID: 2827071343053625889, guid: 0332a9e817ab55b4e8845f11e494b9f9,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 11
     _variantId: ground
     _cellWidth: 2
@@ -184,6 +244,16 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 11
+    _variantId: service
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.3
+    _parts:
+    - _sourceAsset: {fileID: 3660868897903578133, guid: ce4523aa29f23b245a257ec3e7796eb4,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 12
     _variantId: trim_ground
     _cellWidth: 2
@@ -201,6 +271,16 @@ MonoBehaviour:
     _weight: 1
     _parts:
     - _sourceAsset: {fileID: 2709321309675510432, guid: ba1c8755581c5b94f92d7458546e1fea,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 12
+    _variantId: accent_capital
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.35
+    _parts:
+    - _sourceAsset: {fileID: 7405104700063533056, guid: 9825bd062680677499cd5f26e1c8e331,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -244,6 +324,16 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 14
+    _variantId: slatted
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 0.55
+    _parts:
+    - _sourceAsset: {fileID: 4957996002605579858, guid: 3a6c70d81b0f9734eb5a3e752b384ff9,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 15
     _variantId: board
     _cellWidth: 2
@@ -251,6 +341,16 @@ MonoBehaviour:
     _weight: 1
     _parts:
     - _sourceAsset: {fileID: 3031455084633738140, guid: bd1b5ec771bd16449803fcd446d54524,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 15
+    _variantId: vertical
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 0.45
+    _parts:
+    - _sourceAsset: {fileID: 4145244087006076071, guid: b1053b3866d4c9c4e9db969cdd4c1a62,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -271,6 +371,16 @@ MonoBehaviour:
     _weight: 1
     _parts:
     - _sourceAsset: {fileID: 5465854591051727273, guid: 51e5cada7b13872429dc6969533b5b23,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 17
+    _variantId: twin
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 0.4
+    _parts:
+    - _sourceAsset: {fileID: 2190523828212337901, guid: 18fa3f9de14880342986432d1f862c92,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -301,6 +411,26 @@ MonoBehaviour:
     _weight: 0.5
     _parts:
     - _sourceAsset: {fileID: 6529265573914487604, guid: 4eeed5ad6de93a3418466cb0f799d437,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 18
+    _variantId: skylight
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 0.55
+    _parts:
+    - _sourceAsset: {fileID: 2785582668208528588, guid: 8b11aef3c74136245bc6c46c5ea4a6d1,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 18
+    _variantId: chimney
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 0.4
+    _parts:
+    - _sourceAsset: {fileID: 1463990430169651461, guid: d7aa0b93e3ae31744bd8d0e3244a6757,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
