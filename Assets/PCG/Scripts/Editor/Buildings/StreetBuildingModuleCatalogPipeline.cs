@@ -79,7 +79,8 @@ namespace PCGBike.Editor.Buildings
                 return report;
             }
 
-            if (catalog.SchemaVersion != StreetBuildingInstanceModuleCatalog.CurrentSchemaVersion)
+            if (catalog.SchemaVersion != 1
+                && catalog.SchemaVersion != StreetBuildingInstanceModuleCatalog.CurrentSchemaVersion)
                 report.Error($"SchemaVersion {catalog.SchemaVersion} is unsupported.");
             if (string.IsNullOrWhiteSpace(catalog.DisplayName))
                 report.Error("DisplayName is empty.");
@@ -121,6 +122,9 @@ namespace PCGBike.Editor.Buildings
                     report.Error("Duplicate module key: " + key);
                 if (recipe.CellWidth <= 0 || recipe.CellHeight <= 0 || recipe.Weight <= 0)
                     report.Error(key + " has non-positive dimensions or weight.");
+                if (recipe.CellWidth > 4.001f
+                    || Mathf.Abs(recipe.CellWidth / 2.0f - Mathf.Round(recipe.CellWidth / 2.0f)) > 0.001f)
+                    report.Error(key + " width must be a 2m or 4m grid span in phase 2.");
                 if (recipe.Parts == null || recipe.Parts.Count == 0)
                 {
                     report.Error(key + " has no source parts.");
@@ -128,7 +132,8 @@ namespace PCGBike.Editor.Buildings
                 }
 
                 for (int partIndex = 0; partIndex < recipe.Parts.Count; partIndex++)
-                    ValidatePart(report, key, partIndex, recipe.Parts[partIndex], roots);
+                    ValidatePart(report, catalog.SourceKind, recipe, key, partIndex,
+                        recipe.Parts[partIndex], roots);
             }
 
             if (requireRev41Compatibility)
@@ -145,6 +150,8 @@ namespace PCGBike.Editor.Buildings
 
         private static void ValidatePart(
             StreetBuildingCatalogValidationReport report,
+            StreetBuildingAssetSourceKind sourceKind,
+            StreetBuildingInstanceModuleRecipe recipe,
             string key,
             int partIndex,
             StreetBuildingInstancePart part,
@@ -201,13 +208,118 @@ namespace PCGBike.Editor.Buildings
             if (renderers.Any(renderer => renderer.sharedMaterials.Any(material => material == null)))
                 report.Error(label + " contains a missing material reference.");
 
-            int materialSlots = renderers.Sum(renderer => renderer.sharedMaterials.Length);
+            int materialSlots = renderers.SelectMany(renderer => renderer.sharedMaterials)
+                .Where(material => material != null).Distinct().Count();
             if (materialSlots > 3)
-                report.Warning(label + $" uses {materialSlots} material slots; mobile target recommends <= 3.");
+            {
+                if (sourceKind == StreetBuildingAssetSourceKind.ProjectOwned)
+                    report.Error(label + $" uses {materialSlots} material slots; project-owned modules allow <= 3.");
+                else
+                    report.Warning(label + $" uses {materialSlots} material slots; mobile target recommends <= 3.");
+            }
             if (renderers.SelectMany(renderer => renderer.sharedMaterials)
                 .Where(material => material != null)
                 .Any(material => material.shader == null))
                 report.Error(label + " contains a material without a shader.");
+            if (sourceKind == StreetBuildingAssetSourceKind.ProjectOwned)
+            {
+                foreach (Material material in renderers.SelectMany(item => item.sharedMaterials)
+                             .Where(item => item != null).Distinct())
+                {
+                    if (material.shader == null
+                        || material.shader.name != "Universal Render Pipeline/Lit")
+                        report.Error(label + " project-owned material must use URP/Lit.");
+                    if (!material.enableInstancing)
+                        report.Error(label + " project-owned material must enable GPU Instancing.");
+                }
+            }
+
+            ValidateAuthoringBounds(report, recipe, part, label, filters);
+        }
+
+        private static void ValidateAuthoringBounds(
+            StreetBuildingCatalogValidationReport report,
+            StreetBuildingInstanceModuleRecipe recipe,
+            StreetBuildingInstancePart part,
+            string label,
+            IReadOnlyList<MeshFilter> filters)
+        {
+            if (!TryCalculateRootLocalBounds(part.SourceAsset.transform, filters, out Bounds bounds))
+            {
+                report.Error(label + " has no calculable mesh bounds.");
+                return;
+            }
+
+            Vector3 min = bounds.min + part.LocalPosition;
+            Vector3 max = bounds.max + part.LocalPosition;
+            const float tolerance = .011f;
+            bool bottomAnchored = recipe.ModuleRole == StreetBuildingModuleRole.GroundShop
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.GroundShopDoor
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.GroundWall
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.Entrance
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.MiddleWindow
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.MiddleBlank
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.SideWall
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.RearWall
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.FacadeColumn
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.Parapet
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.ParapetCorner
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.ACUnit
+                                  || recipe.ModuleRole == StreetBuildingModuleRole.RoofProp;
+            if (bottomAnchored && Mathf.Abs(min.y) > tolerance)
+                report.Error(label + $" pivot/bounds must touch its placement plane (minY={min.y:R}).");
+
+            if (recipe.ModuleRole == StreetBuildingModuleRole.RoofSurface)
+            {
+                if (min.y > tolerance || Mathf.Abs(max.y) > tolerance)
+                    report.Error(label + $" roof surface top must lie on local Y=0 and extend downward (min/max={min.y:R}/{max.y:R}).");
+            }
+            else if (bottomAnchored && max.y > recipe.CellHeight + tolerance)
+            {
+                report.Error(label + $" exceeds declared CellHeight {recipe.CellHeight:R}m (maxY={max.y:R}).");
+            }
+
+            if (recipe.ModuleRole != StreetBuildingModuleRole.ParapetCorner
+                && bounds.size.x > recipe.CellWidth + tolerance)
+                report.Error(label + $" exceeds declared CellWidth {recipe.CellWidth:R}m (sizeX={bounds.size.x:R}).");
+        }
+
+        private static bool TryCalculateRootLocalBounds(
+            Transform root, IReadOnlyList<MeshFilter> filters, out Bounds result)
+        {
+            result = default;
+            bool initialized = false;
+            foreach (MeshFilter filter in filters)
+            {
+                if (filter == null || filter.sharedMesh == null)
+                    continue;
+                Matrix4x4 matrix = Matrix4x4.identity;
+                for (Transform current = filter.transform; current != null && current != root;
+                     current = current.parent)
+                    matrix = Matrix4x4.TRS(current.localPosition, current.localRotation,
+                        current.localScale) * matrix;
+
+                Bounds meshBounds = filter.sharedMesh.bounds;
+                Vector3 center = meshBounds.center;
+                Vector3 extents = meshBounds.extents;
+                for (int x = -1; x <= 1; x += 2)
+                for (int y = -1; y <= 1; y += 2)
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 point = matrix.MultiplyPoint3x4(center + Vector3.Scale(
+                        extents, new Vector3(x, y, z)));
+                    if (!initialized)
+                    {
+                        result = new Bounds(point, Vector3.zero);
+                        initialized = true;
+                    }
+                    else
+                    {
+                        result.Encapsulate(point);
+                    }
+                }
+            }
+            return initialized;
         }
 
         private static void RequireNear(
@@ -245,6 +357,15 @@ namespace PCGBike.Editor.Buildings
                 throw new InvalidOperationException(report.ToString());
 
             var rows = new List<string>();
+            if (catalog.SchemaVersion >= 2)
+            {
+                rows.Add(string.Join("|",
+                    "SBV2",
+                    catalog.StyleId,
+                    F(catalog.CellWidth),
+                    F(catalog.GroundFloorHeight),
+                    F(catalog.TypicalFloorHeight)));
+            }
             IEnumerable<StreetBuildingInstanceModuleRecipe> recipes = catalog.Modules
                 .OrderBy(recipe => SortOrder(recipe))
                 .ThenBy(recipe => recipe.ModuleRole)
@@ -257,13 +378,28 @@ namespace PCGBike.Editor.Buildings
                     string path = AssetDatabase.GetAssetPath(part.SourceAsset).Replace('\\', '/');
                     Vector3 position = part.LocalPosition;
                     Vector3 rotation = part.LocalEulerRotation;
-                    rows.Add(string.Join("|",
-                        recipe.ModuleRole,
-                        recipe.VariantId,
-                        index.ToString(CultureInfo.InvariantCulture),
-                        path,
-                        F(position.x), F(position.y), F(position.z),
-                        F(rotation.x), F(rotation.y), F(rotation.z)));
+                    if (catalog.SchemaVersion >= 2)
+                    {
+                        rows.Add(string.Join("|",
+                            "M",
+                            recipe.ModuleRole,
+                            recipe.VariantId,
+                            index.ToString(CultureInfo.InvariantCulture),
+                            path,
+                            F(position.x), F(position.y), F(position.z),
+                            F(rotation.x), F(rotation.y), F(rotation.z),
+                            F(recipe.CellWidth), F(recipe.CellHeight), F(recipe.Weight)));
+                    }
+                    else
+                    {
+                        rows.Add(string.Join("|",
+                            recipe.ModuleRole,
+                            recipe.VariantId,
+                            index.ToString(CultureInfo.InvariantCulture),
+                            path,
+                            F(position.x), F(position.y), F(position.z),
+                            F(rotation.x), F(rotation.y), F(rotation.z)));
+                    }
                 }
             }
 
@@ -355,11 +491,13 @@ namespace PCGBike.Editor.Buildings
 
         private static void SetString(HEU_Parameters parameters, string name, string value)
         {
-            if (parameters.SetStringParameterValue(name, value))
-                return;
             HEU_ParameterData data = parameters.GetParameter(name);
             if (data == null || data._stringValues == null || data._stringValues.Length == 0)
                 throw new InvalidOperationException("StreetBuilding string parameter is missing: " + name);
+            // HEU 21 path/file parms can report success without refreshing the
+            // serialized cache that RequestCook uploads. Keep both surfaces in
+            // sync so duplicated HDA roots cannot cook a stale Catalog payload.
+            parameters.SetStringParameterValue(name, value ?? string.Empty);
             data._stringValues[0] = value ?? string.Empty;
         }
 

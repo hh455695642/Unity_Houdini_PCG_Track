@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7e8393ae5e35b8c45a7478881b7786ae, type: 3}
   m_Name: StreetBuildingInstanceModuleCatalog_NAB01
   m_EditorClassIdentifier: 
-  _schemaVersion: 1
+  _schemaVersion: 2
   _displayName: North American Brick Mixed Use 01 (MegaKit Validation)
   _sourceKind: 1
   _styleId: na_brick_mixeduse_01
@@ -20,6 +20,7 @@ MonoBehaviour:
   _sourceSha256: 3cb8b581b271288307dfb39335153af41598459221f986b678f420b7dc071e9d
   _allowedAssetRoots:
   - Assets/PCG/Art/Downtown City MegaKit[Standard]/Exports/FBX (Unity)
+  - Assets/PCG/Art/StreetBuilding/NA_Brick_MixedUse_01/Prefabs/ValidationDetails
   _cellWidth: 2
   _groundFloorHeight: 4
   _typicalFloorHeight: 3
@@ -37,6 +38,20 @@ MonoBehaviour:
     - _sourceAsset: {fileID: 919132149155446097, guid: a7ccaf30425753f4bb088c43e181c464,
         type: 3}
       _localPosition: {x: -0.5, y: 0, z: -0.12}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 3
+    _variantId: entrance_trim
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.6
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 60f1327434d59e841b720c54d19e5a92,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+    - _sourceAsset: {fileID: 919132149155446097, guid: ad302b431c03f2e408e74a73c6bb7ccd,
+        type: 3}
+      _localPosition: {x: -0.5, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 0
     _variantId: shop_metal
@@ -58,6 +73,16 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 2
+    _variantId: brick_ground
+    _cellWidth: 2
+    _cellHeight: 4
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b2c30b3f160a56444a581d92913487ec,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 8
     _variantId: brick_center
     _cellWidth: 2
@@ -65,6 +90,26 @@ MonoBehaviour:
     _weight: 1
     _parts:
     - _sourceAsset: {fileID: 919132149155446097, guid: 5067267da526c64439d756ef95859968,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 8
+    _variantId: metal_center
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 0.3
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 8ec3c16f8f12f39499991739f457dc83,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 8
+    _variantId: trim_center
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 0.3
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 713b2a77569daf24191aff47154080b7,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
@@ -88,6 +133,126 @@ MonoBehaviour:
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 4
+    _variantId: square_single
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 7b7f8616c7f00404a908dfc245a50e2c,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 4
+    _variantId: curved_double
+    _cellWidth: 4
+    _cellHeight: 3
+    _weight: 0.35
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 247a1ea3e3e530746b003a82096ea1e3,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 5
+    _variantId: brick_plain
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 8068eaf1775c9ed4191bd66d2a516d67,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 5
+    _variantId: brick_clean
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.5
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b72a8d65ed492c14b97f8dece9e2be05,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 5
+    _variantId: metal_plain
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.35
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 6b889f225a58fc64ca035c9272fa9ddb,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 5
+    _variantId: trim_plain
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.35
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 8319d59c45c62234baf45c9b9f402264,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 10
+    _variantId: brick_ground
+    _cellWidth: 2
+    _cellHeight: 4
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b2c30b3f160a56444a581d92913487ec,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 10
+    _variantId: brick_upper
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 8068eaf1775c9ed4191bd66d2a516d67,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 10
+    _variantId: brick_upper_clean
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.5
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b72a8d65ed492c14b97f8dece9e2be05,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 11
+    _variantId: brick_ground
+    _cellWidth: 2
+    _cellHeight: 4
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b2c30b3f160a56444a581d92913487ec,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 11
+    _variantId: brick_upper
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 8068eaf1775c9ed4191bd66d2a516d67,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 11
+    _variantId: brick_upper_clean
+    _cellWidth: 2
+    _cellHeight: 3
+    _weight: 0.5
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: b72a8d65ed492c14b97f8dece9e2be05,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
   - _moduleRole: 12
     _variantId: trim_ground
     _cellWidth: 2
@@ -105,6 +270,106 @@ MonoBehaviour:
     _weight: 1
     _parts:
     - _sourceAsset: {fileID: 919132149155446097, guid: 9c46601fdd199a14d879b55c5d4c4588,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 19
+    _variantId: roof_2x2
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 6d30ff0648a24bd4a9935b61bb2bd30d,
+        type: 3}
+      _localPosition: {x: 0, y: 0.2, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 9
+    _variantId: straight_2m
+    _cellWidth: 2
+    _cellHeight: 0.6
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 3313732365137779427, guid: 522b6847fb8a03d48b0569ce5be0c8ff,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 20
+    _variantId: corner_90
+    _cellWidth: 2
+    _cellHeight: 0.6
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 5769949073719297974, guid: 9a3d843295023384d959cf31c4465dae,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 14
+    _variantId: validation_canopy
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 2185970090727883189, guid: 51603e2a516a7d74a9352c5e96cce04b,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 15
+    _variantId: validation_board
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 5251654666665894896, guid: 3e9382e042ac0184386b547e0936d9ca,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 16
+    _variantId: validation_two_floor
+    _cellWidth: 4
+    _cellHeight: 6
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 8181110441187447952, guid: 734cf43587ce46c419398fdc7ceb5626,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 17
+    _variantId: wall_unit
+    _cellWidth: 2
+    _cellHeight: 1
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 919132149155446097, guid: 3bc4607de4f81e6459edf969478901bb,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 18
+    _variantId: water_tank
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 1
+    _parts:
+    - _sourceAsset: {fileID: 39373073663704466, guid: ca6fbf87c69667e44975794858337760,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 18
+    _variantId: roof_vent
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 0.7
+    _parts:
+    - _sourceAsset: {fileID: 3692001667282941249, guid: 976fcf090692c9646bd984f876769000,
+        type: 3}
+      _localPosition: {x: 0, y: 0, z: 0}
+      _localEulerRotation: {x: 0, y: 0, z: 0}
+  - _moduleRole: 18
+    _variantId: mechanical_box
+    _cellWidth: 2
+    _cellHeight: 2
+    _weight: 0.5
+    _parts:
+    - _sourceAsset: {fileID: 8240447568522231504, guid: d630962983c7e154c9ea72dfd27b2dc9,
         type: 3}
       _localPosition: {x: 0, y: 0, z: 0}
       _localEulerRotation: {x: 0, y: 0, z: 0}

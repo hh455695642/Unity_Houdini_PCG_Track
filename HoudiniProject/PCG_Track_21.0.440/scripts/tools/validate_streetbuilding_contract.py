@@ -1,4 +1,4 @@
-"""Validate the persisted REV4.1 StreetBuilding HDA in isolated hython."""
+"""Validate persisted StreetBuilding V6.1 from a fresh locked HDA instance."""
 
 from __future__ import annotations
 
@@ -14,20 +14,16 @@ import hou
 
 
 ASSET_TYPE = "pcgbike::StreetBuilding::1.0"
-REVISION = "STREETBUILDING_REV4_1_SINGLE_ENTRANCE_EDGE_COLUMNS"
-CONTRACT_VERSION = "StreetBuilding.DirectInstances.4.1"
+REVISION = "STREETBUILDING_V6_1_ROOF_ALIGNMENT"
+CONTRACT_VERSION = "StreetBuilding.DirectInstances.6.1"
 SOURCE_PREFIX = "Assets/PCG/Art/Downtown City MegaKit[Standard]/Exports/FBX (Unity)/"
-OUTPUTS = (
-    "OUT_BUILDING_LOD0",
-    "OUT_BUILDING_LOD1",
-    "OUT_BUILDING_LOD2",
-    "OUT_DETAIL_INSTANCES",
-    "OUT_BUILDING_COLLISION",
-    "OUT_BUILDING_METADATA",
-)
-CATALOG = "\n".join((
+DETAIL_PREFIX = "Assets/PCG/Art/StreetBuilding/NA_Brick_MixedUse_01/Prefabs/ValidationDetails/"
+OUTPUTS = ("OUT_BUILDING_LOD0", "OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2",
+           "OUT_DETAIL_INSTANCES", "OUT_BUILDING_COLLISION", "OUT_BUILDING_METADATA")
+
+V1 = "\n".join((
     f"Entrance|entrance_metal|0|{SOURCE_PREFIX}DoorFrame_Metal_Single.fbx|0|0|0|0|0|0",
-    f"Entrance|entrance_metal|1|{SOURCE_PREFIX}Door_2.fbx|-0.5|0|0|0|0|0",
+    f"Entrance|entrance_metal|1|{SOURCE_PREFIX}Door_2.fbx|-0.5|0|-0.12|0|0|0",
     f"GroundShop|shop_metal|0|{SOURCE_PREFIX}Metal_FirstFloor_Window.fbx|0|0|0|0|0|0",
     f"GroundShop|shop_trim|0|{SOURCE_PREFIX}Trim_FirstFloor_Window_001.fbx|0|0|0|0|0|0",
     f"Cornice|brick_center|0|{SOURCE_PREFIX}Cornice_Brick_Center.fbx|0|0|0|0|0|0",
@@ -35,6 +31,60 @@ CATALOG = "\n".join((
     f"MiddleWindow|trim_single|0|{SOURCE_PREFIX}Brick_Window_Trim_Single.fbx|0|0|0|0|0|0",
     f"FacadeColumn|trim_ground|0|{SOURCE_PREFIX}Trim_Column_Center.fbx|0|0|0|0|0|0",
     f"FacadeColumn|brick_upper|0|{SOURCE_PREFIX}Brick_Column_Small.fbx|0|0|0|0|0|0",
+))
+
+
+def v2(role: str, variant: str, asset: str, width: float = 2, height: float = 3,
+       weight: float = 1, part: int = 0, x: float = 0, y: float = 0, z: float = 0) -> str:
+    return (f"M|{role}|{variant}|{part}|{SOURCE_PREFIX}{asset}.fbx|{x}|{y}|{z}|0|0|0|"
+            f"{width}|{height}|{weight}")
+
+
+def detail(role: str, variant: str, path: str, width: float = 2,
+           height: float = 1, weight: float = 1) -> str:
+    return f"M|{role}|{variant}|0|{path}|0|0|0|0|0|0|{width}|{height}|{weight}"
+
+
+V2 = "\n".join((
+    "SBV2|na_brick_mixeduse_01|2|4|3",
+    v2("Entrance", "entrance_metal", "DoorFrame_Metal_Single", part=0),
+    v2("Entrance", "entrance_metal", "Door_2", part=1, x=-.5, z=-.12),
+    v2("Entrance", "entrance_trim", "DoorFrame_Trim", weight=.6, part=0),
+    v2("Entrance", "entrance_trim", "Door_1", weight=.6, part=1, x=-.5),
+    v2("GroundShop", "shop_metal", "Metal_FirstFloor_Window", height=4),
+    v2("GroundShop", "shop_trim", "Trim_FirstFloor_Window_001", height=4),
+    v2("GroundWall", "brick_ground", "Brick_Plain_4", height=4),
+    v2("Cornice", "brick_center", "Cornice_Brick_Center", height=1),
+    v2("Cornice", "metal_center", "Cornice_Metal_Center", height=1, weight=.3),
+    v2("MiddleWindow", "trim", "Brick_Window_Trim"),
+    v2("MiddleWindow", "trim_single", "Brick_Window_Trim_Single"),
+    v2("MiddleWindow", "curved_double", "Brick_Window_CurvedDouble", width=4, weight=.35),
+    v2("MiddleBlank", "brick_plain", "Brick_Plain_3"),
+    v2("MiddleBlank", "brick_clean", "Brick_Plain_3_noWear", weight=.5),
+    v2("SideWall", "brick_ground", "Brick_Plain_4", height=4),
+    v2("SideWall", "brick_upper", "Brick_Plain_3"),
+    v2("SideWall", "brick_upper_clean", "Brick_Plain_3_noWear", weight=.5),
+    v2("RearWall", "brick_ground", "Brick_Plain_4", height=4),
+    v2("RearWall", "brick_upper", "Brick_Plain_3"),
+    v2("RearWall", "brick_upper_clean", "Brick_Plain_3_noWear", weight=.5),
+    v2("FacadeColumn", "trim_ground", "Trim_Column_Center"),
+    v2("FacadeColumn", "brick_upper", "Brick_Column_Small"),
+    v2("RoofSurface", "roof_2x2", "Roof_2x2", height=2, y=.2),
+    detail("Parapet", "straight_2m", DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Straight.prefab",
+           height=.6),
+    detail("ParapetCorner", "corner_90", DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Corner.prefab",
+           height=.6),
+    detail("Awning", "validation_canopy", DETAIL_PREFIX + "PF_SB_NAB01_Awning_Validation.prefab"),
+    detail("Sign", "validation_board", DETAIL_PREFIX + "PF_SB_NAB01_Sign_Validation.prefab"),
+    detail("FireEscape", "validation_two_floor",
+           DETAIL_PREFIX + "PF_SB_NAB01_FireEscape_Validation.prefab", width=4, height=6),
+    detail("ACUnit", "wall_unit", SOURCE_PREFIX + "Prop_ACUnit.fbx"),
+    detail("RoofProp", "water_tank", DETAIL_PREFIX + "PF_SB_NAB01_Roof_WaterTank.prefab",
+           height=2, weight=1),
+    detail("RoofProp", "roof_vent", DETAIL_PREFIX + "PF_SB_NAB01_Roof_Vent.prefab",
+           height=2, weight=.7),
+    detail("RoofProp", "mechanical_box", DETAIL_PREFIX + "PF_SB_NAB01_Roof_MechanicalBox.prefab",
+           height=2, weight=.5),
 ))
 
 
@@ -47,259 +97,361 @@ def require(condition: bool, message: str) -> None:
         raise ContractFailure(message)
 
 
-def point_values(geometry: hou.Geometry, name: str) -> list[Any]:
-    attribute = geometry.findPointAttrib(name)
-    require(attribute is not None, f"Missing point attribute {name}")
-    return [point.attribValue(attribute) for point in geometry.points()]
+def node(asset: hou.Node, name: str) -> hou.Node:
+    result = asset.node(f"StreetBuildingCore/{name}")
+    require(result is not None, f"Missing node {name}")
+    return result
 
 
-def geometry_signature(geometry: hou.Geometry) -> str:
-    attributes = sorted(attribute.name() for attribute in geometry.pointAttribs())
-    payload = {
-        "points": [[round(float(c), 6) for c in point.position()] for point in geometry.points()],
-        "attributes": {
-            name: [point.attribValue(name) for point in geometry.points()]
-            for name in attributes
-        },
-        "primitives": geometry.intrinsicValue("primitivecount"),
-    }
-    return hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True, default=list).encode("utf-8")
-    ).hexdigest()
-
-
-def output_node(asset: hou.Node, name: str) -> hou.Node:
-    node = asset.node(f"StreetBuildingCore/{name}")
-    require(node is not None, f"Missing output node {name}")
-    return node
-
-
-def output_geometry(asset: hou.Node, name: str) -> hou.Geometry:
-    node = output_node(asset, name)
+def geometry(asset: hou.Node, name: str = "OUT_BUILDING_LOD0") -> hou.Geometry:
+    output = node(asset, name)
     try:
-        node.cook(force=True)
+        output.cook(force=True)
     except hou.OperationFailed as exception:
-        raise ContractFailure(f"{name} cook failed: {node.errors()}") from exception
-    require(not node.errors(), f"{name} cook errors: {node.errors()}")
-    require(not node.warnings(), f"{name} cook warnings: {node.warnings()}")
-    return node.geometry()
+        raise ContractFailure(f"{name} cook failed: {output.errors()}") from exception
+    require(not output.errors(), f"{name} errors: {output.errors()}")
+    require(not output.warnings(), f"{name} warnings: {output.warnings()}")
+    return output.geometry()
+
+
+def signature(value: hou.Geometry) -> str:
+    names = sorted(attribute.name() for attribute in value.pointAttribs())
+    payload = {
+        "P": [[round(float(component), 6) for component in point.position()] for point in value.points()],
+        "a": {name: [point.attribValue(name) for point in value.points()] for name in names},
+        "prims": value.intrinsicValue("primitivecount"),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=list).encode()).hexdigest()
+
+
+def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float = 10,
+              floors: int = 4, seed: int = 29, rhythm: int = 3, rear: int = 2,
+              side: int = 2, roof: int = 1, density: float = .6,
+              attachments: int = 1, module_source: int = 1) -> None:
+    values = {
+        "module_source": module_source, "unity_instance_catalog": catalog,
+        "style_id": "na_brick_mixeduse_01", "internal_width": width,
+        "internal_depth": depth, "ground_floor_height": 4.0,
+        "typical_floor_height": 3.0, "floor_count": floors, "parapet_height": .6,
+        "facade_rhythm": rhythm, "detail_density": density,
+        "generate_attachments": attachments, "rear_mode": rear, "side_mode": side,
+        "generate_roof": roof, "generate_lods": 0, "seed": seed,
+    }
+    for name, value in values.items():
+        asset.parm(name).set(value)
 
 
 def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
-    require(asset.type().name() == ASSET_TYPE, f"Wrong asset type: {asset.type().name()}")
-    require(asset.type().maxNumInputs() == 3, "StreetBuilding must retain exactly three inputs")
+    require(asset.type().name() == ASSET_TYPE, f"Wrong type {asset.type().name()}")
+    require(asset.type().maxNumInputs() == 3, "StreetBuilding must retain three inputs")
     definition = asset.type().definition()
-    require(definition is not None, "StreetBuilding definition is missing")
-    require(REVISION in (definition.comment() or ""), "REV4 definition marker is missing")
-
+    require(definition and REVISION in (definition.comment() or ""), "V6.1 marker is missing")
     group = asset.parmTemplateGroup()
     for name, expected in contract["public_defaults"].items():
-        parm = asset.parm(name)
-        require(parm is not None, f"Missing public parameter {name}")
-        actual = parm.eval()
-        if isinstance(expected, float):
-            require(abs(float(actual) - expected) <= 1e-6,
-                    f"Default mismatch for {name}: {actual} != {expected}")
-        else:
-            require(actual == expected, f"Default mismatch for {name}: {actual!r} != {expected!r}")
-    catalog_template = group.find("unity_instance_catalog")
-    require(catalog_template is not None and isinstance(catalog_template, hou.StringParmTemplate),
-            "unity_instance_catalog must exist as a string transport parameter")
-    for name, expected_items in contract["menus"].items():
+        parameter = asset.parm(name)
+        require(parameter is not None, f"Missing public parameter {name}")
+        actual = parameter.eval()
+        require(abs(float(actual) - expected) <= 1e-6 if isinstance(expected, float)
+                else actual == expected, f"Default mismatch {name}: {actual!r} != {expected!r}")
+    for name, expected in contract["menus"].items():
         template = group.find(name)
-        require(template is not None, f"Missing menu {name}")
-        require(list(template.menuItems()) == expected_items,
-                f"Menu mismatch for {name}: {template.menuItems()}")
+        require(template is not None and list(template.menuItems()) == expected,
+                f"Menu mismatch for {name}")
+    require(isinstance(group.find("unity_instance_catalog"), hou.StringParmTemplate),
+            "Catalog transport parameter is missing")
 
 
 def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
     core = asset.node(contract["core_node"])
     require(core is not None, "StreetBuildingCore is missing")
-    for name, expected_type in contract["required_nodes"].items():
-        node = core.node(name)
-        require(node is not None, f"Missing required node {name}")
-        require(node.type().name() == expected_type,
-                f"Node {name} type {node.type().name()} != {expected_type}")
-    for name in ("FIX_EXTERNAL_NORMALS_LOD0", "FIX_EXTERNAL_NORMALS_LOD1", "FIX_EXTERNAL_NORMALS_LOD2"):
-        require(core.node(name) is None, f"Legacy node {name} remains in REV4")
-    switch = core.node("LOD0_MODULE_SOURCE_SWITCH")
-    require(switch.input(1) == core.node("DIRECT_UNITY_INSTANCE_FACADE"),
-            "REV4 direct instance node is not connected to the LOD0 source switch")
-    require(output_node(asset, "OUT_BUILDING_LOD0").input(0) == switch,
-            "LOD0 output does not use the source switch")
+    for name, expected in contract["required_nodes"].items():
+        target = core.node(name)
+        require(target is not None and target.type().name() == expected,
+                f"Required node/type mismatch: {name}/{expected}")
+    require(core.node("DIRECT_UNITY_INSTANCE_FACADE").input(0)
+            == core.node("PARSE_UNITY_INSTANCE_CATALOG"), "Front parser wiring failed")
+    require(core.node("MERGE_DIRECT_BUILDING_INSTANCES").inputs()[:4] == (
+        core.node("DIRECT_UNITY_INSTANCE_FACADE"),
+        core.node("BUILD_DIRECT_SIDE_REAR_INSTANCES"),
+        core.node("BUILD_DIRECT_ROOF_INSTANCES"),
+        core.node("BUILD_DIRECT_ROOF_EDGE_INSTANCES")), "Full-envelope merge wiring failed")
+    require(core.node("VALIDATE_DIRECT_BUILDING_INSTANCES").input(0)
+            == core.node("MERGE_DIRECT_BUILDING_INSTANCES"), "Validator wiring failed")
+    require(core.node("LOD0_MODULE_SOURCE_SWITCH").input(1)
+            == core.node("VALIDATE_DIRECT_BUILDING_INSTANCES"), "V6 shell switch wiring failed")
+    require(core.node("DETAIL_INSTANCE_POINTS").input(0)
+            == core.node("PARSE_UNITY_INSTANCE_CATALOG"), "Detail parser wiring failed")
+    require(core.node("VALIDATE_DIRECT_DETAIL_INSTANCES").input(0)
+            == core.node("DETAIL_INSTANCE_POINTS"), "Detail validator wiring failed")
+    require(core.node("DETAIL_MODULE_SOURCE_SWITCH").input(1)
+            == core.node("VALIDATE_DIRECT_DETAIL_INSTANCES"), "Detail switch wiring failed")
+    require(core.node("OUT_DETAIL_INSTANCES").input(0)
+            == core.node("DETAIL_MODULE_SOURCE_SWITCH"), "Detail output wiring failed")
     empty = core.node("EMPTY_GEOMETRY")
-    for name in OUTPUTS[1:]:
-        require(output_node(asset, name).input(0) == empty,
-                f"{name} must be empty in the REV4 facade-only phase")
+    for name in ("OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2",
+                 "OUT_BUILDING_COLLISION", "OUT_BUILDING_METADATA"):
+        require(node(asset, name).input(0) == empty, f"{name} must remain empty")
 
 
-def configure_direct(asset: hou.Node, width: float = 12.0) -> None:
-    asset.parm("module_source").set(1)
-    asset.parm("unity_instance_catalog").set(CATALOG)
-    asset.parm("internal_width").set(width)
-    asset.parm("ground_floor_height").set(4.0)
-    asset.parm("typical_floor_height").set(3.0)
-    asset.parm("floor_count").set(4)
-    asset.parm("rear_mode").set(0)
-    asset.parm("side_mode").set(1)
-    asset.parm("generate_roof").set(0)
-    asset.parm("generate_lods").set(0)
-    asset.parm("generate_attachments").set(0)
-
-
-def assert_internal_proxy(asset: hou.Node) -> dict[str, int]:
+def assert_internal(asset: hou.Node) -> dict[str, int]:
     asset.parm("module_source").set(0)
-    geometry = output_geometry(asset, "OUT_BUILDING_LOD0")
-    require(geometry.intrinsicValue("primitivecount") > 0,
-            "Internal Proxy no longer emits its existing LOD0 geometry")
-    for point in geometry.points():
-        require(all(math.isfinite(float(value)) for value in point.position()),
-                "Internal Proxy contains NaN/Inf points")
-    return {
-        "points": int(geometry.intrinsicValue("pointcount")),
-        "primitives": int(geometry.intrinsicValue("primitivecount")),
-    }
+    value = geometry(asset)
+    require(value.intrinsicValue("primitivecount") > 0, "Internal Proxy no longer emits geometry")
+    require(all(math.isfinite(float(c)) for point in value.points() for c in point.position()),
+            "Internal Proxy contains NaN/Inf")
+    details = geometry(asset, "OUT_DETAIL_INSTANCES")
+    require(not details.points() and not details.prims(),
+            "Internal Proxy must not emit direct detail instances")
+    return {"points": len(value.points()), "primitives": len(value.prims())}
 
 
-def assert_direct_instances(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
-    configure_direct(asset)
-    geometry = output_geometry(asset, "OUT_BUILDING_LOD0")
-    require(geometry.intrinsicValue("primitivecount") == 0,
-            "Direct instance output contains rebuilt polygon/packed geometry")
-    require(geometry.intrinsicValue("pointcount") == 39,
-            f"12m/4-floor facade must emit 39 part points, got {len(geometry.points())}")
-    require(geometry.findPointAttrib("N") is None,
-            "Direct instance output must remove N when orient is authored")
-    actual_attributes = {attribute.name() for attribute in geometry.pointAttribs()}
-    missing = sorted(set(contract["required_attributes"]) - actual_attributes)
-    require(not missing, f"Direct output missing attributes: {missing}")
+def assert_v1(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
+    configure(asset, V1, rear=0, side=1, roof=0, rhythm=0)
+    value = geometry(asset)
+    require(len(value.prims()) == 0 and len(value.points()) == 39,
+            f"V1 exact baseline changed: {len(value.points())} points")
+    roles = [point.stringAttribValue("module_role") for point in value.points()]
+    require(roles.count("Entrance") == 2 and roles.count("GroundShop") == 5
+            and roles.count("Cornice") == 6 and roles.count("MiddleWindow") == 18
+            and roles.count("FacadeColumn") == 8, "V1 role cardinality changed")
+    required = set(contract["required_attributes"])
+    actual = {attribute.name() for attribute in value.pointAttribs()}
+    require(not required - actual, f"V1 missing attributes: {sorted(required - actual)}")
+    paths = [point.stringAttribValue("unity_instance") for point in value.points()]
+    require(all(path.startswith(SOURCE_PREFIX) for path in paths), "V1 source paths changed")
+    first = signature(value)
+    require(signature(geometry(asset)) == first, "V1 same-input output is not deterministic")
+    details = geometry(asset, "OUT_DETAIL_INSTANCES")
+    require(not details.points(), "V1 compatibility payload must not emit V6 details")
+    return {"points": 39, "unique_assets": len(set(paths)), "sha256": first}
 
-    paths = [str(value) for value in point_values(geometry, "unity_instance")]
-    require(all(path.startswith(SOURCE_PREFIX) and path.endswith(".fbx") for path in paths),
-            "unity_instance paths were rewritten away from original MegaKit FBX assets")
-    require(set(paths).issubset({row.split("|")[3] for row in CATALOG.splitlines()}),
-            "Direct output contains a path not present in the compiled catalog")
-    roles = [str(value) for value in point_values(geometry, "module_role")]
-    require(roles.count("Entrance") == 2, "Entrance must emit frame + door source parts")
-    require(roles.count("GroundShopDoor") == 0, "GroundShopDoor must be absent in REV4.1")
-    require(roles.count("GroundShop") == 5, "Ground floor must emit five shop windows")
-    require(roles.count("Cornice") == 6, "Header must emit six original cornice instances")
-    require(roles.count("MiddleWindow") == 18, "Three upper floors must emit 18 windows")
-    require(roles.count("FacadeColumn") == 8,
-            "Two ground and six upper edge-column instances are required")
 
-    cells = [int(value) for value in point_values(geometry, "cell_index")]
-    entrance_cells = {cell for cell, value in zip(cells, point_values(geometry, "is_building_entrance"))
-                      if int(value) == 1}
-    shop_door_cells = {cell for cell, value in zip(cells, point_values(geometry, "is_shop_entrance"))
-                       if int(value) == 1}
-    require(entrance_cells == {3}, f"Expected one centered entrance cell, got {entrance_cells}")
-    require(not shop_door_cells, f"Unexpected shop-door cells: {shop_door_cells}")
-
-    for point, role, cell, path in zip(geometry.points(), roles, cells, paths):
-        if role == "FacadeColumn" or path.endswith("Door_2.fbx"):
+def assert_v2(asset: hou.Node) -> dict[str, Any]:
+    configure(asset, V2)
+    value = geometry(asset)
+    count = len(value.points())
+    require(len(value.prims()) == 0 and count == 161,
+            f"V2 exact shell baseline changed: {count} points")
+    faces = {point.intAttribValue("face_index") for point in value.points()}
+    require(faces == {0, 1, 2, 3, 4}, f"V2 full envelope missing faces: {faces}")
+    require(sum(point.intAttribValue("is_building_entrance") for point in value.points()) == 1,
+            "V2 must contain exactly one logical entrance")
+    require(all(point.intAttribValue("face_index") == 0 for point in value.points()
+                if point.intAttribValue("is_building_entrance")), "Entrance escaped front face")
+    require(any(point.intAttribValue("module_span") == 2 for point in value.points()),
+            "V2 two-cell solver was not exercised")
+    require(all(tuple(round(float(c), 5) for c in point.attribValue("scale")) == (1.0, 1.0, 1.0)
+                for point in value.points()), "V2 emitted non-unit scale")
+    require(all(abs(math.sqrt(sum(float(c) ** 2 for c in point.attribValue("orient"))) - 1) < .001
+                for point in value.points()), "V2 emitted non-unit orientation")
+    roles = [point.stringAttribValue("module_role") for point in value.points()]
+    require(roles.count("RoofSurface") == 30, "12x10 roof must contain 30 2x2 tiles")
+    require(roles.count("Parapet") == 14 and roles.count("ParapetCorner") == 4,
+            "12x10 parapet must contain 14 straight modules and four corners")
+    roof_points = [point for point in value.points()
+                   if point.stringAttribValue("module_role") == "RoofSurface"]
+    require({round(point.position()[0], 3) for point in roof_points}
+            == {-5.0, -3.0, -1.0, 1.0, 3.0, 5.0},
+            "Roof X centers do not cover the full 12m footprint")
+    require({round(point.position()[2], 3) for point in roof_points}
+            == {-1.0, -3.0, -5.0, -7.0, -9.0},
+            "Roof Z centers do not cover the full 10m footprint")
+    roof_y = 13.0
+    height_by_variant = {}
+    for row in V2.splitlines():
+        fields = row.split("|")
+        if len(fields) == 14 and fields[0] == "M":
+            height_by_variant[(fields[1], fields[2])] = float(fields[12])
+    for point in value.points():
+        role = point.stringAttribValue("module_role")
+        if role in ("RoofSurface", "Parapet", "ParapetCorner"):
             continue
-        expected_houdini_x = -(-6.0 + (cell + 0.5) * 2.0)
-        require(abs(float(point.position()[0]) - expected_houdini_x) <= 1e-6,
-                f"Cell {cell} is not emitted at its 2m cell center")
-
-    upper = [(int(floor), float(point.position()[1])) for point, role, floor in zip(
-        geometry.points(), roles, point_values(geometry, "floor_index")) if role == "MiddleWindow"]
-    expected_y = {1: 4.0, 2: 7.0, 3: 10.0}
-    require(all(abs(y - expected_y[floor]) <= 1e-6 for floor, y in upper),
-            f"Upper floor rows do not follow 4m + 3m native grid: {upper}")
-    variants_by_cell = {}
-    for cell, role, variant in zip(cells, roles, point_values(geometry, "module_variant")):
-        if role == "MiddleWindow":
-            variants_by_cell.setdefault(cell, str(variant))
-    require([variants_by_cell[index] for index in range(6)] ==
-            ["trim", "trim", "trim_single", "trim_single", "trim", "trim"],
-            f"Paired A A B B A A rhythm failed: {variants_by_cell}")
-    column_points = [point for point, role in zip(geometry.points(), roles)
-                     if role == "FacadeColumn"]
-    column_x = sorted({round(float(point.position()[0]), 6) for point in column_points})
-    require(column_x == [-6.0, 6.0],
-            f"Edge columns must sit on the +/-6m facade boundaries: {column_x}")
-    column_rows = sorted(round(float(point.position()[1]), 6) for point in column_points)
-    require(column_rows == [0.0, 0.0, 4.0, 4.0, 7.0, 7.0, 10.0, 10.0],
-            f"Edge-column vertical rows are incorrect: {column_rows}")
-    for name in OUTPUTS[1:]:
-        empty = output_geometry(asset, name)
-        require(len(empty.points()) == 0 and len(empty.prims()) == 0,
-                f"{name} is not empty in facade-only mode")
-
-    before = geometry_signature(geometry)
-    after = geometry_signature(output_geometry(asset, "OUT_BUILDING_LOD0"))
-    require(before == after, "Same direct catalog and parameters produced a different hash")
-    return {"points": len(geometry.points()), "unique_assets": len(set(paths)), "sha256": before}
+        height = height_by_variant[(role, point.stringAttribValue("module_variant"))]
+        require(point.position()[1] + height <= roof_y + .01,
+                f"{role} exceeds roof plane at {point.position()}")
+    first = signature(value)
+    require(signature(geometry(asset)) == first, "V2 weighted selection is not deterministic")
+    configure(asset, V2, seed=47)
+    second = signature(geometry(asset))
+    require(second != first, "Different seeds did not change V2 variant distribution")
+    configure(asset, V2, rear=0, side=1, roof=0)
+    disabled = geometry(asset)
+    require({point.intAttribValue("face_index") for point in disabled.points()} == {0},
+            "Side/rear/roof mode switches did not disable their faces")
+    for output in ("OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2",
+                   "OUT_BUILDING_COLLISION", "OUT_BUILDING_METADATA"):
+        other = geometry(asset, output)
+        require(not other.points() and not other.prims(), f"{output} is not empty")
+    configure(asset, V2)
+    asset.parm("parapet_height").set(0)
+    require(len(geometry(asset).points()) == 143,
+            "parapet_height=0 must remove only the 18 roof-edge modules")
+    return {"points": count, "faces": 5, "roof_tiles": 30,
+            "parapet_straights": 14, "parapet_corners": 4,
+            "unique_assets": len({point.stringAttribValue('unity_instance') for point in value.points()}),
+            "sha256": first, "different_seed_sha256": second}
 
 
-def assert_width_contract() -> dict[str, Any]:
-    results: dict[str, Any] = {}
-    for width in (10.0, 12.0):
-        instance = hou.node("/obj").createNode(ASSET_TYPE, f"VERIFY_WIDTH_{int(width)}")
-        configure_direct(instance, width)
-        geometry = output_geometry(instance, "OUT_BUILDING_LOD0")
-        require(len(geometry.prims()) == 0 and len(geometry.points()) > 0,
-                f"Valid {width}m frontage did not emit points")
-        results[str(width)] = len(geometry.points())
+def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
+    configure(asset, V2, density=1)
+    shell = geometry(asset)
+    shell_sha = signature(shell)
+    value = geometry(asset, "OUT_DETAIL_INSTANCES")
+    count = len(value.points())
+    budget = int(contract["budgets"]["detail_instances_per_building"])
+    require(0 < count <= budget, f"Detail point budget failed: {count}/{budget}")
+    require(not value.prims(), "Detail output must contain instance points only")
+
+    required = set(contract["required_attributes"])
+    actual = {attribute.name() for attribute in value.pointAttribs()}
+    require(not required - actual, f"Details missing attributes: {sorted(required - actual)}")
+    roles = [point.stringAttribValue("module_role") for point in value.points()]
+    expected_wall_roles = {"Awning", "Sign", "FireEscape", "ACUnit"}
+    require(expected_wall_roles.issubset(set(roles)),
+            f"Wall detail role coverage failed: {sorted(set(roles))}")
+    require(roles.count("FireEscape") <= 1, "A building emitted multiple fire escapes")
+    require(all(point.stringAttribValue("unity_instance").startswith((SOURCE_PREFIX, DETAIL_PREFIX))
+                for point in value.points()), "Detail output contains an unapproved asset path")
+    require(all(tuple(round(float(c), 5) for c in point.attribValue("scale")) == (1.0, 1.0, 1.0)
+                for point in value.points()), "Detail output emitted non-unit scale")
+    require(all(abs(math.sqrt(sum(float(c) ** 2 for c in point.attribValue("orient"))) - 1) < .001
+                for point in value.points()), "Detail output emitted non-unit orientation")
+    require(all(point.stringAttribValue("pcg_kind") == "streetbuilding_detail_instance"
+                for point in value.points()), "Detail pcg_kind contract changed")
+
+    width_cells, depth_cells = 6, 5
+    entrance_cell = width_cells // 2
+    for point in value.points():
+        role = point.stringAttribValue("module_role")
+        face = point.intAttribValue("face_index")
+        floor = point.intAttribValue("floor_index")
+        cell = point.intAttribValue("cell_index")
+        if role in ("Awning", "Sign"):
+            require(face == 0 and floor == 0 and cell != entrance_cell,
+                    f"{role} overlaps the entrance or escaped the front ground floor")
+        elif role == "FireEscape":
+            require(face == 3 and floor == 1,
+                    "FireEscape must attach to the rear and start above ground")
+        elif role == "ACUnit":
+            require(face in (1, 2, 3) and floor >= 1,
+                    "ACUnit must attach to an upper side/rear surface")
+        elif role == "RoofProp":
+            x_cell = cell % width_cells
+            z_cell = cell // width_cells
+            require(face == 4 and 1 <= x_cell <= width_cells - 2
+                    and 1 <= z_cell <= depth_cells - 2,
+                    "RoofProp escaped the one-cell roof safety margin")
+            require(point.stringAttribValue("module_variant") != "ac_unit",
+                    "RoofProp must not reuse the wall AC unit")
+            require(abs(point.position()[1] - 13.0) <= .01,
+                    "RoofProp pivot must sit directly on roofY")
+
+    detail_sha = signature(value)
+    require(signature(geometry(asset, "OUT_DETAIL_INSTANCES")) == detail_sha,
+            "Same-seed detail output is not deterministic")
+    seen_roof_variants = set()
+    for seed in range(1, 65):
+        configure(asset, V2, seed=seed, density=1)
+        for point in geometry(asset, "OUT_DETAIL_INSTANCES").points():
+            if point.stringAttribValue("module_role") == "RoofProp":
+                variant = point.stringAttribValue("module_variant")
+                require(variant != "ac_unit" and abs(point.position()[1] - 13.0) <= .01,
+                        f"Invalid roof detail {variant}")
+                seen_roof_variants.add(variant)
+    require(len(seen_roof_variants) >= 2,
+            f"Roof detail seed coverage failed: {sorted(seen_roof_variants)}")
+
+    configure(asset, V2, seed=47, density=1)
+    different_seed_sha = signature(geometry(asset, "OUT_DETAIL_INSTANCES"))
+    require(different_seed_sha != detail_sha, "Different seed did not change any detail")
+
+    configure(asset, V2, density=1, attachments=0)
+    require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
+            "generate_attachments=false did not empty Detail output")
+    require(signature(geometry(asset)) == shell_sha,
+            "generate_attachments=false changed the LOD0 shell")
+    configure(asset, V2, density=0)
+    require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
+            "detail_density=0 did not empty Detail output")
+    require(signature(geometry(asset)) == shell_sha, "detail_density=0 changed the LOD0 shell")
+    configure(asset, V2, density=1, module_source=0)
+    require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
+            "Internal module source emitted direct detail instances")
+
+    return {"points": count, "roles": sorted(set(roles)), "budget": budget,
+            "roof_prop_variants": sorted(seen_roof_variants),
+            "sha256": detail_sha, "different_seed_sha256": different_seed_sha,
+            "toggle_isolated_from_lod0": True}
+
+
+def assert_dimension_contract() -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for width, depth in ((10.0, 8.0), (12.0, 10.0), (16.0, 12.0)):
+        instance = hou.node("/obj").createNode(ASSET_TYPE, f"VERIFY_{int(width)}_{int(depth)}")
+        configure(instance, V2, width=width, depth=depth)
+        result[f"{width}x{depth}"] = len(geometry(instance).points())
         instance.destroy()
     for width in (7.0, 11.0, 15.0):
-        instance = hou.node("/obj").createNode(ASSET_TYPE, f"VERIFY_INVALID_WIDTH_{int(width)}")
-        configure_direct(instance, width)
-        node = output_node(instance, "OUT_BUILDING_LOD0")
+        instance = hou.node("/obj").createNode(ASSET_TYPE, f"REJECT_{int(width)}")
+        configure(instance, V2, width=width)
         failed = False
         try:
-            node.cook(force=True)
-            failed = bool(node.errors())
+            target = node(instance, "OUT_BUILDING_LOD0")
+            target.cook(force=True)
+            failed = bool(target.errors())
         except hou.OperationFailed:
             failed = True
-        require(failed, f"Non-2m frontage {width}m did not fail closed")
-        results[str(width)] = "rejected"
+        require(failed, f"Invalid width {width}m was accepted")
+        result[str(width)] = "rejected"
         instance.destroy()
-    return results
+    return result
 
 
-def validate(hda_path: Path, hip_path: Path, contract_path: Path) -> dict[str, Any]:
-    require(hda_path.is_file(), f"HDA not found: {hda_path}")
-    require(hip_path.is_file(), f"HIP not found: {hip_path}")
+def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
+    require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
-    require(contract["revision"] == REVISION, "Contract revision does not match validator")
-    require(contract["contract_version"] == CONTRACT_VERSION,
-            "Contract version does not match validator")
+    require(contract["revision"] == REVISION and contract["contract_version"] == CONTRACT_VERSION,
+            "Contract revision/version mismatch")
+    expected = {"StreetBuilding.V5.CatalogV2Compatibility", "StreetBuilding.V5.WeightedDeterminism",
+                "StreetBuilding.V5.FullEnvelopeFaces", "StreetBuilding.V5.SpanSolver",
+                "StreetBuilding.V5.SurfaceOrientation", "StreetBuilding.V5.SideRearRoofModes",
+                "StreetBuilding.V5.UnityThreeBuildingShowcase",
+                "StreetBuilding.V6.DetailOutputIsolation",
+                "StreetBuilding.V6.DetailToggleAndDensity",
+                "StreetBuilding.V6.DetailDeterminism",
+                "StreetBuilding.V6.DetailSurfacePlacement",
+                "StreetBuilding.V6.DetailInstanceBudget",
+                "StreetBuilding.V6.ProjectOwnedValidationPrefabs",
+                "StreetBuilding.V6.UnityThreeBuildingDetails",
+                "StreetBuilding.V6_1.RoofFootprintCoverage",
+                "StreetBuilding.V6_1.ShellTopAlignment",
+                "StreetBuilding.V6_1.ParapetContinuity",
+                "StreetBuilding.V6_1.RoofDetailGrounding",
+                "StreetBuilding.V6_1.RoofDetailSemantics",
+                "StreetBuilding.V6_1.CatalogBounds"}
+    require(expected.issubset(contract["contract_ids"]), "V5/V6/V6.1 cumulative IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
-    hou.hipFile.load(str(hip_path), suppress_save_prompt=True, ignore_load_warnings=False)
-    hou.hda.installFile(str(hda_path), change_oplibraries_file=False, force_use_assets=True)
-    fresh = hou.node("/obj").createNode(ASSET_TYPE, "VERIFY_STREETBUILDING_REV4_LOCKED")
-    require(not fresh.isEditable(), "Fresh REV4 validation instance must remain locked")
+    hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
+    hou.hda.installFile(str(hda), change_oplibraries_file=False, force_use_assets=True)
+    fresh = hou.node("/obj").createNode(ASSET_TYPE, "VERIFY_STREETBUILDING_V6_1_LOCKED")
+    require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
-    internal = assert_internal_proxy(fresh)
-    direct = assert_direct_instances(fresh, contract)
-    widths = assert_width_contract()
-    return {
-        "status": "PASS",
-        "asset_type": fresh.type().name(),
-        "instance": fresh.path(),
-        "locked": not fresh.isEditable(),
-        "internal_proxy": internal,
-        "direct_instances": direct,
-        "width_contract": widths,
-    }
+    return {"status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+            "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
+            "v1_compatibility": assert_v1(fresh, contract), "v2_full_envelope": assert_v2(fresh),
+            "v6_1_modular_details": assert_details(fresh, contract),
+            "dimension_contract": assert_dimension_contract()}
 
 
-def parse_args() -> argparse.Namespace:
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     default_root = Path(__file__).resolve().parents[4]
     parser.add_argument("--project-root", type=Path, default=default_root)
     parser.add_argument("--hda", type=Path)
     parser.add_argument("--hip", type=Path)
     parser.add_argument("--contract", type=Path)
-    return parser.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
+    args = parser.parse_args()
     root = args.project_root.resolve()
     hda = (args.hda or root / "Assets/PCG/HDA/City/StreetBuilding.hda").resolve()
     hip = (args.hip or root / "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip").resolve()

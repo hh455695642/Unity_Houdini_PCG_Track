@@ -67,7 +67,7 @@ MODULES: dict[str, dict[str, Any]] = {
         "asset_type": "pcgbike::StreetBuilding::1.0",
         "definition": "Assets/PCG/HDA/City/StreetBuilding.hda",
         "hip": "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip",
-        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_direct_unity_instances_rev4.py",
+        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_roof_alignment_v61.py",
         "restore_files": ["Assets/PCG/HDA/City/StreetBuilding.hda.meta"],
         "network_roots": ["StreetBuildingCore"],
         "outputs": [

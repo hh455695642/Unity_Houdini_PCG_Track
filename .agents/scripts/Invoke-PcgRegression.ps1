@@ -24,7 +24,7 @@ $gateScript = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\
 $cityRoadValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_cityroad_contract.py'
 $trackValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\verify_curve_road_test.py'
 $terrainValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_terrain_shape_params.py'
-$streetBuildingBuilder = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\patch_streetbuilding_direct_unity_instances_rev4.py'
+$streetBuildingBuilder = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\patch_streetbuilding_modular_details_v6.py'
 $streetBuildingValidator = Join-Path $projectRoot 'HoudiniProject\PCG_Track_21.0.440\scripts\tools\validate_streetbuilding_contract.py'
 
 $moduleConfig = @{
@@ -266,7 +266,12 @@ $manifestIdentity = ([System.BitConverter]::ToString($manifestIdentityHash) -rep
 $pointerDirectory = Join-Path $projectRoot '.codex_tmp\regression\pointers'
 $pointerPath = Join-Path $pointerDirectory ("{0}-{1}.txt" -f $Module, $manifestIdentity)
 
-& (Join-Path $projectRoot '.agents\scripts\Ensure-HoudiniMcp.ps1') | Out-Host
+if ($Module -eq 'StreetBuilding') {
+    Write-Step 'INFO' 'StreetBuilding regression uses direct Houdini RPC on 18811; 3055 service management is skipped.'
+}
+else {
+    & (Join-Path $projectRoot '.agents\scripts\Ensure-HoudiniMcp.ps1') | Out-Host
+}
 
 if ($Stage -eq 'Capture') {
     $taskSlug = (($manifest.task -replace '[^A-Za-z0-9_-]', '-') -replace '-+', '-').Trim('-')

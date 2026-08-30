@@ -30,6 +30,10 @@ namespace PCGBike.Buildings
         FireEscape,
         ACUnit,
         RoofProp,
+        // Append-only: catalog assets serialize the numeric enum value.
+        RoofSurface,
+        // Append-only: authored L-shaped 90-degree roof edge module.
+        ParapetCorner,
     }
 
     public enum StreetBuildingAssetSourceKind
@@ -48,7 +52,7 @@ namespace PCGBike.Buildings
         menuName = "PCG/Street Building Instance Module Catalog")]
     public sealed class StreetBuildingInstanceModuleCatalog : ScriptableObject
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         [SerializeField] private int _schemaVersion = CurrentSchemaVersion;
         [SerializeField] private string _displayName = "Street Building Style";

@@ -3,6 +3,7 @@ using System;
 using HoudiniEngineUnity;
 using PCGBike.Buildings;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace PCGBike.Editor.Buildings
@@ -14,6 +15,8 @@ namespace PCGBike.Editor.Buildings
         {
             serializedObject.Update();
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_catalog"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_designPreset"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_variationSeed"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
@@ -23,13 +26,22 @@ namespace PCGBike.Editor.Buildings
                     LogValidation(authoring);
                 if (GUILayout.Button("Compile Preview"))
                     CompilePreview(authoring);
-                if (GUILayout.Button("Apply & Cook (No Auto Save)"))
+                if (GUILayout.Button("Apply, Cook & Save Scene"))
                     ApplyAndCook(authoring);
+            }
+            using (new EditorGUI.DisabledScope(authoring.DesignPreset == null))
+            {
+                if (GUILayout.Button("Apply Design Preset, Cook & Save Scene"))
+                    ApplyDesign(authoring);
             }
 
             if (!string.IsNullOrEmpty(authoring.LastAppliedPayloadSha256))
                 EditorGUILayout.HelpBox(
                     "Last applied payload SHA-256:\n" + authoring.LastAppliedPayloadSha256,
+                    MessageType.Info);
+            if (!string.IsNullOrEmpty(authoring.LastAppliedDesignSha256))
+                EditorGUILayout.HelpBox(
+                    "Last applied design SHA-256:\n" + authoring.LastAppliedDesignSha256,
                     MessageType.Info);
         }
 
@@ -67,14 +79,33 @@ namespace PCGBike.Editor.Buildings
                 HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
                 StreetBuildingCompiledCatalog compiled =
                     StreetBuildingModuleCatalogApplier.Apply(root, authoring);
+                if (!EditorSceneManager.SaveScene(authoring.gameObject.scene))
+                    throw new InvalidOperationException("StreetBuilding Scene save failed.");
                 Debug.Log(
-                    "StreetBuilding Catalog applied and cooked without saving the Scene. Payload SHA-256 "
+                    "StreetBuilding Catalog applied, cooked and saved. Payload SHA-256 "
                     + compiled.Sha256,
                     authoring);
             }
             catch (Exception exception)
             {
                 Debug.LogError("StreetBuilding Catalog apply failed.\n" + exception, authoring);
+            }
+        }
+
+        private static void ApplyDesign(StreetBuildingAuthoring authoring)
+        {
+            try
+            {
+                HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
+                StreetBuildingCompiledCatalog compiled =
+                    StreetBuildingDesignPresetApplier.ApplyAndSave(root, authoring);
+                Debug.Log("StreetBuilding DesignPreset applied, cooked and saved. Payload SHA-256 "
+                          + compiled.Sha256 + " / Design SHA-256 "
+                          + authoring.LastAppliedDesignSha256, authoring);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("StreetBuilding DesignPreset apply failed.\n" + exception, authoring);
             }
         }
     }
