@@ -30,6 +30,7 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingModuleRole.RoofSurface,
             StreetBuildingModuleRole.Parapet,
             StreetBuildingModuleRole.ParapetCorner,
+            StreetBuildingModuleRole.ParapetConcaveCorner,
             StreetBuildingModuleRole.Awning,
             StreetBuildingModuleRole.Sign,
             StreetBuildingModuleRole.FireEscape,
@@ -77,38 +78,36 @@ namespace PCGBike.Editor.Buildings
         {
             string artRoot = "Assets/PCG/Art/StreetBuilding/" + styleId;
             string materialRoot = "Assets/PCG/Materials/Buildings/" + styleId;
-            string catalogPath = artRoot + "/StreetBuildingInstanceModuleCatalog.asset";
-            StreetBuildingInstanceModuleCatalog catalog =
-                AssetDatabase.LoadAssetAtPath<StreetBuildingInstanceModuleCatalog>(catalogPath);
-            if (catalog == null)
-                throw new InvalidOperationException("Missing Style Kit catalog: " + catalogPath);
-            if (catalog.SourceKind != StreetBuildingAssetSourceKind.ProjectOwned)
-                throw new InvalidOperationException(styleId + " is not ProjectOwned.");
-            if (!string.Equals(catalog.StyleId, styleId, StringComparison.Ordinal))
-                throw new InvalidOperationException(styleId + " catalog StyleId mismatch.");
+            string stylePath = artRoot + "/SBStyle_" + styleId + ".asset";
+            StreetBuildingStyleConfig style = AssetDatabase.LoadAssetAtPath<StreetBuildingStyleConfig>(stylePath);
+            if (style == null)
+                throw new InvalidOperationException("Missing StyleConfig: " + stylePath);
+            if (!string.Equals(style.StyleId, styleId, StringComparison.Ordinal))
+                throw new InvalidOperationException(styleId + " StyleConfig StyleId mismatch.");
 
-            StreetBuildingCatalogValidationReport validation =
-                StreetBuildingModuleCatalogValidator.Validate(catalog);
+            StreetBuildingStyleValidationReport validation = StreetBuildingStyleValidator.Validate(style);
             if (!validation.IsValid)
                 throw new InvalidOperationException(styleId + "\n" + validation);
-            if (catalog.Modules.Count < 40)
-                throw new InvalidOperationException(styleId + " requires at least 40 reference recipes.");
+            if (style.EnumerateModules().Count() != 42)
+                throw new InvalidOperationException(styleId + " requires exactly 42 module definitions.");
 
-            HashSet<StreetBuildingModuleRole> roles = catalog.Modules
-                .Select(item => item.ModuleRole).ToHashSet();
+            HashSet<StreetBuildingModuleRole> roles = style.EnumerateModules()
+                .Where(item => item.Module != null).Select(item => item.Module.ModuleRole).ToHashSet();
             StreetBuildingModuleRole[] missingRoles = RequiredRoles
                 .Where(role => !roles.Contains(role)).ToArray();
             if (missingRoles.Length > 0)
                 throw new InvalidOperationException(styleId + " missing roles: " + string.Join(", ", missingRoles));
 
-            string[] dependencies = AssetDatabase.GetDependencies(catalogPath, true)
-                .Concat(catalog.Modules.SelectMany(recipe => recipe.Parts)
-                    .Select(part => AssetDatabase.GetAssetPath(part.SourceAsset))
+            string[] dependencies = AssetDatabase.GetDependencies(stylePath, true)
+                .Concat(style.EnumerateModules().Where(item => item.Module?.Prefab != null)
+                    .Select(item => AssetDatabase.GetAssetPath(item.Module.Prefab))
                     .SelectMany(path => AssetDatabase.GetDependencies(path, true)))
                 .Distinct(StringComparer.Ordinal).ToArray();
             foreach (string dependency in dependencies)
             {
                 bool allowed = dependency.StartsWith(artRoot + "/", StringComparison.Ordinal)
+                               || dependency.StartsWith(
+                                   "Assets/PCG/Art/StreetBuilding/_Shared/", StringComparison.Ordinal)
                                || dependency.StartsWith(materialRoot + "/", StringComparison.Ordinal)
                                || dependency.StartsWith("Assets/PCG/Scripts/Buildings/", StringComparison.Ordinal)
                                || dependency.StartsWith("Packages/", StringComparison.Ordinal);
@@ -129,6 +128,10 @@ namespace PCGBike.Editor.Buildings
                     throw new InvalidOperationException(styleId + " material must use URP/Lit.");
                 if (!material.enableInstancing)
                     throw new InvalidOperationException(styleId + " material must enable GPU Instancing: " + material.name);
+                if (material.doubleSidedGI)
+                    throw new InvalidOperationException(styleId + " material must disable Double Sided GI: " + material.name);
+                if (material.HasProperty("_Cull") && material.GetFloat("_Cull") < 1.5f)
+                    throw new InvalidOperationException(styleId + " material must use back-face culling: " + material.name);
             }
 
             string[] textureGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { artRoot + "/Textures" });
@@ -141,7 +144,7 @@ namespace PCGBike.Editor.Buildings
                     throw new InvalidOperationException(styleId + " reference textures must be 128x128.");
             }
 
-            StreetBuildingCompiledCatalog compiled = StreetBuildingModuleCatalogCompiler.Compile(catalog);
+            StreetBuildingCompiledStyle compiled = StreetBuildingStyleCompiler.Compile(style);
             return $"{styleId}:{compiled.ModuleCount}:{compiled.Sha256.Substring(0, 12)}";
         }
 

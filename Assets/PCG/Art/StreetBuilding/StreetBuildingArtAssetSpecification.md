@@ -1,4 +1,4 @@
-# StreetBuilding 美术资产制作规范（阶段 5 / Catalog V2）
+# StreetBuilding 美术资产制作规范（V7 / Catalog V3 / 单面模块）
 
 本规范定义 StreetBuilding 模块化立面资产的长期自建标准。Downtown City MegaKit 仅作为只读验证源，不是项目正式资产模板。
 
@@ -40,7 +40,7 @@
 - 复合模块的组合偏移和旋转优先在 Prefab 子节点内完成；Catalog 允许记录 Part Position，Part Rotation 保持零旋转。
 - 左右边缘立柱的 Pivot 位于建筑边界线，不占用 2m Bay。
 
-当前 `StreetBuilding.DirectInstances.6.1` 网格：
+当前 `StreetBuilding.DirectInstances.7.0` 网格：
 
 - Bay 宽度：2m
 - 首层高度：4m
@@ -48,17 +48,22 @@
 - 正面、侧面、背面均按 2m Cell 排布，屋顶按 2×2m Tile 排布。
 - 允许 2m 单格和 4m 双格立面模块；4m 模块必须声明 `CellWidth=4`，不得与已有占用重叠。
 - 建筑保持单个正面入口，侧面和背面禁止入口。
+- 体块只允许 `Rectangle` 与等高 `LShape`，不制作 U 形、退台或分层高度模块。
+- L 形缺口固定在后左或后右，缺口宽/深均为 2m 倍数，并至少保留 4m 宽的两条翼。
 
-## 4. Catalog V2 与必需模块槽位
+## 4. Catalog V3、StyleLibrary 与 ModuleFamily
 
 Catalog 编译结果使用 UTF-8、Invariant Culture 和稳定排序：
 
 ```text
-SBV2|<StyleId>|<CellWidth>|<GroundFloorHeight>|<TypicalFloorHeight>
+SBV3|<StyleId>|<CellWidth>|<GroundFloorHeight>|<TypicalFloorHeight>|<SelectedFamilyId>
 M|Role|Variant|PartIndex|AssetPath|PosX|PosY|PosZ|EulerX|EulerY|EulerZ|CellWidth|CellHeight|Weight
 ```
 
-- `Weight` 必须大于 0；相同 Role 内按权重做确定性选择。
+- `StreetBuildingStyleLibrary` 只索引多个独立 Catalog；每个 Style 使用独立资产，避免一个巨型 SO 产生全局脏改。
+- Catalog V3 可配置多个 `ModuleFamily`。每栋建筑先由 `BuildingId + Seed` 稳定选择一个 Family，再在 Family 内按 Role/Variant 权重选择。
+- Recipe 的 `FamilyId="*"` 表示所有 Family 共享；HDA 每次只接收选中 Family 与共享模块。
+- `Weight` 必须大于 0；Family 与相同 Role 内 Variant 均按权重确定性选择。
 - 同一 `Role + VariantId` 的 PartIndex 从 0 连续递增。
 - Payload 内容直接参与 SHA-256，修改尺寸、权重、路径或局部偏移都会产生新版本。
 - HDA 同时接受旧 V1 10 字段 Payload；V1 仅用于 REV4.1 精确回归，不作为新 Catalog 默认格式。
@@ -82,6 +87,7 @@ M|Role|Variant|PartIndex|AssetPath|PosX|PosY|PosZ|EulerX|EulerY|EulerZ|CellWidth
 - `RoofSurface`：2×2m 平屋顶 Tile
 - `Parapet`：2m 直线女儿墙，根 Pivot 位于底部中心，标准高度 0.6m
 - `ParapetCorner`：90° L 形转角，根 Pivot 位于外侧精确转角，局部形体沿 `+X/-Z` 向内延伸
+- `ParapetConcaveCorner`：L 形唯一阴角，Pivot 位于凹入轮廓交点；不得用阳角资产靠负缩放镜像。
 - `RoofProp` 已从 LOD0 外壳移入独立 `OUT_DETAIL_INSTANCES`
 
 Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 `Parapet` 与
@@ -113,6 +119,10 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 
 ## 6. 材质与移动端约束
 
+- 墙面、门窗底板、侧/背墙、屋面、檐口、阳角/阴角和女儿墙全部交付为单面开放 Mesh；不得封背、不得额外制作不可见厚度。
+- 单面朝向：立面法线朝局部 `+Z`，屋面法线朝 `+Y`；转角各片法线朝建筑外侧。Unity 材质必须 `Cull Back`，`Double Sided GI` 关闭。
+- 需要真实体积的独立细节（空调、水箱、烟囱等）可以是闭合 Mesh；“单面”约束只作用于建筑外壳 Role。
+- 不允许用双面 Shader、关闭剔除或生成端负缩放补救错误法线；导入后必须检查 Scene View Backface 与 Mesh 法线。
 - 仅使用兼容 URP 的 Shader；不得依赖 Built-in Shader。
 - 支持 GPU Instancing 的材质应开启 Instancing。
 - 透明材质仅用于玻璃等必要区域，避免大面积透明叠层和过度 Overdraw。
@@ -129,7 +139,7 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 
 | 项目 | 最低要求 |
 |---|---:|
-| Catalog | 1 个，`SchemaVersion=2`、`SourceKind=ProjectOwned` |
+| Catalog | 1 个，`SchemaVersion=3`、`SourceKind=ProjectOwned`，至少 1 个启用 Family |
 | 基础/外壳/细节 Role | 覆盖当前 17 个必需 Role |
 | 参考 Recipe | 40 个；新增 Variant 只能追加稳定键 |
 | DesignPreset | Compact / Standard / Corner Tall 各 1 个 |
@@ -148,13 +158,13 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 
 1. `PCG/StreetBuilding/Project Owned/Build Rich Styles + Six Building Showcase`，重建两套参考 Style Kit，重新 Cook 六栋展示建筑并直接保存场景。
 2. `PCG/StreetBuilding/Project Owned/Audit Reference Style Kits`，确认依赖只来自当前 Style、对应材质目录、项目 Authoring 脚本与 URP Package。
-3. 检查 `PCG_Building` 的正面、侧背面与屋顶；六栋建筑应在体量、层数、首层用途、立面节奏和细节密度上可辨识。
+3. 检查 `PCG_Building` 的正面、侧背面与屋顶；展示固定为 2 栋矩形 + 4 栋左右 L 形，不生成 U 形。
 4. 运行 StreetBuilding `VerifyFast` 与 `VerifyFull`，确保 HDA/HIP 累计合同没有变化。
 
 ## 8. Authoring 流程
 
 1. 美术按本规范创建 FBX 与 Prefab。
-2. 在 `StreetBuildingInstanceModuleCatalog` 中登记 Style、允许目录和模块槽位。
+2. 在 `StreetBuildingStyleLibrary` 登记 Style Catalog；在 Catalog V3 中登记 Family、Role、Variant、权重与单面模块。
 3. 在 `StreetBuildingAuthoring` Inspector 执行 `Validate Catalog`。
 4. 执行 `Compile Preview`，确认 Payload 和 SHA-256 稳定。
 5. 执行 `Apply, Cook & Save Scene`；该操作更新 `module_source`、`unity_instance_catalog` 和 `style_id`，Cook 成功后直接保存 Scene。

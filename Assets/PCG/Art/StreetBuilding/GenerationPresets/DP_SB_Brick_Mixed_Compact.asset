@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f0f60d1f168cdc40bf0c1018fa2f32a, type: 3}
+  m_Name: DP_SB_Brick_Mixed_Compact
+  m_EditorClassIdentifier: 
+  _width: 10
+  _depth: 8
+  _massingShape: 0
+  _notchWidth: 4
+  _notchDepth: 4
+  _notchSide: 0
+  _floors: 3
+  _cornerBuilding: 0
+  _groundUse: 3
+  _facadeMode: 0
+  _facadeRhythm: 1
+  _shopfrontRatio: 0.55
+  _sideMode: 2
+  _rearMode: 2
+  _generateRoof: 1
+  _parapetHeight: 0.6
+  _generateArchitecturalTrim: 1
+  _generateAttachments: 1
+  _detailDensity: 0.35
+  _baseSeed: 101
+  _facadeOverrides: []
+  _attachmentRules:
+  - _kind: 0
+    _density: 0.35
+    _maximumCount: 8
+    _facades: 3
+    _floorFrom: 1
+    _floorTo: 1
+  - _kind: 1
+    _density: 0.35
+    _maximumCount: 8
+    _facades: 3
+    _floorFrom: 1
+    _floorTo: 1
+  - _kind: 2
+    _density: 0.175
+    _maximumCount: 4
+    _facades: 12
+    _floorFrom: 2
+    _floorTo: 3
+  - _kind: 3
+    _density: 0.35
+    _maximumCount: 16
+    _facades: 15
+    _floorFrom: 2
+    _floorTo: 3
+  - _kind: 4
+    _density: 0.175
+    _maximumCount: 8
+    _facades: 15
+    _floorFrom: 4
+    _floorTo: 4

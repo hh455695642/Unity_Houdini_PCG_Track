@@ -1,0 +1,532 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b89995859dd1049adca88ae92265a3, type: 3}
+  m_Name: SBStyle_urban_brick_mixeduse_01
+  m_EditorClassIdentifier: 
+  _schemaVersion: 4
+  _styleId: urban_brick_mixeduse_01
+  _displayName: Urban Brick Mixed Use 01
+  _cellWidth: 2
+  _groundFloorHeight: 4
+  _typicalFloorHeight: 3
+  _allowedAssetRoots:
+  - Assets/PCG/Art/StreetBuilding/urban_brick_mixeduse_01
+  _groundFacade:
+  - _prefab: {fileID: 5776335057141414780, guid: df96b1386cee5394d871ce6f1bf34ceb,
+      type: 3}
+    _variantId: entrance_metal
+    _moduleRole: 3
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 6370016066608996344, guid: c010bb052cd16c9488c5264ddb9f2f06,
+      type: 3}
+    _variantId: entrance_glass
+    _moduleRole: 3
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 3
+    _weight: 0.45
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 61137608165969114, guid: 2197da902c0c80e4aba8a6014d06213e, type: 3}
+    _variantId: shop_metal
+    _moduleRole: 0
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 2115228737020647468, guid: 8f661e2caea06014bad8c7f99fcc588d,
+      type: 3}
+    _variantId: shop_trim
+    _moduleRole: 0
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 3
+    _weight: 0.65
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 3270426431276137335, guid: 43a4aa264d31a5549bfc4c6c4901548c,
+      type: 3}
+    _variantId: shop_arcade
+    _moduleRole: 0
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 3
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 3139449169823053378, guid: 920f0893244f30b4e967579912d6a054,
+      type: 3}
+    _variantId: wall_ground
+    _moduleRole: 2
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 4
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 1
+  _upperFacade:
+  - _prefab: {fileID: 730852391573534854, guid: 6be9bba81e15090408ccfb1e559740c1,
+      type: 3}
+    _variantId: trim
+    _moduleRole: 4
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 8951159662851670316, guid: eba005a3403389743b2eda186bbf8d37,
+      type: 3}
+    _variantId: trim_single
+    _moduleRole: 4
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.8
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 385223359306764202, guid: e88bc6b485ef17344a8a24692b2ca18a,
+      type: 3}
+    _variantId: curved_double
+    _moduleRole: 4
+    _widthSpan: 2
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.35
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 240821458922664702, guid: 24a3c1d1d54526745b89c58de3e5967b,
+      type: 3}
+    _variantId: balcony
+    _moduleRole: 4
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.45
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 6261661837821192227, guid: 8300d055b0ff1214badb2879b9cebf7d,
+      type: 3}
+    _variantId: narrow_pair
+    _moduleRole: 4
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 1242450792411420473, guid: 45448184bd51c864ca476c8213af5ce6,
+      type: 3}
+    _variantId: plain_a
+    _moduleRole: 5
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 4357193879988287293, guid: b258ed2ada21f9f44abaae96892c81d1,
+      type: 3}
+    _variantId: plain_b
+    _moduleRole: 5
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 5624033334315930480, guid: 580d4050748ea314d84f9215371da86c,
+      type: 3}
+    _variantId: panel
+    _moduleRole: 5
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.4
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  _sideRear:
+  - _prefab: {fileID: 4706583554062255126, guid: 9e50deeadd553a04f82f43dec6f6744e,
+      type: 3}
+    _variantId: ground
+    _moduleRole: 10
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 4
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 4
+    _allowedFloors: 1
+  - _prefab: {fileID: 3213287985130935855, guid: bcba640fb5a3fb842aca8a13cc4be4a8,
+      type: 3}
+    _variantId: upper_a
+    _moduleRole: 10
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 4
+    _allowedFloors: 2
+  - _prefab: {fileID: 491520066217262191, guid: ce6b5984f606e5b4ebb8aa613da2fd82,
+      type: 3}
+    _variantId: upper_b
+    _moduleRole: 10
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 4
+    _allowedFloors: 2
+  - _prefab: {fileID: 2827071343053625889, guid: 0332a9e817ab55b4e8845f11e494b9f9,
+      type: 3}
+    _variantId: upper_c
+    _moduleRole: 10
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.35
+    _enabled: 1
+    _allowedFacades: 4
+    _allowedFloors: 2
+  - _prefab: {fileID: 6599273880348673411, guid: 26692bbe9b8256246a531c44231aa443,
+      type: 3}
+    _variantId: ground
+    _moduleRole: 11
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 0
+    _absoluteHeight: 4
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 8
+    _allowedFloors: 1
+  - _prefab: {fileID: 5747764035310448051, guid: a4adcab0c6b92cc4eb62659434442c76,
+      type: 3}
+    _variantId: upper_a
+    _moduleRole: 11
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 8
+    _allowedFloors: 2
+  - _prefab: {fileID: 8333046866946633127, guid: 3381f3298d4f38f4786e047522a07f0a,
+      type: 3}
+    _variantId: upper_b
+    _moduleRole: 11
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 8
+    _allowedFloors: 2
+  - _prefab: {fileID: 3660868897903578133, guid: ce4523aa29f23b245a257ec3e7796eb4,
+      type: 3}
+    _variantId: service
+    _moduleRole: 11
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 1
+    _absoluteHeight: 3
+    _weight: 0.3
+    _enabled: 1
+    _allowedFacades: 8
+    _allowedFloors: 2
+  _convexConcaveCorners: []
+  _columnTrimCornice:
+  - _prefab: {fileID: 106005199383582058, guid: 1d90d0bb86e55014dbd0c1d540d168e2,
+      type: 3}
+    _variantId: brick_center
+    _moduleRole: 8
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 1
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 7
+  - _prefab: {fileID: 2713131771433928642, guid: a219bbce824084c4492c954ed2183954,
+      type: 3}
+    _variantId: trim_ground
+    _moduleRole: 12
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 7
+  - _prefab: {fileID: 2709321309675510432, guid: ba1c8755581c5b94f92d7458546e1fea,
+      type: 3}
+    _variantId: brick_upper
+    _moduleRole: 12
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 3
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 7
+  - _prefab: {fileID: 7405104700063533056, guid: 9825bd062680677499cd5f26e1c8e331,
+      type: 3}
+    _variantId: accent_capital
+    _moduleRole: 12
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 3
+    _weight: 0.35
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 7
+  _roofParapet:
+  - _prefab: {fileID: 7466805306592326812, guid: 91c5e33eac6de474d8dd64972f325b95,
+      type: 3}
+    _variantId: roof_2x2
+    _moduleRole: 19
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 2
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 8801575860994558054, guid: bfbc512ec4da24e4c9f179559ba05be8,
+      type: 3}
+    _variantId: straight_2m
+    _moduleRole: 9
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 0.6
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 6221826580590716885, guid: 741efd494cb706148b212214e60a9ccc,
+      type: 3}
+    _variantId: corner_90
+    _moduleRole: 20
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 0.6
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 2009134178023053728, guid: 749bca78d6c30b848a548f05c2153c5c,
+      type: 3}
+    _variantId: concave_90
+    _moduleRole: 21
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 2
+    _absoluteHeight: 0.6
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  _attachments:
+  - _prefab: {fileID: 3598534212064782929, guid: f25c7df9e2eccf04fac6308071e28f61,
+      type: 3}
+    _variantId: canopy
+    _moduleRole: 14
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 4957996002605579858, guid: 3a6c70d81b0f9734eb5a3e752b384ff9,
+      type: 3}
+    _variantId: slatted
+    _moduleRole: 14
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 3031455084633738140, guid: bd1b5ec771bd16449803fcd446d54524,
+      type: 3}
+    _variantId: board
+    _moduleRole: 15
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 4145244087006076071, guid: b1053b3866d4c9c4e9db969cdd4c1a62,
+      type: 3}
+    _variantId: vertical
+    _moduleRole: 15
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 0.45
+    _enabled: 1
+    _allowedFacades: 3
+    _allowedFloors: 1
+  - _prefab: {fileID: 7200407435137317813, guid: 2d382baef83a15b489be9f45e9c77def,
+      type: 3}
+    _variantId: two_floor
+    _moduleRole: 16
+    _widthSpan: 2
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 6
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 12
+    _allowedFloors: 2
+  - _prefab: {fileID: 5465854591051727273, guid: 51e5cada7b13872429dc6969533b5b23,
+      type: 3}
+    _variantId: wall_unit
+    _moduleRole: 17
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 2190523828212337901, guid: 18fa3f9de14880342986432d1f862c92,
+      type: 3}
+    _variantId: twin
+    _moduleRole: 17
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 1
+    _weight: 0.4
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 2
+  - _prefab: {fileID: 2309007235930859050, guid: 0d443b2c9a2e710418a0ca54370832e7,
+      type: 3}
+    _variantId: water_tank
+    _moduleRole: 18
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 2
+    _weight: 1
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 4292626091344891879, guid: 812a5c7ae46f076499e14ed9cd988a90,
+      type: 3}
+    _variantId: roof_vent
+    _moduleRole: 18
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 2
+    _weight: 0.7
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 6529265573914487604, guid: 4eeed5ad6de93a3418466cb0f799d437,
+      type: 3}
+    _variantId: mechanical_box
+    _moduleRole: 18
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 2
+    _weight: 0.5
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 2785582668208528588, guid: 8b11aef3c74136245bc6c46c5ea4a6d1,
+      type: 3}
+    _variantId: skylight
+    _moduleRole: 18
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 2
+    _weight: 0.55
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4
+  - _prefab: {fileID: 1463990430169651461, guid: d7aa0b93e3ae31744bd8d0e3244a6757,
+      type: 3}
+    _variantId: chimney
+    _moduleRole: 18
+    _widthSpan: 1
+    _depthSpan: 1
+    _heightType: 3
+    _absoluteHeight: 2
+    _weight: 0.4
+    _enabled: 1
+    _allowedFacades: 15
+    _allowedFloors: 4

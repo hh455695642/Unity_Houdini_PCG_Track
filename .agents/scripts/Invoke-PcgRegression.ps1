@@ -291,10 +291,10 @@ function Invoke-StreetBuildingContractTests {
         throw 'StreetBuilding EditMode contract bridge returned no result.'
     }
     $value = [string]$result.value
-    if (-not $value.StartsWith('PASS|6|')) {
+    if (-not $value.StartsWith('PASS|7|')) {
         throw "StreetBuilding EditMode contract bridge returned an invalid result: $value"
     }
-    Write-Step 'PASS' 'StreetBuilding EditMode contracts: 6 passed'
+    Write-Step 'PASS' 'StreetBuilding EditMode contracts: 7 passed'
 }
 
 if ($Stage -eq 'Capture') {

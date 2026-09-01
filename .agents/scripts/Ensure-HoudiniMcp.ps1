@@ -294,6 +294,143 @@ function Test-CodexHoudiniMcpConfig {
     return $expectedUrl
 }
 
+function Test-CodexCliHoudiniMcpConfig {
+    param(
+        [string]$Path,
+        [string]$ExpectedUrl
+    )
+
+    $codexCommand = Get-Command 'codex' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $codexCommand) {
+        throw 'Missing Codex CLI. The Houdini MCP endpoint cannot be validated against Codex configuration parsing.'
+    }
+
+    # Force the CLI to parse the same config file validated above. A malformed
+    # unrelated top-level option prevents every MCP server from loading, even
+    # when the Houdini section and endpoint themselves are correct.
+    $configHome = Split-Path -Path $Path -Parent
+    $previousCodexHome = $env:CODEX_HOME
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $env:CODEX_HOME = $configHome
+        $ErrorActionPreference = 'Continue'
+        $output = & $codexCommand.Source mcp get houdini 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($null -eq $previousCodexHome) {
+            Remove-Item -Path 'Env:\CODEX_HOME' -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:CODEX_HOME = $previousCodexHome
+        }
+    }
+
+    $text = ($output | ForEach-Object { [string]$_ }) -join "`n"
+    if ($exitCode -ne 0) {
+        throw "Codex CLI rejected $Path; no MCP server can load until the configuration parses successfully. Detail: $text"
+    }
+    if (-not $text.Contains($ExpectedUrl)) {
+        throw "Codex CLI loaded the Houdini MCP entry but did not report expected URL $ExpectedUrl. Detail: $text"
+    }
+}
+
+function Test-McpToolDiscovery {
+    param([string]$Endpoint)
+
+    $baseHeaders = @{ Accept = 'application/json, text/event-stream' }
+    $initializeBody = @{
+        jsonrpc = '2.0'
+        id = 1
+        method = 'initialize'
+        params = @{
+            protocolVersion = '2025-06-18'
+            capabilities = @{}
+            clientInfo = @{ name = 'pcg-houdini-preflight'; version = '1.0' }
+        }
+    } | ConvertTo-Json -Depth 6 -Compress
+
+    $initialize = Invoke-WebRequest `
+        -UseBasicParsing `
+        -Uri $Endpoint `
+        -Method Post `
+        -Headers $baseHeaders `
+        -ContentType 'application/json' `
+        -Body $initializeBody `
+        -TimeoutSec 10
+
+    $sessionId = [string]$initialize.Headers['mcp-session-id']
+    if ([string]::IsNullOrWhiteSpace($sessionId)) {
+        throw "Houdini MCP initialize response did not include mcp-session-id: $Endpoint"
+    }
+
+    $sessionHeaders = @{
+        Accept = 'application/json, text/event-stream'
+        'mcp-session-id' = $sessionId
+    }
+
+    try {
+        $initializedBody = @{ jsonrpc = '2.0'; method = 'notifications/initialized' } |
+            ConvertTo-Json -Compress
+        Invoke-WebRequest `
+            -UseBasicParsing `
+            -Uri $Endpoint `
+            -Method Post `
+            -Headers $sessionHeaders `
+            -ContentType 'application/json' `
+            -Body $initializedBody `
+            -TimeoutSec 10 | Out-Null
+
+        $toolsBody = @{ jsonrpc = '2.0'; id = 2; method = 'tools/list'; params = @{} } |
+            ConvertTo-Json -Depth 4 -Compress
+        $toolsResponse = Invoke-WebRequest `
+            -UseBasicParsing `
+            -Uri $Endpoint `
+            -Method Post `
+            -Headers $sessionHeaders `
+            -ContentType 'application/json' `
+            -Body $toolsBody `
+            -TimeoutSec 20
+
+        $dataLine = $toolsResponse.Content -split "`n" |
+            Where-Object { $_ -like 'data:*' } |
+            Select-Object -Last 1
+        if ([string]::IsNullOrWhiteSpace($dataLine)) {
+            throw "Houdini MCP tools/list returned no SSE data event: $Endpoint"
+        }
+
+        $response = $dataLine.Substring(5).Trim() | ConvertFrom-Json
+        if ($response.error) {
+            throw "Houdini MCP tools/list failed: $($response.error | ConvertTo-Json -Compress)"
+        }
+
+        $tools = @($response.result.tools)
+        if ($tools.Count -eq 0) {
+            throw "Houdini MCP initialized but exposed zero tools: $Endpoint"
+        }
+
+        return [PSCustomObject]@{
+            SessionId = $sessionId
+            ToolCount = $tools.Count
+            ToolNames = @($tools | ForEach-Object { $_.name })
+        }
+    }
+    finally {
+        try {
+            Invoke-WebRequest `
+                -UseBasicParsing `
+                -Uri $Endpoint `
+                -Method Delete `
+                -Headers $sessionHeaders `
+                -TimeoutSec 3 | Out-Null
+        }
+        catch {
+            # Session cleanup is best-effort and must not hide discovery results.
+        }
+    }
+}
+
 function Start-HoudiniMcpServer {
     param(
         [string]$Repo,
@@ -396,6 +533,12 @@ Write-Step 'OK' "Houdini MCP Server healthy: $($health.Uri), listener=$($mcpList
 $mcpEndpoint = Test-CodexHoudiniMcpConfig -Path $CodexConfigPath -Port $McpPort
 Write-Step 'OK' "Codex Houdini MCP endpoint configured: $mcpEndpoint"
 
+Test-CodexCliHoudiniMcpConfig -Path $CodexConfigPath -ExpectedUrl $mcpEndpoint
+Write-Step 'OK' 'Codex CLI accepted the complete configuration and resolved the Houdini MCP entry.'
+
+$mcpDiscovery = Test-McpToolDiscovery -Endpoint $mcpEndpoint
+Write-Step 'OK' "Houdini MCP protocol discovery passed: $($mcpDiscovery.ToolCount) tools."
+
 [PSCustomObject]@{
     HoudiniProcessId = $houdiniProcess.Id
     RpcPort          = $HoudiniPort
@@ -406,4 +549,5 @@ Write-Step 'OK' "Codex Houdini MCP endpoint configured: $mcpEndpoint"
     McpHealth        = $health.Status
     McpService       = $health.Service
     McpEndpoint      = $mcpEndpoint
+    McpToolCount     = $mcpDiscovery.ToolCount
 }

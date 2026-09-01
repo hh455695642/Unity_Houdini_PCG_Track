@@ -16,6 +16,7 @@ import copy
 import datetime as _datetime
 import fnmatch
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import traceback
 from typing import Any, Iterable
 
 
@@ -67,7 +69,7 @@ MODULES: dict[str, dict[str, Any]] = {
         "asset_type": "pcgbike::StreetBuilding::1.0",
         "definition": "Assets/PCG/HDA/City/StreetBuilding.hda",
         "hip": "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip",
-        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_roof_alignment_v61.py",
+        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_styleconfig_sbv4_v9.py",
         "restore_files": ["Assets/PCG/HDA/City/StreetBuilding.hda.meta"],
         "network_roots": ["StreetBuildingCore"],
         "outputs": [
@@ -889,29 +891,57 @@ def persist_isolated(
         }
 
     builder = resolve_scoped_path(project_root, config["builder"])
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(builder),
-            "--project-root",
-            str(project_root),
-            "--save",
-            "true",
-            "--update-existing",
-            "true",
-        ],
-        cwd=project_root,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-        check=False,
-    )
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.returncode != 0:
-        raise GateFailure(
-            "Isolated builder failed:\n" + (result.stderr or result.stdout).strip())
+    if module == "StreetBuilding":
+        # The gate already runs in a disposable hython. Launching another
+        # hython here can fail silently on Windows when Unity and Houdini GUI
+        # also own Engine sessions. Execute the project builder in this same
+        # isolated process and retain byte-exact rollback on any exception.
+        import hou
+        definition_path = resolve_scoped_path(project_root, definition)
+        hip_path = resolve_scoped_path(project_root, hip)
+        before_definition = definition_path.read_bytes()
+        before_hip = hip_path.read_bytes()
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "pcg_streetbuilding_isolated_builder", builder)
+            if spec is None or spec.loader is None:
+                raise RuntimeError(f"Cannot load isolated builder: {builder}")
+            builder_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(builder_module)
+            hou.hipFile.load(str(hip_path), suppress_save_prompt=True,
+                             ignore_load_warnings=False)
+            hou.hda.installFile(str(definition_path),
+                                change_oplibraries_file=False,
+                                force_use_assets=True)
+            asset = hou.node(config["asset_path"])
+            result_data = builder_module.apply_loaded(asset, save=True)
+            print(json.dumps(result_data, ensure_ascii=False, indent=2))
+        except Exception as exc:
+            definition_path.write_bytes(before_definition)
+            hip_path.write_bytes(before_hip)
+            raise GateFailure("Isolated builder failed:\n" + traceback.format_exc()) from exc
+    else:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(builder),
+                "--project-root",
+                str(project_root),
+                "--save",
+                "true",
+            ],
+            cwd=project_root,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.returncode != 0:
+            raise GateFailure(
+                "Isolated builder failed:\n" + (result.stderr or result.stdout).strip())
     states = file_state(project_root, (config["definition"], config["hip"]))
     missing = [path for path, state in states.items() if not state["exists"]]
     if missing:

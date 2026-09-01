@@ -3,7 +3,6 @@ using System;
 using HoudiniEngineUnity;
 using PCGBike.Buildings;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace PCGBike.Editor.Buildings
@@ -14,99 +13,75 @@ namespace PCGBike.Editor.Buildings
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_catalog"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_designPreset"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_variationSeed"));
+            EditorGUILayout.LabelField("风格解析", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"), new GUIContent("固定 StyleConfig"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_styleLibrary"), new GUIContent("Style Library"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_buildingId"), new GUIContent("Building ID"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_usageTag"), new GUIContent("用途 Tag"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_variationSeed"), new GUIContent("Variation Seed"));
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("生成规则", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_generationPreset"), new GUIContent("可选 GenerationPreset"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
-            using (new EditorGUI.DisabledScope(authoring.Catalog == null))
+            StreetBuildingStyleConfig style = authoring.ResolveStyle();
+            string source = authoring.FixedStyleConfig != null ? "Fixed StyleConfig"
+                : authoring.StyleLibrary != null ? "StyleLibrary 稳定加权选择" : "未解析";
+            EditorGUILayout.HelpBox(style == null
+                    ? "最终风格：未解析"
+                    : $"最终风格：{style.DisplayName} ({style.StyleId})\n来源：{source}\n规则："
+                      + (authoring.GenerationPreset == null ? "HDA 可见参数" : "GenerationPreset > HDA 参数"),
+                style == null ? MessageType.Error : MessageType.Info);
+
+            using (new EditorGUI.DisabledScope(style == null))
+            using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Validate Catalog"))
-                    LogValidation(authoring);
-                if (GUILayout.Button("Compile Preview"))
-                    CompilePreview(authoring);
-                if (GUILayout.Button("Apply, Cook & Save Scene"))
-                    ApplyAndCook(authoring);
+                if (GUILayout.Button("Validate")) Validate(authoring, style);
+                if (GUILayout.Button("Compile Preview")) CompilePreview(authoring, style);
+                if (GUILayout.Button("定位 StyleConfig")) EditorGUIUtility.PingObject(style);
             }
-            using (new EditorGUI.DisabledScope(authoring.DesignPreset == null))
-            {
-                if (GUILayout.Button("Apply Design Preset, Cook & Save Scene"))
-                    ApplyDesign(authoring);
-            }
+            using (new EditorGUI.DisabledScope(style == null))
+                if (GUILayout.Button("Apply Style + Rules, Cook & Save Scene")) Apply(authoring);
 
             if (!string.IsNullOrEmpty(authoring.LastAppliedPayloadSha256))
-                EditorGUILayout.HelpBox(
-                    "Last applied payload SHA-256:\n" + authoring.LastAppliedPayloadSha256,
-                    MessageType.Info);
+                EditorGUILayout.HelpBox("最后 Style Payload SHA-256:\n" + authoring.LastAppliedPayloadSha256, MessageType.None);
             if (!string.IsNullOrEmpty(authoring.LastAppliedDesignSha256))
-                EditorGUILayout.HelpBox(
-                    "Last applied design SHA-256:\n" + authoring.LastAppliedDesignSha256,
-                    MessageType.Info);
+                EditorGUILayout.HelpBox("最后完整规则 SHA-256:\n" + authoring.LastAppliedDesignSha256, MessageType.None);
+            if (!string.IsNullOrEmpty(authoring.LastCookDiagnostic))
+                EditorGUILayout.HelpBox("Cook 诊断：\n" + authoring.LastCookDiagnostic,
+                    authoring.LastCookDiagnostic.Contains("PASS") ? MessageType.Info : MessageType.Warning);
         }
 
-        private static void LogValidation(StreetBuildingAuthoring authoring)
+        private static void Validate(StreetBuildingAuthoring authoring, StreetBuildingStyleConfig style)
         {
-            StreetBuildingCatalogValidationReport report =
-                StreetBuildingModuleCatalogValidator.Validate(authoring.Catalog);
-            if (report.IsValid)
-                Debug.Log(report, authoring);
-            else
-                Debug.LogError(report, authoring);
+            string result = StreetBuildingDesignPresetApplier.Validate(authoring.GenerationPreset, style);
+            if (string.IsNullOrEmpty(result)) Debug.Log("StreetBuilding Style + Generation validation PASS.", authoring);
+            else Debug.LogError(result, authoring);
         }
 
-        private static void CompilePreview(StreetBuildingAuthoring authoring)
+        private static void CompilePreview(StreetBuildingAuthoring authoring, StreetBuildingStyleConfig style)
         {
             try
             {
-                StreetBuildingCompiledCatalog compiled =
-                    StreetBuildingModuleCatalogCompiler.Compile(authoring.Catalog);
-                Debug.Log(
-                    $"StreetBuilding Catalog compile PASS: {compiled.ModuleCount} modules / "
-                    + $"{compiled.PartCount} parts / SHA-256 {compiled.Sha256}\n{compiled.Payload}",
-                    authoring);
+                StreetBuildingCompiledStyle compiledStyle = StreetBuildingStyleCompiler.Compile(style);
+                StreetBuildingCompiledGeneration compiledRules = StreetBuildingGenerationCompiler.Compile(
+                    authoring.GenerationPreset, style, authoring.VariationSeed);
+                Debug.Log($"StreetBuilding compile PASS\nSBV4 {compiledStyle.ModuleCount} modules / {compiledStyle.Sha256}"
+                          + $"\nSBR1 {compiledRules.Sha256}\n{compiledStyle.Payload}\n{compiledRules.Payload}", authoring);
             }
-            catch (Exception exception)
-            {
-                Debug.LogError("StreetBuilding Catalog compile failed.\n" + exception, authoring);
-            }
+            catch (Exception exception) { Debug.LogError("StreetBuilding compile failed.\n" + exception, authoring); }
         }
 
-        private static void ApplyAndCook(StreetBuildingAuthoring authoring)
+        private static void Apply(StreetBuildingAuthoring authoring)
         {
             try
             {
                 HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
-                StreetBuildingCompiledCatalog compiled =
-                    StreetBuildingModuleCatalogApplier.Apply(root, authoring);
-                if (!EditorSceneManager.SaveScene(authoring.gameObject.scene))
-                    throw new InvalidOperationException("StreetBuilding Scene save failed.");
-                Debug.Log(
-                    "StreetBuilding Catalog applied, cooked and saved. Payload SHA-256 "
-                    + compiled.Sha256,
-                    authoring);
+                StreetBuildingCompiledStyle compiled = StreetBuildingDesignPresetApplier.ApplyAndSave(root, authoring);
+                Debug.Log("StreetBuilding applied, cooked and saved. SBV4 SHA-256 " + compiled.Sha256, authoring);
             }
-            catch (Exception exception)
-            {
-                Debug.LogError("StreetBuilding Catalog apply failed.\n" + exception, authoring);
-            }
-        }
-
-        private static void ApplyDesign(StreetBuildingAuthoring authoring)
-        {
-            try
-            {
-                HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
-                StreetBuildingCompiledCatalog compiled =
-                    StreetBuildingDesignPresetApplier.ApplyAndSave(root, authoring);
-                Debug.Log("StreetBuilding DesignPreset applied, cooked and saved. Payload SHA-256 "
-                          + compiled.Sha256 + " / Design SHA-256 "
-                          + authoring.LastAppliedDesignSha256, authoring);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogError("StreetBuilding DesignPreset apply failed.\n" + exception, authoring);
-            }
+            catch (Exception exception) { Debug.LogError("StreetBuilding apply failed.\n" + exception, authoring); }
         }
     }
 }

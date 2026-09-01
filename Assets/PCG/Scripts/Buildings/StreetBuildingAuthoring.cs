@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace PCGBike.Buildings
 {
@@ -10,30 +11,56 @@ namespace PCGBike.Buildings
     [AddComponentMenu("PCG Bike/Street Building/Authoring")]
     public sealed class StreetBuildingAuthoring : MonoBehaviour
     {
-        [SerializeField] private StreetBuildingInstanceModuleCatalog _catalog;
-        [SerializeField] private StreetBuildingDesignPreset _designPreset;
+        [SerializeField] private StreetBuildingStyleConfig _fixedStyleConfig;
+        [SerializeField] private StreetBuildingStyleLibrary _styleLibrary;
+        [SerializeField] private string _buildingId;
+        [SerializeField] private string _usageTag;
+        [FormerlySerializedAs("_designPreset")]
+        [SerializeField] private StreetBuildingGenerationPreset _generationPreset;
         [SerializeField] private int _variationSeed;
         [SerializeField, HideInInspector] private string _lastAppliedPayloadSha256;
         [SerializeField, HideInInspector] private string _lastAppliedDesignSha256;
+        [SerializeField, HideInInspector] private string _lastCookDiagnostic;
 
-        public StreetBuildingInstanceModuleCatalog Catalog => _catalog;
-        public StreetBuildingDesignPreset DesignPreset => _designPreset;
+        public StreetBuildingStyleConfig FixedStyleConfig => _fixedStyleConfig;
+        public StreetBuildingStyleLibrary StyleLibrary => _styleLibrary;
+        public string BuildingId => string.IsNullOrWhiteSpace(_buildingId) ? gameObject.name : _buildingId;
+        public string UsageTag => _usageTag;
+        public StreetBuildingGenerationPreset GenerationPreset => _generationPreset;
+        [System.Obsolete("Use GenerationPreset.")]
+        public StreetBuildingDesignPreset DesignPreset => _generationPreset as StreetBuildingDesignPreset;
         public int VariationSeed => _variationSeed;
         public string LastAppliedPayloadSha256 => _lastAppliedPayloadSha256;
         public string LastAppliedDesignSha256 => _lastAppliedDesignSha256;
+        public string LastCookDiagnostic => _lastCookDiagnostic;
 
-#if UNITY_EDITOR
-        public void SetEditorCatalog(StreetBuildingInstanceModuleCatalog catalog)
+        public StreetBuildingStyleConfig ResolveStyle()
         {
-            _catalog = catalog;
+            if (_fixedStyleConfig != null)
+                return _fixedStyleConfig;
+            return _styleLibrary == null
+                ? null
+                : _styleLibrary.ResolveStyle(BuildingId, _variationSeed, _usageTag);
         }
 
-        public void SetEditorDesign(StreetBuildingDesignPreset preset, int variationSeed)
+#if UNITY_EDITOR
+        public void SetEditorFixedStyle(StreetBuildingStyleConfig styleConfig)
         {
-            _designPreset = preset;
+            _fixedStyleConfig = styleConfig;
+        }
+
+        public void SetEditorStyleLibrary(
+            StreetBuildingStyleLibrary styleLibrary, string buildingId, string usageTag = null)
+        {
+            _styleLibrary = styleLibrary;
+            _buildingId = buildingId ?? string.Empty;
+            _usageTag = usageTag ?? string.Empty;
+        }
+
+        public void SetEditorDesign(StreetBuildingGenerationPreset preset, int variationSeed)
+        {
+            _generationPreset = preset;
             _variationSeed = variationSeed;
-            if (preset != null)
-                _catalog = preset.Catalog;
         }
 
         public void SetEditorAppliedPayloadSha256(string sha256)
@@ -44,6 +71,12 @@ namespace PCGBike.Buildings
         public void SetEditorAppliedDesignSha256(string sha256)
         {
             _lastAppliedDesignSha256 = sha256 ?? string.Empty;
+        }
+
+
+        public void SetEditorCookDiagnostic(string diagnostic)
+        {
+            _lastCookDiagnostic = diagnostic ?? string.Empty;
         }
 #endif
     }
