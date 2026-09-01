@@ -50,11 +50,6 @@ namespace PCGBike.Buildings
     [CreateAssetMenu(fileName = "SBStyle_New", menuName = "PCG/Street Building/Style Config")]
     public sealed class StreetBuildingStyleConfig : ScriptableObject
     {
-        public const int CurrentSchemaVersion = 4;
-
-        [SerializeField] private int _schemaVersion = CurrentSchemaVersion;
-        [SerializeField] private string _styleId = "new_streetbuilding_style";
-        [SerializeField] private string _displayName = "新建筑风格";
         [SerializeField, Min(.01f)] private float _cellWidth = 2f;
         [SerializeField, Min(.01f)] private float _groundFloorHeight = 4f;
         [SerializeField, Min(.01f)] private float _typicalFloorHeight = 3f;
@@ -68,9 +63,6 @@ namespace PCGBike.Buildings
         [SerializeField] private List<StreetBuildingModuleDefinition> _roofParapet = new();
         [SerializeField] private List<StreetBuildingModuleDefinition> _attachments = new();
 
-        public int SchemaVersion => _schemaVersion;
-        public string StyleId => _styleId;
-        public string DisplayName => _displayName;
         public float CellWidth => _cellWidth;
         public float GroundFloorHeight => _groundFloorHeight;
         public float TypicalFloorHeight => _typicalFloorHeight;
@@ -106,14 +98,10 @@ namespace PCGBike.Buildings
             source ?? Array.Empty<StreetBuildingModuleDefinition>();
 
 #if UNITY_EDITOR
-        public void SetEditorData(int schemaVersion, string styleId, string displayName,
-            float cellWidth, float groundFloorHeight, float typicalFloorHeight,
+        public void SetEditorData(float cellWidth, float groundFloorHeight, float typicalFloorHeight,
             IEnumerable<string> allowedAssetRoots,
             IDictionary<StreetBuildingModuleGroup, List<StreetBuildingModuleDefinition>> groups)
         {
-            _schemaVersion = schemaVersion;
-            _styleId = styleId ?? string.Empty;
-            _displayName = displayName ?? string.Empty;
             _cellWidth = cellWidth;
             _groundFloorHeight = groundFloorHeight;
             _typicalFloorHeight = typicalFloorHeight;

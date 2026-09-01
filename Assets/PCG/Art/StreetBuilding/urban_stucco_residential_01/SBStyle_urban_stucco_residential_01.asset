@@ -12,9 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4b89995859dd1049adca88ae92265a3, type: 3}
   m_Name: SBStyle_urban_stucco_residential_01
   m_EditorClassIdentifier: 
-  _schemaVersion: 4
-  _styleId: urban_stucco_residential_01
-  _displayName: Urban Stucco Residential 01
   _cellWidth: 2
   _groundFloorHeight: 4
   _typicalFloorHeight: 3

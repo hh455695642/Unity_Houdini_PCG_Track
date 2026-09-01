@@ -30,7 +30,7 @@ namespace PCGBike.Editor.Buildings
                 : authoring.StyleLibrary != null ? "StyleLibrary 稳定加权选择" : "未解析";
             EditorGUILayout.HelpBox(style == null
                     ? "最终风格：未解析"
-                    : $"最终风格：{style.DisplayName} ({style.StyleId})\n来源：{source}\n规则："
+                    : $"最终风格：{style.name}\n来源：{source}\n规则："
                       + (authoring.GenerationPreset == null ? "HDA 可见参数" : "GenerationPreset > HDA 参数"),
                 style == null ? MessageType.Error : MessageType.Info);
 
@@ -67,7 +67,7 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingCompiledStyle compiledStyle = StreetBuildingStyleCompiler.Compile(style);
                 StreetBuildingCompiledGeneration compiledRules = StreetBuildingGenerationCompiler.Compile(
                     authoring.GenerationPreset, style, authoring.VariationSeed);
-                Debug.Log($"StreetBuilding compile PASS\nSBV4 {compiledStyle.ModuleCount} modules / {compiledStyle.Sha256}"
+                Debug.Log($"StreetBuilding compile PASS\nStyle payload {compiledStyle.ModuleCount} modules / {compiledStyle.Sha256}"
                           + $"\nSBR1 {compiledRules.Sha256}\n{compiledStyle.Payload}\n{compiledRules.Payload}", authoring);
             }
             catch (Exception exception) { Debug.LogError("StreetBuilding compile failed.\n" + exception, authoring); }
@@ -79,7 +79,7 @@ namespace PCGBike.Editor.Buildings
             {
                 HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
                 StreetBuildingCompiledStyle compiled = StreetBuildingDesignPresetApplier.ApplyAndSave(root, authoring);
-                Debug.Log("StreetBuilding applied, cooked and saved. SBV4 SHA-256 " + compiled.Sha256, authoring);
+                Debug.Log("StreetBuilding applied, cooked and saved. Style payload SHA-256 " + compiled.Sha256, authoring);
             }
             catch (Exception exception) { Debug.LogError("StreetBuilding apply failed.\n" + exception, authoring); }
         }

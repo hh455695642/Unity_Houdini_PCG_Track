@@ -25,9 +25,6 @@ namespace PCGBike.Editor.Buildings
         {
             serializedObject.Update();
             EditorGUILayout.LabelField("风格总配置", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_schemaVersion"), new GUIContent("Schema 版本"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_styleId"), new GUIContent("稳定 Style ID"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_displayName"), new GUIContent("显示名称"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_cellWidth"), new GUIContent("单元宽度 (m)"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_groundFloorHeight"), new GUIContent("首层高度 (m)"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_typicalFloorHeight"), new GUIContent("标准层高度 (m)"));
@@ -87,9 +84,9 @@ namespace PCGBike.Editor.Buildings
             try
             {
                 StreetBuildingCompiledStyle result = StreetBuildingStyleCompiler.Compile(style);
-                Debug.Log($"SBV4 compile PASS: {result.ModuleCount} modules / SHA-256 {result.Sha256}\n{result.Payload}", style);
+                Debug.Log($"Style payload compile PASS: {result.ModuleCount} modules / SHA-256 {result.Sha256}\n{result.Payload}", style);
             }
-            catch (Exception exception) { Debug.LogError("SBV4 compile failed.\n" + exception, style); }
+            catch (Exception exception) { Debug.LogError("Style payload compile failed.\n" + exception, style); }
         }
     }
 }

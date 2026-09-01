@@ -48,11 +48,6 @@ namespace PCGBike.Editor.Buildings
         {
             var report = new StreetBuildingStyleValidationReport();
             if (style == null) { report.Error("StyleConfig is null."); return report; }
-            if (style.SchemaVersion != StreetBuildingStyleConfig.CurrentSchemaVersion)
-                report.Error($"SchemaVersion must be {StreetBuildingStyleConfig.CurrentSchemaVersion}.");
-            if (string.IsNullOrWhiteSpace(style.StyleId) || !IdPattern.IsMatch(style.StyleId))
-                report.Error($"StyleId '{style.StyleId}' must be lowercase snake_case.");
-            if (string.IsNullOrWhiteSpace(style.DisplayName)) report.Error("DisplayName is empty.");
             if (style.CellWidth <= 0 || style.GroundFloorHeight <= 0 || style.TypicalFloorHeight <= 0)
                 report.Error("Cell/floor dimensions must be positive.");
 
@@ -219,7 +214,7 @@ namespace PCGBike.Editor.Buildings
             string F(float value) => value.ToString("R", CultureInfo.InvariantCulture);
             var lines = new List<string>
             {
-                string.Join("|", "SBV4", style.StyleId, F(style.CellWidth),
+                string.Join("|", "STYLE", F(style.CellWidth),
                     F(style.GroundFloorHeight), F(style.TypicalFloorHeight))
             };
             var rows = new List<string>();

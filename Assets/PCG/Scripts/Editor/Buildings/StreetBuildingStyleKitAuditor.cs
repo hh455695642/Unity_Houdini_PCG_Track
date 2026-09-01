@@ -63,40 +63,37 @@ namespace PCGBike.Editor.Buildings
         /// <summary>Reflection/test-friendly deterministic audit entry point.</summary>
         public static string AuditProjectOwnedStyles()
         {
-            string[] styleIds =
+            string[] styleFolders =
             {
-                StreetBuildingProjectOwnedStyleBuilder.BrickStyleId,
-                StreetBuildingProjectOwnedStyleBuilder.StuccoStyleId
+                StreetBuildingProjectOwnedStyleBuilder.BrickStyleFolder,
+                StreetBuildingProjectOwnedStyleBuilder.StuccoStyleFolder
             };
-            var summaries = new List<string>(styleIds.Length);
-            foreach (string styleId in styleIds)
-                summaries.Add(AuditStyle(styleId));
+            var summaries = new List<string>(styleFolders.Length);
+            foreach (string styleFolder in styleFolders)
+                summaries.Add(AuditStyle(styleFolder));
             return $"PASS|{summaries.Count}|{string.Join(";", summaries)}";
         }
 
-        private static string AuditStyle(string styleId)
+        private static string AuditStyle(string styleFolder)
         {
-            string artRoot = "Assets/PCG/Art/StreetBuilding/" + styleId;
-            string materialRoot = "Assets/PCG/Materials/Buildings/" + styleId;
-            string stylePath = artRoot + "/SBStyle_" + styleId + ".asset";
+            string artRoot = "Assets/PCG/Art/StreetBuilding/" + styleFolder;
+            string materialRoot = "Assets/PCG/Materials/Buildings/" + styleFolder;
+            string stylePath = artRoot + "/SBStyle_" + styleFolder + ".asset";
             StreetBuildingStyleConfig style = AssetDatabase.LoadAssetAtPath<StreetBuildingStyleConfig>(stylePath);
             if (style == null)
                 throw new InvalidOperationException("Missing StyleConfig: " + stylePath);
-            if (!string.Equals(style.StyleId, styleId, StringComparison.Ordinal))
-                throw new InvalidOperationException(styleId + " StyleConfig StyleId mismatch.");
-
             StreetBuildingStyleValidationReport validation = StreetBuildingStyleValidator.Validate(style);
             if (!validation.IsValid)
-                throw new InvalidOperationException(styleId + "\n" + validation);
+                throw new InvalidOperationException(styleFolder + "\n" + validation);
             if (style.EnumerateModules().Count() != 42)
-                throw new InvalidOperationException(styleId + " requires exactly 42 module definitions.");
+                throw new InvalidOperationException(styleFolder + " requires exactly 42 module definitions.");
 
             HashSet<StreetBuildingModuleRole> roles = style.EnumerateModules()
                 .Where(item => item.Module != null).Select(item => item.Module.ModuleRole).ToHashSet();
             StreetBuildingModuleRole[] missingRoles = RequiredRoles
                 .Where(role => !roles.Contains(role)).ToArray();
             if (missingRoles.Length > 0)
-                throw new InvalidOperationException(styleId + " missing roles: " + string.Join(", ", missingRoles));
+                throw new InvalidOperationException(styleFolder + " missing roles: " + string.Join(", ", missingRoles));
 
             string[] dependencies = AssetDatabase.GetDependencies(stylePath, true)
                 .Concat(style.EnumerateModules().Where(item => item.Module?.Prefab != null)
@@ -112,40 +109,40 @@ namespace PCGBike.Editor.Buildings
                                || dependency.StartsWith("Assets/PCG/Scripts/Buildings/", StringComparison.Ordinal)
                                || dependency.StartsWith("Packages/", StringComparison.Ordinal);
                 if (!allowed)
-                    throw new InvalidOperationException(styleId + " has external dependency: " + dependency);
+                    throw new InvalidOperationException(styleFolder + " has external dependency: " + dependency);
                 if (dependency.IndexOf("Downtown City MegaKit", StringComparison.OrdinalIgnoreCase) >= 0)
-                    throw new InvalidOperationException(styleId + " references the validation MegaKit: " + dependency);
+                    throw new InvalidOperationException(styleFolder + " references the validation MegaKit: " + dependency);
             }
 
             string[] materialGuids = AssetDatabase.FindAssets("t:Material", new[] { materialRoot });
             if (materialGuids.Length != 5)
-                throw new InvalidOperationException(styleId + " must own exactly five shared materials.");
+                throw new InvalidOperationException(styleFolder + " must own exactly five shared materials.");
             foreach (string guid in materialGuids)
             {
                 Material material = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
                 if (material == null || material.shader == null
                     || material.shader.name != "Universal Render Pipeline/Lit")
-                    throw new InvalidOperationException(styleId + " material must use URP/Lit.");
+                    throw new InvalidOperationException(styleFolder + " material must use URP/Lit.");
                 if (!material.enableInstancing)
-                    throw new InvalidOperationException(styleId + " material must enable GPU Instancing: " + material.name);
+                    throw new InvalidOperationException(styleFolder + " material must enable GPU Instancing: " + material.name);
                 if (material.doubleSidedGI)
-                    throw new InvalidOperationException(styleId + " material must disable Double Sided GI: " + material.name);
+                    throw new InvalidOperationException(styleFolder + " material must disable Double Sided GI: " + material.name);
                 if (material.HasProperty("_Cull") && material.GetFloat("_Cull") < 1.5f)
-                    throw new InvalidOperationException(styleId + " material must use back-face culling: " + material.name);
+                    throw new InvalidOperationException(styleFolder + " material must use back-face culling: " + material.name);
             }
 
             string[] textureGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { artRoot + "/Textures" });
             if (textureGuids.Length != 5)
-                throw new InvalidOperationException(styleId + " must own exactly five reference textures.");
+                throw new InvalidOperationException(styleFolder + " must own exactly five reference textures.");
             foreach (string guid in textureGuids)
             {
                 Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(guid));
                 if (texture == null || texture.width != 128 || texture.height != 128)
-                    throw new InvalidOperationException(styleId + " reference textures must be 128x128.");
+                    throw new InvalidOperationException(styleFolder + " reference textures must be 128x128.");
             }
 
             StreetBuildingCompiledStyle compiled = StreetBuildingStyleCompiler.Compile(style);
-            return $"{styleId}:{compiled.ModuleCount}:{compiled.Sha256.Substring(0, 12)}";
+            return $"{styleFolder}:{compiled.ModuleCount}:{compiled.Sha256.Substring(0, 12)}";
         }
 
         private void OnGUI()

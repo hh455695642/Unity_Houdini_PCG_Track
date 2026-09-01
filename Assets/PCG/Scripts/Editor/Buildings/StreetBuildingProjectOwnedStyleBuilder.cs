@@ -14,8 +14,8 @@ namespace PCGBike.Editor.Buildings
     /// </summary>
     public static class StreetBuildingProjectOwnedStyleBuilder
     {
-        public const string BrickStyleId = "urban_brick_mixeduse_01";
-        public const string StuccoStyleId = "urban_stucco_residential_01";
+        public const string BrickStyleFolder = "urban_brick_mixeduse_01";
+        public const string StuccoStyleFolder = "urban_stucco_residential_01";
         public const string ScenePath = "Assets/PCG/Scenes/PCG_Building.unity";
         public const string ShowcaseRootName = "Phase4_ProjectOwned_Showcase";
 

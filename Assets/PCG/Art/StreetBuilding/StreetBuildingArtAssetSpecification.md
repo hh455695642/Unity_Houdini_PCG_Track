@@ -1,19 +1,19 @@
-# StreetBuilding 美术资产制作规范（V7 / Catalog V3 / 单面模块）
+# StreetBuilding 美术资产制作规范（V10 / 无版本 StyleConfig / 单面模块）
 
 本规范定义 StreetBuilding 模块化立面资产的长期自建标准。Downtown City MegaKit 仅作为只读验证源，不是项目正式资产模板。
 
 ## 1. 目录与命名
 
-每个风格使用稳定的小写 snake_case `StyleId`，例如 `na_brick_mixeduse_01`。
+每套资产创建一个独立 `StreetBuildingStyleConfig`。配置资产引用本身就是身份；目录名仅用于人工组织，不进入 Payload，也不要求额外维护 Style Id 或 Display Name。
 
 | 内容 | 路径 |
 |---|---|
-| 模型 | `Assets/PCG/Art/StreetBuilding/<StyleId>/Models/` |
-| Prefab | `Assets/PCG/Art/StreetBuilding/<StyleId>/Prefabs/` |
-| 验证细节 Prefab | `Assets/PCG/Art/StreetBuilding/<StyleId>/Prefabs/ValidationDetails/` |
-| Catalog | `Assets/PCG/Art/StreetBuilding/<StyleId>/` |
-| 材质 | `Assets/PCG/Materials/Buildings/<StyleId>/` |
-| 纹理 | `Assets/PCG/Art/StreetBuilding/<StyleId>/Textures/` |
+| 模型 | `Assets/PCG/Art/StreetBuilding/<StyleFolder>/Models/` |
+| Prefab | `Assets/PCG/Art/StreetBuilding/<StyleFolder>/Prefabs/` |
+| 验证细节 Prefab | `Assets/PCG/Art/StreetBuilding/<StyleFolder>/Prefabs/ValidationDetails/` |
+| StyleConfig | `Assets/PCG/Art/StreetBuilding/<StyleFolder>/` |
+| 材质 | `Assets/PCG/Materials/Buildings/<StyleFolder>/` |
+| 纹理 | `Assets/PCG/Art/StreetBuilding/<StyleFolder>/Textures/` |
 
 - 模型：`SM_SB_<Style>_<Role>_<Variant>`
 - Prefab：`PF_SB_<Style>_<Role>_<Variant>`
@@ -26,7 +26,7 @@
 
 - 正式交付单元以 Prefab 为主，裸 FBX Model Prefab 保持兼容。
 - 一个逻辑模块可以由 Prefab 内多个 FBX 子节点组成，例如门框与门扇。
-- Catalog 只保存资产引用、逻辑角色、Variant、尺寸、权重和局部偏移，不复制 Mesh、Material 或 Texture。
+- StyleConfig 只保存资产引用、逻辑角色、Variant、尺寸和权重，不复制 Mesh、Material 或 Texture。
 - Prefab 根只允许 `Transform`；可见子节点只允许 `Transform`、`MeshFilter`、`MeshRenderer`。
 - 当前效果验证 Prefab 禁止脚本、Collider、LODGroup、Light、Animator 和其他运行时行为。
 
@@ -37,10 +37,10 @@
 - 面向街道观察立面时，`+X` 向右，`+Z` 为立面朝外方向。
 - 建筑内部位于立面平面的 `-Z` 一侧。
 - 模块根 Pivot 位于对应网格单元的底部中心，根 Transform 必须为 Position `(0,0,0)`、Rotation `(0,0,0)`、Scale `(1,1,1)`。
-- 复合模块的组合偏移和旋转优先在 Prefab 子节点内完成；Catalog 允许记录 Part Position，Part Rotation 保持零旋转。
+- 复合模块的组合偏移和旋转放在 Prefab 子节点内完成；一个模块条目引用一个完整 Prefab。
 - 左右边缘立柱的 Pivot 位于建筑边界线，不占用 2m Bay。
 
-当前 `StreetBuilding.DirectInstances.7.0` 网格：
+当前 `StreetBuilding.VersionlessStyle.10.0` 网格：
 
 - Bay 宽度：2m
 - 首层高度：4m
@@ -51,24 +51,23 @@
 - 体块只允许 `Rectangle` 与等高 `LShape`，不制作 U 形、退台或分层高度模块。
 - L 形缺口固定在后左或后右，缺口宽/深均为 2m 倍数，并至少保留 4m 宽的两条翼。
 
-## 4. Catalog V3、StyleLibrary 与 ModuleFamily
+## 4. 无版本 StyleConfig 与 StyleLibrary
 
-Catalog 编译结果使用 UTF-8、Invariant Culture 和稳定排序：
+StyleConfig 编译结果使用 UTF-8、Invariant Culture 和稳定排序：
 
 ```text
-SBV3|<StyleId>|<CellWidth>|<GroundFloorHeight>|<TypicalFloorHeight>|<SelectedFamilyId>
-M|Role|Variant|PartIndex|AssetPath|PosX|PosY|PosZ|EulerX|EulerY|EulerZ|CellWidth|CellHeight|Weight
+STYLE|<CellWidth>|<GroundFloorHeight>|<TypicalFloorHeight>
+M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|Weight|FacadeMask|FloorMask|BoundsX|BoundsY|BoundsZ|BoundsMinX|BoundsMinY|BoundsMinZ
 ```
 
-- `StreetBuildingStyleLibrary` 只索引多个独立 Catalog；每个 Style 使用独立资产，避免一个巨型 SO 产生全局脏改。
-- Catalog V3 可配置多个 `ModuleFamily`。每栋建筑先由 `BuildingId + Seed` 稳定选择一个 Family，再在 Family 内按 Role/Variant 权重选择。
-- Recipe 的 `FamilyId="*"` 表示所有 Family 共享；HDA 每次只接收选中 Family 与共享模块。
-- `Weight` 必须大于 0；Family 与相同 Role 内 Variant 均按权重确定性选择。
-- 同一 `Role + VariantId` 的 PartIndex 从 0 连续递增。
+- `StreetBuildingStyleLibrary` 只索引多个独立 StyleConfig；列表顺序仅用于 Inspector 展示，不参与配置身份或模块选择。
+- 每套资产只维护自己的 StyleConfig；同一 Role 内 Variant 按 `BuildingId + Seed` 和权重确定性选择。
+- `Weight` 必须大于 0；`Role + VariantId` 在单个 StyleConfig 内必须唯一。
+- Payload 不包含 Schema、Style Id、Display Name 或 Module Family；HDA 只接受上述 `STYLE` 头和 18 字段模块行。
 - Payload 内容直接参与 SHA-256，修改尺寸、权重、路径或局部偏移都会产生新版本。
-- HDA 同时接受旧 V1 10 字段 Payload；V1 仅用于 REV4.1 精确回归，不作为新 Catalog 默认格式。
+- 不保留旧版本 Payload 兼容分支；旧格式必须由 Unity 重新编译并写回场景后才能 Cook。
 
-当前 REV4.1 Catalog 至少包含以下稳定键：
+每套 StyleConfig 至少包含以下稳定键：
 
 - `Entrance / entrance_metal`
 - `GroundShop / shop_metal`
@@ -90,7 +89,7 @@ M|Role|Variant|PartIndex|AssetPath|PosX|PosY|PosZ|EulerX|EulerY|EulerZ|CellWidth
 - `ParapetConcaveCorner`：L 形唯一阴角，Pivot 位于凹入轮廓交点；不得用阳角资产靠负缩放镜像。
 - `RoofProp` 已从 LOD0 外壳移入独立 `OUT_DETAIL_INSTANCES`
 
-Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 `Parapet` 与
+无版本 StyleConfig 模式在 `parapet_height > 0` 时生成连续女儿墙。`Parapet` 与
 `ParapetCorner` 的声明高度必须等于 `parapet_height`，禁止生成端缩放；设为 0 时只关闭
 屋顶边缘模块，不改变墙面和屋面 Tile。
 
@@ -112,7 +111,7 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
   `roof_vent`、`mechanical_box`，禁止复用 `ac_unit`。根 Pivot 的 `minY` 必须为 0，生成点
   直接位于 roofY，且至少退让屋顶边缘一个 2m Cell。
 - 根 Transform 必须归零；形体偏移、支架布局和局部旋转全部放在可见子节点内。
-- HDA 只接受 Catalog 提供的原始资产路径，输出 `scale=(1,1,1)` 与归一化 `orient`；美术不得依赖生成端非等比缩放。
+- HDA 只接受 StyleConfig 提供的原始资产路径，输出 `scale=(1,1,1)` 与归一化 `orient`；美术不得依赖生成端非等比缩放。
 - 已发布 `Role + VariantId` 是稳定键。升级资产可以替换引用，但不得把同一键静默改成另一种角色、占地或挂接面。
 - `detail_density` 仅控制细节概率，不得改变 LOD0 外壳；`generate_attachments=false` 或密度为 0 时细节输出必须为空。
 - 每栋最多 64 个细节实例；新增细节种类应复用独立 Role/Variant 配方和现有选择种子，不得在 Prefab 内添加运行时脚本。
@@ -139,7 +138,7 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 
 | 项目 | 最低要求 |
 |---|---:|
-| Catalog | 1 个，`SchemaVersion=3`、`SourceKind=ProjectOwned`，至少 1 个启用 Family |
+| StyleConfig | 1 个，直接覆盖本套资产的全部必需 Role，不包含 Schema、Style Id、Display Name 或 Family |
 | 基础/外壳/细节 Role | 覆盖当前 17 个必需 Role |
 | 参考 Recipe | 40 个；新增 Variant 只能追加稳定键 |
 | DesignPreset | Compact / Standard / Corner Tall 各 1 个 |
@@ -152,7 +151,7 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 阳台/凹槽、后勤门和屋顶轮廓。
 
 参考贴图仅是占位质量基线。正式美术可替换为外部 DCC 导出的 FBX 和正式 PBR 贴图，但 Prefab
-路径、Role + VariantId、Pivot、声明尺寸与 Catalog 结构必须保持稳定，或通过显式版本迁移升级。
+路径、Role + VariantId、Pivot、声明尺寸与 StyleConfig 结构必须保持稳定。
 
 提交前运行：
 
@@ -164,10 +163,10 @@ Direct V2 在 `parapet_height > 0` 时生成连续女儿墙。Catalog 模式下 
 ## 8. Authoring 流程
 
 1. 美术按本规范创建 FBX 与 Prefab。
-2. 在 `StreetBuildingStyleLibrary` 登记 Style Catalog；在 Catalog V3 中登记 Family、Role、Variant、权重与单面模块。
-3. 在 `StreetBuildingAuthoring` Inspector 执行 `Validate Catalog`。
+2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Role、Variant、权重与单面模块，并按需加入 `StreetBuildingStyleLibrary`。
+3. 在 `StreetBuildingAuthoring` Inspector 执行 `Validate Style`。
 4. 执行 `Compile Preview`，确认 Payload 和 SHA-256 稳定。
-5. 执行 `Apply, Cook & Save Scene`；该操作更新 `module_source`、`unity_instance_catalog` 和 `style_id`，Cook 成功后直接保存 Scene。
+5. 执行 `Apply, Cook & Save Scene`；该操作更新 `module_source`、`unity_instance_catalog` 和 `unity_bridge_end_marker`，Cook 成功后直接保存 Scene。
 6. 检查前、后、左、右和鸟瞰视图，确认墙顶不越过 roofY、屋面完整覆盖 footprint、
    女儿墙连续，并能看到不同密度的雨棚、招牌、消防梯、墙面 AC 与落地屋顶设备。
 

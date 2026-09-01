@@ -22,7 +22,6 @@ namespace PCGBike.Buildings
             StreetBuildingStyleLibraryEntry[] candidates = _styles
                 .Where(item => item != null && item.Enabled && item.StyleConfig != null
                                && item.Weight > 0 && item.Matches(usageTag))
-                .OrderBy(item => item.StyleConfig.StyleId, StringComparer.Ordinal)
                 .ToArray();
             if (candidates.Length == 0)
                 return null;

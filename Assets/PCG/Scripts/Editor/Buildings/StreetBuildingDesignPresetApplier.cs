@@ -36,7 +36,7 @@ namespace PCGBike.Editor.Buildings
         };
         private static readonly string[] StringParameters =
         {
-            "unity_instance_catalog", "unity_generation_rules", "style_id"
+            "unity_instance_catalog", "unity_generation_rules"
         };
 
         public static string Validate(
@@ -143,7 +143,6 @@ namespace PCGBike.Editor.Buildings
             SetInt(parameters, "module_source", 1);
             SetString(parameters, "unity_instance_catalog", stylePayload);
             SetString(parameters, "unity_generation_rules", generationPayload);
-            SetString(parameters, "style_id", style.StyleId);
             SetFloat(parameters, "ground_floor_height", style.GroundFloorHeight);
             SetFloat(parameters, "typical_floor_height", style.TypicalFloorHeight);
             if (preset == null) return;

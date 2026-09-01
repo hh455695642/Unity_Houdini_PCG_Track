@@ -1,6 +1,6 @@
 namespace PCGBike.Buildings
 {
-    /// <summary>稳定模块语义。数值只追加，不重排；SBV1-SBV4 均依赖该顺序。</summary>
+    /// <summary>稳定模块语义。数值只追加，不重排；Unity→Houdini 模块载荷依赖该顺序。</summary>
     public enum StreetBuildingModuleRole
     {
         GroundShop,
