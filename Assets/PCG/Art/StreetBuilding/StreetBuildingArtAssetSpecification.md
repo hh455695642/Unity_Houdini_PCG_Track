@@ -26,7 +26,7 @@
 
 - 正式交付单元以 Prefab 为主，裸 FBX Model Prefab 保持兼容。
 - 一个逻辑模块可以由 Prefab 内多个 FBX 子节点组成，例如门框与门扇。
-- StyleConfig 只保存资产引用、逻辑角色、Variant、尺寸和权重，不复制 Mesh、Material 或 Texture。
+- StyleConfig 只保存资产引用、逻辑角色、尺寸和权重，不复制 Mesh、Material 或 Texture。`module_variant` 自动取该条目 `Prefab.name` 的精确文件名（不含 `.prefab` 扩展名），美术不填写额外 VariantId。
 - Prefab 根只允许 `Transform`；可见子节点只允许 `Transform`、`MeshFilter`、`MeshRenderer`。
 - 当前效果验证 Prefab 禁止脚本、Collider、LODGroup、Light、Animator 和其他运行时行为。
 
@@ -61,24 +61,13 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 ```
 
 - 每个 StreetBuilding HDA 必须显式引用一个独立 StyleConfig，不提供自动风格库或跨风格随机选择。
-- 每套资产只维护自己的 StyleConfig；同一 Role 内 Variant 由 HDA 按生成 Seed 和权重确定性选择。
-- `Weight` 必须大于 0；`Role + VariantId` 在单个 StyleConfig 内必须唯一。
+- 每套资产只维护自己的 StyleConfig；两套风格分别创建、分别维护，HDA 不在 StyleConfig 之间交叉选择。同一 Role 内的不同 Prefab 由 HDA 按生成 Seed 和权重确定性选择。
+- `Weight` 必须大于 0；`Role + Prefab.name` 在单个 StyleConfig 内必须唯一。这里的 `Prefab.name` 是精确文件名（不含 `.prefab`），并自动写入 Payload 的 `Variant` 列。
 - Payload 不包含 Schema、Style Id、Display Name 或 Module Family；HDA 只接受上述 `STYLE` 头和 18 字段模块行。
-- Payload 内容直接参与 SHA-256，修改尺寸、权重、路径或局部偏移都会产生新版本。
+- Payload 内容直接参与 SHA-256，修改尺寸、权重、Prefab 路径、Prefab 文件名或局部偏移都会产生新版本。
 - 不保留旧版本 Payload 兼容分支；旧格式必须由 Unity 重新编译并写回场景后才能 Cook。
-
-每套 StyleConfig 至少包含以下稳定键：
-
-- `Entrance / entrance_metal`
-- `GroundShop / shop_metal`
-- `GroundShop / shop_trim`
-- `Cornice / brick_center`
-- `MiddleWindow / trim`
-- `MiddleWindow / trim_single`
-- `FacadeColumn / trim_ground`
-- `FacadeColumn / brick_upper`
-
-后续可以增加 Variant，但不得重用或静默改写已发布的 `Role + VariantId`。
+- 不维护人工 VariantId、稳定语义键或跨资产映射；Prefab 的文件名就是本条目的唯一 Variant 值。新增模块时直接登记其 Prefab 引用、Role、尺寸和权重即可。
+- Prefab 改名、移动目录或替换后，都必须重新执行“应用风格、Cook 并保存场景”。仅移动目录且不改文件名时，`module_variant` 保持不变，但 Payload 中的路径会变化；改名或替换会使 Payload/SHA-256 与确定性选择基线变化，需以重新 Cook 的结果为准。
 
 完整外壳还需要：
 
@@ -112,9 +101,9 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
   直接位于 roofY，且至少退让屋顶边缘一个 2m Cell。
 - 根 Transform 必须归零；形体偏移、支架布局和局部旋转全部放在可见子节点内。
 - HDA 只接受 StyleConfig 提供的原始资产路径，输出 `scale=(1,1,1)` 与归一化 `orient`；美术不得依赖生成端非等比缩放。
-- 已发布 `Role + VariantId` 是稳定键。升级资产可以替换引用，但不得把同一键静默改成另一种角色、占地或挂接面。
+- Prefab 文件名是自动生成的 `module_variant`，不是人工维护的稳定键。升级资产仍须保持其 Role、占地和挂接面与配置声明一致；若改名、移动或替换 Prefab，必须重新 Apply StyleConfig + Cook。
 - `attachment_global_density` 仅控制细节概率，不得改变 LOD0 外壳；`attachments_enabled=false` 或密度为 0 时细节输出必须为空。
-- 每栋最多 64 个细节实例；新增细节种类应复用独立 Role/Variant 配方和现有选择种子，不得在 Prefab 内添加运行时脚本。
+- 每栋最多 64 个细节实例；新增细节种类应使用独立 Role 与 Prefab 配方，并复用现有选择种子，不得在 Prefab 内添加运行时脚本。
 
 ## 6. 材质与移动端约束
 
@@ -140,18 +129,18 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 |---|---:|
 | StyleConfig | 1 个，直接覆盖本套资产的全部必需 Role，不包含 Schema、Style Id、Display Name 或 Family |
 | 基础/外壳/细节 Role | 覆盖当前 17 个必需 Role |
-| 参考 Recipe | 40 个；新增 Variant 只能追加稳定键 |
+| 参考 Recipe | 40 个；同一 StyleConfig 内每个 `Role + Prefab.name` 唯一 |
 | HDA 示例配置 | Compact / Standard / Corner Tall 直接保存在各 HDA 参数上，不创建 Preset 资产 |
 | 共享材质 | 5 个：Wall / Accent / Roof / Glass / Metal |
 | 参考贴图 | 5 张 128×128 可平铺程序纹理，仅用于验证色彩、节奏与材质分层 |
 
 参考几何需要主动表现以下视觉层次：首层商业或住宅入口、标准层窗型变化、空白墙节奏、檐口、
 边缘立柱、完整侧背立面、连续女儿墙，以及独立输出的雨棚、招牌、消防梯、墙面设备和屋顶设备。
-同一风格内不能只靠随机颜色制造差异；至少要通过多个稳定 Variant 改变开窗、分格、挑檐、
+同一风格内不能只靠随机颜色制造差异；至少要通过多个不同 Prefab 改变开窗、分格、挑檐、
 阳台/凹槽、后勤门和屋顶轮廓。
 
 参考贴图仅是占位质量基线。正式美术可替换为外部 DCC 导出的 FBX 和正式 PBR 贴图，但 Prefab
-路径、Role + VariantId、Pivot、声明尺寸与 StyleConfig 结构必须保持稳定。
+路径、Prefab 文件名、Role、Pivot、声明尺寸与 StyleConfig 结构必须保持稳定。若路径、文件名或引用替换，按第 8 节重新 Apply StyleConfig + Cook。
 
 提交前运行：
 
@@ -163,7 +152,7 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 ## 8. Authoring 流程
 
 1. 美术按本规范创建 FBX 与 Prefab。
-2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Role、Variant、权重与单面模块，并在目标 HDA 的 `StreetBuildingAuthoring` 上显式指定。
+2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Prefab、Role、权重与单面模块；`module_variant` 会自动采用 `Prefab.name`，无需填写 VariantId。将该 StyleConfig 在目标 HDA 的 `StreetBuildingAuthoring` 上显式指定。
 3. 在 HDA 参数面板调整体块、立面、附件及唯一的 `Variation Seed`；高级楼层/附件覆盖默认折叠。`Site Source=Internal` 时外部地块 payload 不得覆盖面板，只有 `External` 时允许覆盖。
 4. 在 `StreetBuildingAuthoring` Inspector 执行 `验证 / Validate`。
 5. 执行 `编译预览 / Compile Preview`，确认 Style Payload 和 SHA-256 稳定。

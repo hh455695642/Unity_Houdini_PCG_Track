@@ -124,7 +124,6 @@ namespace PCGBike.Buildings
     public sealed class StreetBuildingModuleDefinition
     {
         [SerializeField] private GameObject _prefab;
-        [SerializeField] private string _variantId;
         [SerializeField] private StreetBuildingModuleRole _moduleRole;
         [SerializeField, Min(1)] private int _widthSpan = 1;
         [SerializeField, Min(1)] private int _depthSpan = 1;
@@ -136,7 +135,6 @@ namespace PCGBike.Buildings
         [SerializeField] private StreetBuildingFloorMask _allowedFloors = StreetBuildingFloorMask.All;
 
         public GameObject Prefab => _prefab;
-        public string VariantId => _variantId;
         public StreetBuildingModuleRole ModuleRole => _moduleRole;
         public int WidthSpan => Mathf.Max(1, _widthSpan);
         public int DepthSpan => Mathf.Max(1, _depthSpan);
@@ -156,14 +154,13 @@ namespace PCGBike.Buildings
         };
 
 #if UNITY_EDITOR
-        public StreetBuildingModuleDefinition(GameObject prefab, string variantId,
-            StreetBuildingModuleRole moduleRole, int widthSpan, int depthSpan,
+        public StreetBuildingModuleDefinition(GameObject prefab, StreetBuildingModuleRole moduleRole,
+            int widthSpan, int depthSpan,
             StreetBuildingModuleHeightType heightType, float absoluteHeight, float weight,
             bool enabled, StreetBuildingFacadeMask allowedFacades,
             StreetBuildingFloorMask allowedFloors)
         {
             _prefab = prefab;
-            _variantId = variantId ?? string.Empty;
             _moduleRole = moduleRole;
             _widthSpan = Mathf.Max(1, widthSpan);
             _depthSpan = Mathf.Max(1, depthSpan);
@@ -175,7 +172,6 @@ namespace PCGBike.Buildings
             _allowedFloors = allowedFloors;
         }
 
-        public void SetEditorVariantId(string variantId) => _variantId = variantId ?? string.Empty;
 #endif
     }
 }

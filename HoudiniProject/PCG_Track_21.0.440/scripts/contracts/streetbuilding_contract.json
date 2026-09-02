@@ -223,6 +223,7 @@
     "StreetBuilding.V9.UnityBridgeHapiVisible",
     "StreetBuilding.V12.HdaPanelSingleSource",
     "StreetBuilding.V12.ExternalParcelOnlyOverride",
-    "StreetBuilding.V12.StyleBridgeHapiVisible"
+    "StreetBuilding.V12.StyleBridgeHapiVisible",
+    "StreetBuilding.V13.PrefabFilenameVariant"
   ]
 }

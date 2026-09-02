@@ -29,61 +29,67 @@ ROLE_NAMES = ("GroundShop", "GroundShopDoor", "GroundWall", "Entrance",
 ATTACHMENT_TOKENS = ("awning", "sign", "fire_escape", "wall_ac", "roof_props")
 
 
-def style_row(role: int, variant: str, path: str, width: int = 1, height: float = 3,
+def prefab_filename(path: str) -> str:
+    """Match Unity's Prefab.name: the asset filename without its final extension."""
+    return Path(path.replace("\\", "/")).stem
+
+
+def style_row(role: int, path: str, width: int = 1, height: float = 3,
               weight: float = 1, facades: int = 15, floors: int = 7) -> str:
+    variant = prefab_filename(path)
     return (f"M|0|{role}|{variant}|{path}|{width}|1|2|{height}|{weight}|"
             f"{facades}|{floors}|2|{height}|.2|-1|0|-.1")
 
 
 STYLE_CATALOG = "\n".join((
     "STYLE|2|4|3",
-    style_row(3, "entrance_metal", SOURCE_PREFIX + "DoorFrame_Metal_Single.fbx", height=4),
-    style_row(3, "entrance_trim", SOURCE_PREFIX + "DoorFrame_Trim.fbx", height=4, weight=.6),
-    style_row(0, "shop_metal", SOURCE_PREFIX + "Metal_FirstFloor_Window.fbx", height=4),
-    style_row(0, "shop_trim", SOURCE_PREFIX + "Trim_FirstFloor_Window_001.fbx", height=4),
-    style_row(1, "shop_door", SOURCE_PREFIX + "Door_2.fbx", height=4),
-    style_row(2, "brick_ground", SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
-    style_row(4, "trim", SOURCE_PREFIX + "Brick_Window_Trim.fbx"),
-    style_row(4, "trim_single", SOURCE_PREFIX + "Brick_Window_Trim_Single.fbx"),
-    style_row(4, "curved_double", SOURCE_PREFIX + "Brick_Window_CurvedDouble.fbx",
+    style_row(3, SOURCE_PREFIX + "DoorFrame_Metal_Single.fbx", height=4),
+    style_row(3, SOURCE_PREFIX + "DoorFrame_Trim.fbx", height=4, weight=.6),
+    style_row(0, SOURCE_PREFIX + "Metal_FirstFloor_Window.fbx", height=4),
+    style_row(0, SOURCE_PREFIX + "Trim_FirstFloor_Window_001.fbx", height=4),
+    style_row(1, SOURCE_PREFIX + "Door_2.fbx", height=4),
+    style_row(2, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
+    style_row(4, SOURCE_PREFIX + "Brick_Window_Trim.fbx"),
+    style_row(4, SOURCE_PREFIX + "Brick_Window_Trim_Single.fbx"),
+    style_row(4, SOURCE_PREFIX + "Brick_Window_CurvedDouble.fbx",
               width=2, weight=.35),
-    style_row(5, "brick_plain", SOURCE_PREFIX + "Brick_Plain_3.fbx"),
-    style_row(5, "brick_clean", SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
-    style_row(6, "convex_ground", SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
-    style_row(6, "convex_upper", SOURCE_PREFIX + "Brick_Plain_3.fbx"),
-    style_row(7, "concave_ground", SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
-    style_row(7, "concave_upper", SOURCE_PREFIX + "Brick_Plain_3.fbx"),
-    style_row(8, "brick_center", SOURCE_PREFIX + "Cornice_Brick_Center.fbx", height=1),
-    style_row(8, "metal_center", SOURCE_PREFIX + "Cornice_Metal_Center.fbx", height=1, weight=.3),
-    style_row(10, "brick_ground", SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
-    style_row(10, "brick_upper", SOURCE_PREFIX + "Brick_Plain_3.fbx"),
-    style_row(10, "brick_upper_clean", SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
-    style_row(11, "brick_ground", SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
-    style_row(11, "brick_upper", SOURCE_PREFIX + "Brick_Plain_3.fbx"),
-    style_row(11, "brick_upper_clean", SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
-    style_row(12, "trim_ground", SOURCE_PREFIX + "Trim_Column_Center.fbx", height=4),
-    style_row(12, "brick_upper", SOURCE_PREFIX + "Brick_Column_Small.fbx"),
-    style_row(19, "roof_2x2", SOURCE_PREFIX + "Roof_2x2.fbx", height=2, floors=4),
-    style_row(9, "straight_2m", DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Straight.prefab",
+    style_row(5, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
+    style_row(5, SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
+    style_row(6, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
+    style_row(6, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
+    style_row(7, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
+    style_row(7, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
+    style_row(8, SOURCE_PREFIX + "Cornice_Brick_Center.fbx", height=1),
+    style_row(8, SOURCE_PREFIX + "Cornice_Metal_Center.fbx", height=1, weight=.3),
+    style_row(10, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
+    style_row(10, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
+    style_row(10, SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
+    style_row(11, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
+    style_row(11, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
+    style_row(11, SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
+    style_row(12, SOURCE_PREFIX + "Trim_Column_Center.fbx", height=4),
+    style_row(12, SOURCE_PREFIX + "Brick_Column_Small.fbx"),
+    style_row(19, SOURCE_PREFIX + "Roof_2x2.fbx", height=2, floors=4),
+    style_row(9, DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Straight.prefab",
               height=.6, floors=4),
-    style_row(20, "corner_90", DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Corner.prefab",
+    style_row(20, DETAIL_PREFIX + "PF_SB_NAB01_Parapet_Corner.prefab",
               height=.6, floors=4),
-    style_row(21, "concave_90",
+    style_row(21,
               "Assets/PCG/Art/StreetBuilding/urban_brick_mixeduse_01/Prefabs/"
               "PF_SB_urban_brick_mixeduse_01_Parapet_ConcaveCorner.prefab",
               height=.6, floors=4),
-    style_row(14, "validation_canopy", DETAIL_PREFIX + "PF_SB_NAB01_Awning_Validation.prefab",
+    style_row(14, DETAIL_PREFIX + "PF_SB_NAB01_Awning_Validation.prefab",
               height=1),
-    style_row(15, "validation_board", DETAIL_PREFIX + "PF_SB_NAB01_Sign_Validation.prefab",
+    style_row(15, DETAIL_PREFIX + "PF_SB_NAB01_Sign_Validation.prefab",
               height=1),
-    style_row(16, "validation_two_floor",
+    style_row(16,
               DETAIL_PREFIX + "PF_SB_NAB01_FireEscape_Validation.prefab", width=2, height=6),
-    style_row(17, "wall_unit", SOURCE_PREFIX + "Prop_ACUnit.fbx", height=1),
-    style_row(18, "water_tank", DETAIL_PREFIX + "PF_SB_NAB01_Roof_WaterTank.prefab",
+    style_row(17, SOURCE_PREFIX + "Prop_ACUnit.fbx", height=1),
+    style_row(18, DETAIL_PREFIX + "PF_SB_NAB01_Roof_WaterTank.prefab",
               height=2),
-    style_row(18, "roof_vent", DETAIL_PREFIX + "PF_SB_NAB01_Roof_Vent.prefab",
+    style_row(18, DETAIL_PREFIX + "PF_SB_NAB01_Roof_Vent.prefab",
               height=2, weight=.7),
-    style_row(18, "mechanical_box", DETAIL_PREFIX + "PF_SB_NAB01_Roof_MechanicalBox.prefab",
+    style_row(18, DETAIL_PREFIX + "PF_SB_NAB01_Roof_MechanicalBox.prefab",
               height=2, weight=.5),
 ))
 
@@ -95,6 +101,50 @@ class ContractFailure(RuntimeError):
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ContractFailure(message)
+
+
+def catalog_module_rows(catalog: str) -> list[list[str]]:
+    """Return validated module rows from the versionless Unity style payload."""
+    rows = []
+    for row in catalog.splitlines():
+        fields = row.split("|")
+        if fields[0] != "M":
+            continue
+        require(len(fields) == 18, f"Malformed module catalog row: {row}")
+        rows.append(fields)
+    require(rows, "Style catalog does not contain module rows")
+    return rows
+
+
+def variants_for_role(catalog: str, role: str) -> set[str]:
+    role_index = ROLE_NAMES.index(role)
+    return {fields[3] for fields in catalog_module_rows(catalog)
+            if int(fields[2]) == role_index}
+
+
+def assert_prefab_filename_variant(asset: hou.Node) -> dict[str, Any]:
+    """Require the payload and generated points to derive Variant from asset filenames."""
+    catalog_rows = catalog_module_rows(STYLE_CATALOG)
+    for fields in catalog_rows:
+        expected = prefab_filename(fields[4])
+        require(fields[3] == expected,
+                f"Catalog variant {fields[3]!r} must equal asset filename {expected!r}")
+
+    configure(asset, STYLE_CATALOG, density=1)
+    for token in ATTACHMENT_TOKENS:
+        asset.parm(f"{token}_density").set(1)
+
+    checked = 0
+    for output in ("OUT_BUILDING_LOD0", "OUT_DETAIL_INSTANCES"):
+        for point in geometry(asset, output).points():
+            path = point.stringAttribValue("unity_instance")
+            variant = point.stringAttribValue("module_variant")
+            expected = prefab_filename(path)
+            require(path and variant == expected,
+                    f"{output} variant {variant!r} must equal asset filename {expected!r}: {path}")
+            checked += 1
+    require(checked > 0, "Prefab filename variant contract emitted no instance points")
+    return {"catalog_rows": len(catalog_rows), "instance_points": checked}
 
 
 def node(asset: hou.Node, name: str) -> hou.Node:
@@ -362,6 +412,7 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
                 for point in value.points()), "Detail output emitted non-unit orientation")
     require(all(point.stringAttribValue("pcg_kind") == "streetbuilding_detail_instance"
                 for point in value.points()), "Detail pcg_kind contract changed")
+    wall_ac_variants = variants_for_role(STYLE_CATALOG, "ACUnit")
 
     width_cells, depth_cells = 6, 5
     entrance_cell = width_cells // 2
@@ -387,8 +438,8 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
             require(face == 4 and 1 <= x_cell <= width_cells - 2
                     and 1 <= z_cell <= depth_cells - 2,
                     "RoofProp escaped the one-cell roof safety margin")
-            require(point.stringAttribValue("module_variant") != "ac_unit",
-                    "RoofProp must not reuse the wall AC unit")
+            require(point.stringAttribValue("module_variant") not in wall_ac_variants,
+                    "RoofProp must not reuse a wall AC asset filename")
             require(abs(point.position()[1] - 13.0) <= .01,
                     "RoofProp pivot must sit directly on roofY")
 
@@ -403,7 +454,7 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
         for point in geometry(asset, "OUT_DETAIL_INSTANCES").points():
             if point.stringAttribValue("module_role") == "RoofProp":
                 variant = point.stringAttribValue("module_variant")
-                require(variant != "ac_unit" and abs(point.position()[1] - 13.0) <= .01,
+                require(variant not in wall_ac_variants and abs(point.position()[1] - 13.0) <= .01,
                         f"Invalid roof detail {variant}")
                 seen_roof_variants.add(variant)
     require(len(seen_roof_variants) >= 2,
@@ -792,7 +843,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.V9.UnityBridgeHapiVisible",
                 "StreetBuilding.V12.HdaPanelSingleSource",
                 "StreetBuilding.V12.ExternalParcelOnlyOverride",
-                "StreetBuilding.V12.StyleBridgeHapiVisible"}
+                "StreetBuilding.V12.StyleBridgeHapiVisible",
+                "StreetBuilding.V13.PrefabFilenameVariant"}
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
@@ -803,6 +855,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     assert_network(fresh, contract)
     return {"status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
+            "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
             "v6_1_modular_details": assert_details(fresh, contract),
             "l_shape_topology": assert_l_shape(fresh),

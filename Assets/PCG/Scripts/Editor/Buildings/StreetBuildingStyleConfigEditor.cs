@@ -45,7 +45,6 @@ namespace PCGBike.Editor.Buildings
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("批量生成稳定 VariantId")) AssignVariantIds(style);
                 if (GUILayout.Button("定位首个缺失模块")) PingFirstMissing(style);
             }
             using (new EditorGUILayout.HorizontalScope())
@@ -53,15 +52,6 @@ namespace PCGBike.Editor.Buildings
                 if (GUILayout.Button("Validate")) LogValidation(style);
                 if (GUILayout.Button("Compile Preview")) CompilePreview(style);
             }
-        }
-
-        private static void AssignVariantIds(StreetBuildingStyleConfig style)
-        {
-            Undo.RecordObject(style, "Assign StreetBuilding Variant IDs");
-            foreach ((_, StreetBuildingModuleDefinition module) in style.EnumerateModules())
-                if (module != null && module.Prefab != null && string.IsNullOrWhiteSpace(module.VariantId))
-                    module.SetEditorVariantId(StreetBuildingStyleCompiler.BuildStableVariantId(module.ModuleRole, module.Prefab));
-            EditorUtility.SetDirty(style);
         }
 
         private static void PingFirstMissing(StreetBuildingStyleConfig style)

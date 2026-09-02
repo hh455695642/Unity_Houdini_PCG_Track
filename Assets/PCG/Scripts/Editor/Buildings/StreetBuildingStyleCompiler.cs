@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using PCGBike.Buildings;
 using UnityEditor;
 using UnityEngine;
@@ -41,9 +40,6 @@ namespace PCGBike.Editor.Buildings
 
     public static class StreetBuildingStyleValidator
     {
-        private static readonly Regex IdPattern =
-            new("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$", RegexOptions.CultureInvariant);
-
         public static StreetBuildingStyleValidationReport Validate(StreetBuildingStyleConfig style)
         {
             var report = new StreetBuildingStyleValidationReport();
@@ -60,11 +56,14 @@ namespace PCGBike.Editor.Buildings
                 if (module == null) { report.Error(label + " is null."); continue; }
                 if (!module.Enabled) continue;
                 if (module.Prefab == null) { report.Error(label + " has no Prefab."); continue; }
-                if (string.IsNullOrWhiteSpace(module.VariantId) || module.VariantId.Contains("|")
-                    || module.VariantId.Contains("\n") || !IdPattern.IsMatch(module.VariantId))
-                    report.Error(label + $" has invalid VariantId '{module.VariantId}'.");
-                string key = module.ModuleRole + "|" + module.VariantId;
-                if (!keys.Add(key)) report.Error("Duplicate Role/VariantId: " + key);
+                string prefabName = module.Prefab.name;
+                if (string.IsNullOrWhiteSpace(prefabName) || prefabName.Contains("|")
+                    || prefabName.Contains("\n") || prefabName.Contains("\r"))
+                {
+                    report.Error(label + $" has invalid Prefab.name '{prefabName}'; it must be non-empty and cannot contain '|', CR, or LF.");
+                }
+                string key = module.ModuleRole + "|" + prefabName;
+                if (!keys.Add(key)) report.Error("Duplicate Role/Prefab.name: " + key);
                 if (module.Weight <= 0) report.Error(key + " weight must be positive.");
                 if (module.AllowedFacades == StreetBuildingFacadeMask.None)
                     report.Error(key + " has no allowed facade.");
@@ -76,7 +75,7 @@ namespace PCGBike.Editor.Buildings
                 string path = (AssetDatabase.GetAssetPath(module.Prefab) ?? string.Empty).Replace('\\', '/');
                 if (!path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
                     report.Error(key + " must reference one project Prefab: " + path);
-                if (path.Contains("|") || path.Contains("\n"))
+                if (path.Contains("|") || path.Contains("\n") || path.Contains("\r"))
                     report.Error(key + " path contains a payload delimiter.");
 
                 ValidatePrefab(report, style, module, key);
@@ -214,7 +213,7 @@ namespace PCGBike.Editor.Buildings
             {
                 if (module == null || !module.Enabled) continue;
                 StreetBuildingStyleValidator.TryGetLocalBounds(module.Prefab, out Bounds bounds);
-                rows.Add(string.Join("|", "M", (int)group, (int)module.ModuleRole, module.VariantId,
+                rows.Add(string.Join("|", "M", (int)group, (int)module.ModuleRole, module.Prefab.name,
                     AssetDatabase.GetAssetPath(module.Prefab).Replace('\\', '/'), module.WidthSpan,
                     module.DepthSpan, (int)module.HeightType, F(module.ResolveHeight(style)),
                     F(module.Weight), (int)module.AllowedFacades, (int)module.AllowedFloors,
@@ -227,15 +226,6 @@ namespace PCGBike.Editor.Buildings
             string digest = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))
                 .Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
             return new StreetBuildingCompiledStyle(payload, digest, rows.Count);
-        }
-
-        public static string BuildStableVariantId(StreetBuildingModuleRole role, GameObject prefab)
-        {
-            string source = prefab == null ? role.ToString() : prefab.name;
-            string value = Regex.Replace(source, "([a-z0-9])([A-Z])", "$1_$2").ToLowerInvariant();
-            value = Regex.Replace(value, "[^a-z0-9]+", "_").Trim('_');
-            if (string.IsNullOrEmpty(value) || !char.IsLetter(value[0])) value = "module_" + value;
-            return value;
         }
     }
 }
