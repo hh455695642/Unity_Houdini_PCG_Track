@@ -53,7 +53,6 @@ namespace PCGBike.Buildings
         [SerializeField, Min(.01f)] private float _cellWidth = 2f;
         [SerializeField, Min(.01f)] private float _groundFloorHeight = 4f;
         [SerializeField, Min(.01f)] private float _typicalFloorHeight = 3f;
-        [SerializeField] private List<string> _allowedAssetRoots = new();
 
         [SerializeField] private List<StreetBuildingModuleDefinition> _groundFacade = new();
         [SerializeField] private List<StreetBuildingModuleDefinition> _upperFacade = new();
@@ -66,7 +65,6 @@ namespace PCGBike.Buildings
         public float CellWidth => _cellWidth;
         public float GroundFloorHeight => _groundFloorHeight;
         public float TypicalFloorHeight => _typicalFloorHeight;
-        public IReadOnlyList<string> AllowedAssetRoots => _allowedAssetRoots;
         public IReadOnlyList<StreetBuildingModuleDefinition> GroundFacade => _groundFacade;
         public IReadOnlyList<StreetBuildingModuleDefinition> UpperFacade => _upperFacade;
         public IReadOnlyList<StreetBuildingModuleDefinition> SideRear => _sideRear;
@@ -99,13 +97,11 @@ namespace PCGBike.Buildings
 
 #if UNITY_EDITOR
         public void SetEditorData(float cellWidth, float groundFloorHeight, float typicalFloorHeight,
-            IEnumerable<string> allowedAssetRoots,
             IDictionary<StreetBuildingModuleGroup, List<StreetBuildingModuleDefinition>> groups)
         {
             _cellWidth = cellWidth;
             _groundFloorHeight = groundFloorHeight;
             _typicalFloorHeight = typicalFloorHeight;
-            _allowedAssetRoots = allowedAssetRoots == null ? new List<string>() : new List<string>(allowedAssetRoots);
             _groundFacade = Get(groups, StreetBuildingModuleGroup.GroundFacade);
             _upperFacade = Get(groups, StreetBuildingModuleGroup.UpperFacade);
             _sideRear = Get(groups, StreetBuildingModuleGroup.SideRear);

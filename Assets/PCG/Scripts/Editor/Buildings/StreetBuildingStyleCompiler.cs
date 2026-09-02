@@ -51,10 +51,6 @@ namespace PCGBike.Editor.Buildings
             if (style.CellWidth <= 0 || style.GroundFloorHeight <= 0 || style.TypicalFloorHeight <= 0)
                 report.Error("Cell/floor dimensions must be positive.");
 
-            string[] roots = style.AllowedAssetRoots.Where(value => !string.IsNullOrWhiteSpace(value))
-                .Select(Normalize).Distinct(StringComparer.Ordinal).ToArray();
-            if (roots.Length == 0) report.Error("AllowedAssetRoots is empty.");
-
             var keys = new HashSet<string>(StringComparer.Ordinal);
             var roleCounts = new Dictionary<StreetBuildingModuleRole, int>();
             int index = 0;
@@ -77,13 +73,11 @@ namespace PCGBike.Editor.Buildings
                 if (!RoleMatchesGroup(module.ModuleRole, group))
                     report.Error($"{key} is in incompatible group {group}.");
 
-                string path = Normalize(AssetDatabase.GetAssetPath(module.Prefab));
+                string path = (AssetDatabase.GetAssetPath(module.Prefab) ?? string.Empty).Replace('\\', '/');
                 if (!path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
                     report.Error(key + " must reference one project Prefab: " + path);
                 if (path.Contains("|") || path.Contains("\n"))
                     report.Error(key + " path contains a payload delimiter.");
-                if (roots.Length > 0 && !roots.Any(root => path == root || path.StartsWith(root + "/", StringComparison.Ordinal)))
-                    report.Error(key + " is outside AllowedAssetRoots: " + path);
 
                 ValidatePrefab(report, style, module, key);
                 roleCounts[module.ModuleRole] = roleCounts.TryGetValue(module.ModuleRole, out int count) ? count + 1 : 1;
@@ -201,8 +195,6 @@ namespace PCGBike.Editor.Buildings
                 .Distinct().Count();
             if (slots > 3) report.Warning(key + $" uses {slots} materials; mobile target recommends <= 3.");
         }
-
-        private static string Normalize(string path) => (path ?? string.Empty).Replace('\\', '/').TrimEnd('/');
     }
 
     public static class StreetBuildingStyleCompiler

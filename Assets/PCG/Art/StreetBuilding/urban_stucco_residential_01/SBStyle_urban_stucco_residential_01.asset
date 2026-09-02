@@ -15,8 +15,6 @@ MonoBehaviour:
   _cellWidth: 2
   _groundFloorHeight: 4
   _typicalFloorHeight: 3
-  _allowedAssetRoots:
-  - Assets/PCG/Art/StreetBuilding/urban_stucco_residential_01
   _groundFacade:
   - _prefab: {fileID: 1142296757215362686, guid: fec7db9cada540a438106acdca7bebaf,
       type: 3}

@@ -15,8 +15,6 @@ MonoBehaviour:
   _cellWidth: 2
   _groundFloorHeight: 4
   _typicalFloorHeight: 3
-  _allowedAssetRoots:
-  - Assets/PCG/Art/StreetBuilding/urban_brick_mixeduse_01
   _groundFacade:
   - _prefab: {fileID: 5776335057141414780, guid: df96b1386cee5394d871ce6f1bf34ceb,
       type: 3}

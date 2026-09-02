@@ -28,7 +28,6 @@ namespace PCGBike.Editor.Buildings
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_cellWidth"), new GUIContent("单元宽度 (m)"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_groundFloorHeight"), new GUIContent("首层高度 (m)"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_typicalFloorHeight"), new GUIContent("标准层高度 (m)"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_allowedAssetRoots"), new GUIContent("允许的 Prefab 目录"), true);
 
             foreach ((string property, string label) in Groups)
             {
