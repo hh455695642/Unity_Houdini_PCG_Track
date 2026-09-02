@@ -1,4 +1,4 @@
-"""Validate persisted StreetBuilding V10 from a fresh locked HDA instance."""
+"""Validate persisted StreetBuilding V12 from a fresh locked HDA instance."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ import hou
 
 
 ASSET_TYPE = "pcgbike::StreetBuilding::1.0"
-REVISION = "STREETBUILDING_V10_VERSIONLESS_STYLE_PAYLOAD"
-CONTRACT_VERSION = "StreetBuilding.VersionlessStyle.10.0"
+REVISION = "STREETBUILDING_V12_HDA_PANEL_GENERATION"
+CONTRACT_VERSION = "StreetBuilding.HdaPanelGeneration.12.0"
 SOURCE_PREFIX = "Assets/PCG/Art/Downtown City MegaKit[Standard]/Exports/FBX (Unity)/"
 DETAIL_PREFIX = "Assets/PCG/Art/StreetBuilding/NA_Brick_MixedUse_01/Prefabs/ValidationDetails/"
 OUTPUTS = ("OUT_BUILDING_LOD0", "OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2",
@@ -26,6 +26,7 @@ ROLE_NAMES = ("GroundShop", "GroundShopDoor", "GroundWall", "Entrance",
               "Cornice", "Parapet", "SideWall", "RearWall", "FacadeColumn",
               "FloorBand", "Awning", "Sign", "FireEscape", "ACUnit", "RoofProp",
               "RoofSurface", "ParapetCorner", "ParapetConcaveCorner")
+ATTACHMENT_TOKENS = ("awning", "sign", "fire_escape", "wall_ac", "roof_props")
 
 
 def style_row(role: int, variant: str, path: str, width: int = 1, height: float = 3,
@@ -145,16 +146,16 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
               attachments: int = 1, module_source: int = 1, shape: int = 0,
               notch_width: float = 4, notch_depth: float = 4, notch_side: int = 0) -> None:
     values = {
-        "module_source": module_source, "unity_instance_catalog": catalog,
-        "internal_width": width,
-        "internal_depth": depth, "ground_floor_height": 4.0,
-        "typical_floor_height": 3.0, "floor_count": floors, "parapet_height": .6,
-        "facade_rhythm": rhythm, "detail_density": density,
-        "generate_attachments": attachments, "rear_mode": rear, "side_mode": side,
-        "generate_roof": roof, "generate_lods": 0, "seed": seed,
-        "massing_shape": shape, "notch_width": notch_width,
-        "notch_depth": notch_depth, "notch_side": notch_side,
-        "unity_generation_rules": "", "site_source": 0, "corner_building": 0,
+        "module_source": module_source, "unity_style_catalog": catalog,
+        "building_width": width,
+        "building_depth": depth, "floor_height_ground": 4.0,
+        "floor_height_typical": 3.0, "floor_count": floors, "parapet_height": .6,
+        "facade_rhythm": rhythm, "attachment_global_density": density,
+        "attachments_enabled": attachments, "rear_facade_mode": rear,
+        "side_facade_mode": side, "roof_enabled": roof, "lod_outputs_enabled": 0,
+        "variation_seed": seed, "massing_shape": shape, "l_notch_width": notch_width,
+        "l_notch_depth": notch_depth, "l_notch_side": notch_side,
+        "site_source": 0, "corner_building": 0,
     }
     for name, value in values.items():
         asset.parm(name).set(value)
@@ -164,7 +165,7 @@ def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
     require(asset.type().name() == ASSET_TYPE, f"Wrong type {asset.type().name()}")
     require(asset.type().maxNumInputs() == 3, "StreetBuilding must retain three inputs")
     definition = asset.type().definition()
-    require(definition and REVISION in (definition.comment() or ""), "V10 marker is missing")
+    require(definition and REVISION in (definition.comment() or ""), "V12 marker is missing")
     group = asset.parmTemplateGroup()
     for name, expected in contract["public_defaults"].items():
         parameter = asset.parm(name)
@@ -176,16 +177,21 @@ def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
         template = group.find(name)
         require(template is not None and list(template.menuItems()) == expected,
                 f"Menu mismatch for {name}")
-    require(isinstance(group.find("unity_instance_catalog"), hou.StringParmTemplate),
+    require(isinstance(group.find("unity_style_catalog"), hou.StringParmTemplate),
             "Catalog transport parameter is missing")
-    require(isinstance(group.find("unity_generation_rules"), hou.StringParmTemplate),
-            "Generation-rule transport parameter is missing")
     require(isinstance(group.find("unity_bridge_end_marker"), hou.StringParmTemplate),
             "Unity bridge HAPI end marker is missing")
-    require(group.find("style_id") is None and group.find("unity_bridge_revision") is None,
-            "Removed style identity/version parameters are still public")
-    require(not group.find("unity_bridge_end_marker").isHidden(),
-            "Unity bridge end marker must remain HAPI-visible")
+    require(group.find("unity_generation_rules") is None
+            and group.find("style_id") is None
+            and group.find("unity_bridge_revision") is None,
+            "Removed generation/style bridge parameters are still public")
+    require(group.find("sb_bridge") is not None and not group.find("sb_bridge").isHidden(),
+            "Unity bridge folder must remain HAPI-visible")
+    floor_template = group.find("floor_count")
+    require(floor_template.maxValue() == 12 and floor_template.maxIsStrict(),
+            "Floor Count must be strictly limited to 12")
+    require("massing_shape == rectangle" in str(group.find("l_notch_width").conditionals()),
+            "L-notch controls must be conditional")
 
 
 def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
@@ -330,8 +336,8 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
 
 def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
     configure(asset, STYLE_CATALOG, density=1)
-    for kind in range(5):
-        asset.parm(f"attachment_{kind}_density").set(1)
+    for token in ATTACHMENT_TOKENS:
+        asset.parm(f"{token}_density").set(1)
     shell = geometry(asset)
     shell_sha = signature(shell)
     value = geometry(asset, "OUT_DETAIL_INSTANCES")
@@ -392,8 +398,8 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
     seen_roof_variants = set()
     for seed in range(1, 65):
         configure(asset, STYLE_CATALOG, seed=seed, density=1)
-        for kind in range(5):
-            asset.parm(f"attachment_{kind}_density").set(1)
+        for token in ATTACHMENT_TOKENS:
+            asset.parm(f"{token}_density").set(1)
         for point in geometry(asset, "OUT_DETAIL_INSTANCES").points():
             if point.stringAttribValue("module_role") == "RoofProp":
                 variant = point.stringAttribValue("module_variant")
@@ -404,20 +410,21 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
             f"Roof detail seed coverage failed: {sorted(seen_roof_variants)}")
 
     configure(asset, STYLE_CATALOG, seed=47, density=1)
-    for kind in range(5):
-        asset.parm(f"attachment_{kind}_density").set(1)
+    for token in ATTACHMENT_TOKENS:
+        asset.parm(f"{token}_density").set(1)
     different_seed_sha = signature(geometry(asset, "OUT_DETAIL_INSTANCES"))
     require(different_seed_sha != detail_sha, "Different seed did not change any detail")
 
     configure(asset, STYLE_CATALOG, density=1, attachments=0)
     require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
-            "generate_attachments=false did not empty Detail output")
+            "attachments_enabled=false did not empty Detail output")
     require(signature(geometry(asset)) == shell_sha,
-            "generate_attachments=false changed the LOD0 shell")
+            "attachments_enabled=false changed the LOD0 shell")
     configure(asset, STYLE_CATALOG, density=0)
     require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
-            "detail_density=0 did not empty Detail output")
-    require(signature(geometry(asset)) == shell_sha, "detail_density=0 changed the LOD0 shell")
+            "attachment_global_density=0 did not empty Detail output")
+    require(signature(geometry(asset)) == shell_sha,
+            "attachment_global_density=0 changed the LOD0 shell")
     configure(asset, STYLE_CATALOG, density=1, module_source=0)
     require(not geometry(asset, "OUT_DETAIL_INSTANCES").points(),
             "Internal module source emitted direct detail instances")
@@ -433,8 +440,8 @@ def assert_l_shape(asset: hou.Node) -> dict[str, Any]:
     for side, label in ((0, "rear_left"), (1, "rear_right")):
         configure(asset, STYLE_CATALOG, density=1, shape=1, notch_width=4, notch_depth=4,
                   notch_side=side)
-        for kind in range(5):
-            asset.parm(f"attachment_{kind}_density").set(1)
+        for token in ATTACHMENT_TOKENS:
+            asset.parm(f"{token}_density").set(1)
         value = geometry(asset)
         roles = [point.stringAttribValue("module_role") for point in value.points()]
         require(len(value.points()) > 0, f"{label} L output is empty")
@@ -525,6 +532,52 @@ def generation_global(seed: int, mode: int = 2, corner: int = 1) -> str:
     return (f"SBR1\nG|12|10|0|4|4|0|4|{corner}|3|{mode}|2|.65|2|2|1|.6|1|1|1|{seed}")
 
 
+def set_facade_override(asset: hou.Node, *, floor_from: int, floor_to: int,
+                        mode: int, rhythm: int, entrance: tuple[int, int] = (0, 0),
+                        shop_door: tuple[int, int] = (0, 0),
+                        shopfront: tuple[int, int] = (0, 0),
+                        window: tuple[int, int] = (0, 0),
+                        blank: tuple[int, int] = (0, 0)) -> None:
+    asset.parm("facade_overrides").set(1)
+    values = {
+        "facade_override_target1": 0,
+        "facade_override_floor_start1": floor_from,
+        "facade_override_floor_end1": floor_to,
+        "facade_override_layout_mode1": mode,
+        "facade_override_rhythm1": rhythm,
+        "facade_override_entrance_min1": entrance[0],
+        "facade_override_entrance_max1": entrance[1],
+        "facade_override_shop_door_min1": shop_door[0],
+        "facade_override_shop_door_max1": shop_door[1],
+        "facade_override_shopfront_min1": shopfront[0],
+        "facade_override_shopfront_max1": shopfront[1],
+        "facade_override_window_min1": window[0],
+        "facade_override_window_max1": window[1],
+        "facade_override_blank_min1": blank[0],
+        "facade_override_blank_max1": blank[1],
+    }
+    for name, value in values.items():
+        asset.parm(name).set(value)
+
+
+def set_attachment_overrides(asset: hou.Node, rows: list[tuple[int, float, int, int, int, int]]) -> None:
+    asset.parm("attachment_overrides").set(len(rows))
+    for index, (kind, density, maximum, mask, floor_from, floor_to) in enumerate(rows, 1):
+        values = {
+            f"attachment_override_kind{index}": kind,
+            f"attachment_override_density{index}": density,
+            f"attachment_override_max_count{index}": maximum,
+            f"attachment_override_front{index}": 1 if mask & 1 else 0,
+            f"attachment_override_secondary_front{index}": 1 if mask & 2 else 0,
+            f"attachment_override_side{index}": 1 if mask & 4 else 0,
+            f"attachment_override_rear{index}": 1 if mask & 8 else 0,
+            f"attachment_override_floor_start{index}": floor_from,
+            f"attachment_override_floor_end{index}": floor_to,
+        }
+        for name, value in values.items():
+            asset.parm(name).set(value)
+
+
 def make_external_input(name: str, points: list[tuple[float, float, float]], *,
                         closed: bool, payload: str = "") -> hou.Node:
     container = hou.node("/obj").createNode("geo", name)
@@ -550,8 +603,8 @@ def make_external_input(name: str, points: list[tuple[float, float, float]], *,
 def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
     configure(asset, STYLE_CATALOG, density=1)
     asset.parm("corner_building").set(1)
-    for kind in range(5):
-        asset.parm(f"attachment_{kind}_density").set(1)
+    for token in ("awning", "sign", "fire_escape", "wall_ac", "roof_props"):
+        asset.parm(f"{token}_density").set(1)
 
     parser = geometry(asset, "PARSE_UNITY_INSTANCE_CATALOG")
     require(int(parser.attribValue("catalog_module_rows")) > 0,
@@ -560,8 +613,12 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
             and parser.findGlobalAttrib("module_family") is None,
             "Removed schema/family metadata was emitted")
 
-    manual = generation_global(29) + "\nO|0|1|1|2|3|1|1|1|1|2|2|0|0|2|2"
-    asset.parm("unity_generation_rules").set(manual)
+    asset.parm("variation_seed").set(29)
+    asset.parm("facade_layout_mode").set(2)
+    for name, value in {
+        "entrance_count_min": 1, "shop_door_count_min": 1,
+        "shopfront_count_min": 2, "window_count_min": 0, "blank_count_min": 2,
+    }.items(): asset.parm(name).set(value)
     allocated = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
     counts = semantic_counts(allocated, 0, 1)
     require(counts == {"entrance": 1, "shop_door": 1, "shopfront": 2, "blank": 2},
@@ -573,8 +630,10 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
     require({point.intAttribValue("facade_target") for point in selected.points()} >= {0, 1, 2, 3},
             "Corner building did not expose all semantic facade targets")
 
-    overflow = generation_global(29) + "\nO|0|1|1|2|3|2|2|2|2|4|4|0|0|3|3"
-    asset.parm("unity_generation_rules").set(overflow)
+    for name, value in {
+        "entrance_count_min": 2, "shop_door_count_min": 2,
+        "shopfront_count_min": 4, "window_count_min": 0, "blank_count_min": 3,
+    }.items(): asset.parm(name).set(value)
     compressed = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
     report = str(compressed.attribValue("streetbuilding_rule_report"))
     require(int(compressed.attribValue("streetbuilding_rule_compressed")) == 1
@@ -589,26 +648,34 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
             and "functional_priority" in str(metadata.attribValue("streetbuilding_rule_report")),
             "Compression diagnostics did not reach Metadata output")
 
-    floor_override = generation_global(29, mode=0) + "\nO|0|3|3|2|1|0|0|0|0|0|0|2|2|0|0"
-    asset.parm("unity_generation_rules").set(floor_override)
+    asset.parm("facade_layout_mode").set(0)
+    set_facade_override(asset, floor_from=3, floor_to=3, mode=2, rhythm=1,
+                        window=(2, 2))
     floor_value = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
     require(semantic_counts(floor_value, 0, 3).get("window", 0) == 2,
             "Front third-floor sparse override did not resolve exactly two windows")
 
-    random_payload = (generation_global(41, mode=1)
-        + "\nO|0|1|4|1|0|0|1|0|1|1|4|1|5|0|3")
-    asset.parm("unity_generation_rules").set(random_payload)
+    asset.parm("facade_overrides").set(0)
+    asset.parm("facade_layout_mode").set(1)
+    asset.parm("variation_seed").set(41)
+    for name, value in {
+        "entrance_count_min": 0, "entrance_count_max": 1,
+        "shop_door_count_min": 0, "shop_door_count_max": 1,
+        "shopfront_count_min": 1, "shopfront_count_max": 4,
+        "window_count_min": 1, "window_count_max": 5,
+        "blank_count_min": 0, "blank_count_max": 3,
+    }.items(): asset.parm(name).set(value)
     random_a = signature(geometry(asset, "SELECT_FACADE_MODULES"))
     random_b = signature(geometry(asset, "SELECT_FACADE_MODULES"))
     require(random_a == random_b, "Random Range is not deterministic for the same seed")
-    asset.parm("unity_generation_rules").set(random_payload.replace("|41", "|47", 1))
+    asset.parm("variation_seed").set(47)
     random_c = signature(geometry(asset, "SELECT_FACADE_MODULES"))
     require(random_c != random_a, "Random Range did not react to a different seed")
 
-    attachment_payload = manual + "\n" + "\n".join((
-        "A|0|1|8|3|1|1", "A|1|1|8|3|1|1", "A|2|1|4|8|2|4",
-        "A|3|1|16|12|2|4", "A|4|1|8|15|1|99"))
-    asset.parm("unity_generation_rules").set(attachment_payload)
+    set_attachment_overrides(asset, [
+        (0, 1, 8, 3, 1, 1), (1, 1, 8, 3, 1, 1), (2, 1, 4, 8, 2, 4),
+        (3, 1, 16, 12, 2, 4), (4, 1, 8, 15, 1, 13),
+    ])
     details = geometry(asset, "OUT_DETAIL_INSTANCES")
     roles = {point.stringAttribValue("module_role") for point in details.points()}
     require({"Awning", "Sign", "FireEscape", "ACUnit", "RoofProp"}.issubset(roles),
@@ -616,8 +683,7 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
     require(len(details.points()) <= contract["budgets"]["detail_instances_per_building"],
             "Attachment groups exceeded the 64-instance budget")
 
-    ac_rear_third = manual + "\nA|3|1|16|8|3|3"
-    asset.parm("unity_generation_rules").set(ac_rear_third)
+    set_attachment_overrides(asset, [(3, 1, 16, 8, 3, 3)])
     restricted = geometry(asset, "OUT_DETAIL_INSTANCES")
     ac_points = [point for point in restricted.points()
                  if point.stringAttribValue("module_role") == "ACUnit"]
@@ -635,8 +701,13 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
         frontage = make_external_input("VERIFY_VERSIONLESS_FRONTAGE",
             [(-8, 0, 0), (8, 0, 0)], closed=False)
         asset.setInput(0, parcel); asset.setInput(1, frontage)
+        asset.parm("variation_seed").set(29)
+        asset.parm("site_source").set(0)
+        internal = geometry(asset, "PARSE_GENERATION_RULES")
+        require(int(internal.attribValue("effective_seed")) == 29
+                and str(internal.attribValue("rule_source")) == "hda",
+                "Internal mode incorrectly consumed streetbuilding_rule_payload")
         asset.parm("site_source").set(1)
-        asset.parm("unity_generation_rules").set(generation_global(29))
         resolved = geometry(asset, "PARSE_GENERATION_RULES")
         parcel_actual = {"width": float(resolved.attribValue("effective_width")),
                          "seed": int(resolved.attribValue("effective_seed")),
@@ -645,7 +716,7 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
         require(abs(parcel_actual["width"] - 16) <= 1e-6
                 and parcel_actual["seed"] == 73
                 and parcel_actual["source"] == "parcel",
-                f"Parcel payload did not override Unity GenerationPreset rules: {parcel_actual}")
+                f"External parcel payload did not override HDA defaults: {parcel_actual}")
     finally:
         asset.setInput(0, None); asset.setInput(1, None)
         if parcel is not None: parcel.destroy()
@@ -655,7 +726,8 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
     return {"payload_header": "STYLE", "manual_counts": counts,
             "compression_reported": True, "third_floor_windows": 2,
             "random_same_seed": random_a, "random_different_seed": random_c,
-            "attachment_roles": sorted(roles), "parcel_priority": True}
+            "attachment_roles": sorted(roles), "internal_ignores_parcel": True,
+            "external_parcel_priority": True}
 
 
 def assert_dimension_contract() -> dict[str, Any]:
@@ -717,12 +789,15 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.V9.ParcelFrontageRulePayload",
                 "StreetBuilding.V9.AttachmentGroups",
                 "StreetBuilding.V9.RuleDeterminism",
-                "StreetBuilding.V9.UnityBridgeHapiVisible"}
+                "StreetBuilding.V9.UnityBridgeHapiVisible",
+                "StreetBuilding.V12.HdaPanelSingleSource",
+                "StreetBuilding.V12.ExternalParcelOnlyOverride",
+                "StreetBuilding.V12.StyleBridgeHapiVisible"}
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
     hou.hda.installFile(str(hda), change_oplibraries_file=False, force_use_assets=True)
-    fresh = hou.node("/obj").createNode(ASSET_TYPE, "VERIFY_STREETBUILDING_V10_LOCKED")
+    fresh = hou.node("/obj").createNode(ASSET_TYPE, "VERIFY_STREETBUILDING_V12_LOCKED")
     require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)

@@ -13,36 +13,31 @@ namespace PCGBike.Editor.Buildings
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.LabelField("风格配置", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"), new GUIContent("固定 StyleConfig"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_variationSeed"), new GUIContent("Variation Seed"));
-            EditorGUILayout.Space(4);
-            EditorGUILayout.LabelField("生成规则", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_generationPreset"), new GUIContent("可选 GenerationPreset"));
+            EditorGUILayout.LabelField("风格 / Style", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"),
+                new GUIContent("固定风格配置 / Fixed StyleConfig"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
             EditorGUILayout.HelpBox(style == null
                     ? "必须为当前 HDA 显式指定 StyleConfig。"
-                    : $"最终风格：{style.name}\n来源：当前 HDA 显式 StyleConfig\n规则："
-                      + (authoring.GenerationPreset == null ? "HDA 可见参数" : "GenerationPreset > HDA 参数"),
+                    : $"当前风格：{style.name}\n体块、立面、附件与 Variation Seed 请直接在 HDA 参数面板调整。",
                 style == null ? MessageType.Error : MessageType.Info);
 
             using (new EditorGUI.DisabledScope(style == null))
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Validate")) Validate(authoring, style);
-                if (GUILayout.Button("Compile Preview")) CompilePreview(authoring, style);
+                if (GUILayout.Button("验证 / Validate")) Validate(authoring, style);
+                if (GUILayout.Button("编译预览 / Compile Preview")) CompilePreview(authoring, style);
                 if (GUILayout.Button("定位 StyleConfig")) EditorGUIUtility.PingObject(style);
             }
             using (new EditorGUI.DisabledScope(style == null))
-                if (GUILayout.Button("Apply Style + Rules, Cook & Save Scene")) Apply(authoring);
+                if (GUILayout.Button("应用风格、Cook 并保存场景 / Apply Style, Cook & Save")) Apply(authoring);
 
             if (!string.IsNullOrEmpty(authoring.LastAppliedPayloadSha256))
-                EditorGUILayout.HelpBox("最后 Style Payload SHA-256:\n" + authoring.LastAppliedPayloadSha256, MessageType.None);
-            if (!string.IsNullOrEmpty(authoring.LastAppliedDesignSha256))
-                EditorGUILayout.HelpBox("最后完整规则 SHA-256:\n" + authoring.LastAppliedDesignSha256, MessageType.None);
+                EditorGUILayout.HelpBox("最后 Style Payload SHA-256:\n" + authoring.LastAppliedPayloadSha256,
+                    MessageType.None);
             if (!string.IsNullOrEmpty(authoring.LastCookDiagnostic))
                 EditorGUILayout.HelpBox("Cook 诊断：\n" + authoring.LastCookDiagnostic,
                     authoring.LastCookDiagnostic.Contains("PASS") ? MessageType.Info : MessageType.Warning);
@@ -50,8 +45,8 @@ namespace PCGBike.Editor.Buildings
 
         private static void Validate(StreetBuildingAuthoring authoring, StreetBuildingStyleConfig style)
         {
-            string result = StreetBuildingDesignPresetApplier.Validate(authoring.GenerationPreset, style);
-            if (string.IsNullOrEmpty(result)) Debug.Log("StreetBuilding Style + Generation validation PASS.", authoring);
+            string result = StreetBuildingStyleApplier.Validate(style);
+            if (string.IsNullOrEmpty(result)) Debug.Log("StreetBuilding StyleConfig validation PASS.", authoring);
             else Debug.LogError(result, authoring);
         }
 
@@ -59,13 +54,11 @@ namespace PCGBike.Editor.Buildings
         {
             try
             {
-                StreetBuildingCompiledStyle compiledStyle = StreetBuildingStyleCompiler.Compile(style);
-                StreetBuildingCompiledGeneration compiledRules = StreetBuildingGenerationCompiler.Compile(
-                    authoring.GenerationPreset, style, authoring.VariationSeed);
-                Debug.Log($"StreetBuilding compile PASS\nStyle payload {compiledStyle.ModuleCount} modules / {compiledStyle.Sha256}"
-                          + $"\nSBR1 {compiledRules.Sha256}\n{compiledStyle.Payload}\n{compiledRules.Payload}", authoring);
+                StreetBuildingCompiledStyle compiled = StreetBuildingStyleCompiler.Compile(style);
+                Debug.Log($"StreetBuilding style compile PASS\n{compiled.ModuleCount} modules / {compiled.Sha256}\n"
+                          + compiled.Payload, authoring);
             }
-            catch (Exception exception) { Debug.LogError("StreetBuilding compile failed.\n" + exception, authoring); }
+            catch (Exception exception) { Debug.LogError("StreetBuilding style compile failed.\n" + exception, authoring); }
         }
 
         private static void Apply(StreetBuildingAuthoring authoring)
@@ -73,10 +66,10 @@ namespace PCGBike.Editor.Buildings
             try
             {
                 HEU_HoudiniAssetRoot root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
-                StreetBuildingCompiledStyle compiled = StreetBuildingDesignPresetApplier.ApplyAndSave(root, authoring);
-                Debug.Log("StreetBuilding applied, cooked and saved. Style payload SHA-256 " + compiled.Sha256, authoring);
+                StreetBuildingCompiledStyle compiled = StreetBuildingStyleApplier.ApplyAndSave(root, authoring);
+                Debug.Log("StreetBuilding style applied, cooked and saved. SHA-256 " + compiled.Sha256, authoring);
             }
-            catch (Exception exception) { Debug.LogError("StreetBuilding apply failed.\n" + exception, authoring); }
+            catch (Exception exception) { Debug.LogError("StreetBuilding style apply failed.\n" + exception, authoring); }
         }
     }
 }

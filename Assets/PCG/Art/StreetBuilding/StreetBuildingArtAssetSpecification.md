@@ -1,4 +1,4 @@
-# StreetBuilding 美术资产制作规范（V10 / 无版本 StyleConfig / 单面模块）
+# StreetBuilding 美术资产制作规范（V12 / 一 HDA 一 StyleConfig / 面板生成规则）
 
 本规范定义 StreetBuilding 模块化立面资产的长期自建标准。Downtown City MegaKit 仅作为只读验证源，不是项目正式资产模板。
 
@@ -40,7 +40,7 @@
 - 复合模块的组合偏移和旋转放在 Prefab 子节点内完成；一个模块条目引用一个完整 Prefab。
 - 左右边缘立柱的 Pivot 位于建筑边界线，不占用 2m Bay。
 
-当前 `StreetBuilding.VersionlessStyle.10.0` 网格：
+当前 `StreetBuilding.HdaPanelGeneration.12.0` 网格：
 
 - Bay 宽度：2m
 - 首层高度：4m
@@ -113,7 +113,7 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 - 根 Transform 必须归零；形体偏移、支架布局和局部旋转全部放在可见子节点内。
 - HDA 只接受 StyleConfig 提供的原始资产路径，输出 `scale=(1,1,1)` 与归一化 `orient`；美术不得依赖生成端非等比缩放。
 - 已发布 `Role + VariantId` 是稳定键。升级资产可以替换引用，但不得把同一键静默改成另一种角色、占地或挂接面。
-- `detail_density` 仅控制细节概率，不得改变 LOD0 外壳；`generate_attachments=false` 或密度为 0 时细节输出必须为空。
+- `attachment_global_density` 仅控制细节概率，不得改变 LOD0 外壳；`attachments_enabled=false` 或密度为 0 时细节输出必须为空。
 - 每栋最多 64 个细节实例；新增细节种类应复用独立 Role/Variant 配方和现有选择种子，不得在 Prefab 内添加运行时脚本。
 
 ## 6. 材质与移动端约束
@@ -141,7 +141,7 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 | StyleConfig | 1 个，直接覆盖本套资产的全部必需 Role，不包含 Schema、Style Id、Display Name 或 Family |
 | 基础/外壳/细节 Role | 覆盖当前 17 个必需 Role |
 | 参考 Recipe | 40 个；新增 Variant 只能追加稳定键 |
-| DesignPreset | Compact / Standard / Corner Tall 各 1 个 |
+| HDA 示例配置 | Compact / Standard / Corner Tall 直接保存在各 HDA 参数上，不创建 Preset 资产 |
 | 共享材质 | 5 个：Wall / Accent / Roof / Glass / Metal |
 | 参考贴图 | 5 张 128×128 可平铺程序纹理，仅用于验证色彩、节奏与材质分层 |
 
@@ -155,7 +155,7 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 
 提交前运行：
 
-1. `PCG/StreetBuilding/Project Owned/Build Rich Styles + Six Building Showcase`，重建两套参考 Style Kit，重新 Cook 六栋展示建筑并直接保存场景。
+1. 六栋展示建筑直接维护各自 HDA 面板参数；不得通过 GenerationPreset 或 DesignPreset 覆盖。
 2. `PCG/StreetBuilding/Project Owned/Audit Reference Style Kits`，确认依赖只来自当前 Style、对应材质目录、项目 Authoring 脚本与 URP Package。
 3. 检查 `PCG_Building` 的正面、侧背面与屋顶；展示固定为 2 栋矩形 + 4 栋左右 L 形，不生成 U 形。
 4. 运行 StreetBuilding `VerifyFast` 与 `VerifyFull`，确保 HDA/HIP 累计合同没有变化。
@@ -164,10 +164,11 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 
 1. 美术按本规范创建 FBX 与 Prefab。
 2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Role、Variant、权重与单面模块，并在目标 HDA 的 `StreetBuildingAuthoring` 上显式指定。
-3. 在 `StreetBuildingAuthoring` Inspector 执行 `Validate Style`。
-4. 执行 `Compile Preview`，确认 Payload 和 SHA-256 稳定。
-5. 执行 `Apply, Cook & Save Scene`；该操作更新 `module_source`、`unity_instance_catalog` 和 `unity_bridge_end_marker`，Cook 成功后直接保存 Scene。
-6. 检查前、后、左、右和鸟瞰视图，确认墙顶不越过 roofY、屋面完整覆盖 footprint、
+3. 在 HDA 参数面板调整体块、立面、附件及唯一的 `Variation Seed`；高级楼层/附件覆盖默认折叠。`Site Source=Internal` 时外部地块 payload 不得覆盖面板，只有 `External` 时允许覆盖。
+4. 在 `StreetBuildingAuthoring` Inspector 执行 `验证 / Validate`。
+5. 执行 `编译预览 / Compile Preview`，确认 Style Payload 和 SHA-256 稳定。
+6. 执行 `应用风格、Cook 并保存场景`；该操作只更新 `module_source`、`unity_style_catalog`、StyleConfig 所属层高和 `unity_bridge_end_marker`，不得改写任何生成参数。
+7. 检查前、后、左、右和鸟瞰视图，确认墙顶不越过 roofY、屋面完整覆盖 footprint、
    女儿墙连续，并能看到不同密度的雨棚、招牌、消防梯、墙面 AC 与落地屋顶设备。
 
 任何校验或 Cook 失败都不得保存场景；Applier 会尝试恢复原参数与原 Payload。程序化地块、CityRoad 相邻遮挡、LOD、Collider 和运行时 Cook 均不属于阶段 5。

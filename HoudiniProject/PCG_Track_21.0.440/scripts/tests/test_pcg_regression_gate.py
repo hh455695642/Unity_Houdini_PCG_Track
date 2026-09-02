@@ -87,17 +87,17 @@ def snapshot():
 
 
 class CompareSnapshotsTests(unittest.TestCase):
-    def test_streetbuilding_phase4_contract_ids_are_cumulative(self):
+    def test_streetbuilding_hda_panel_contract_ids_are_cumulative(self):
         contract_path = (PROJECT_ROOT / "HoudiniProject" / "PCG_Track_21.0.440"
                          / "scripts" / "contracts" / "streetbuilding_contract.json")
         contract_ids = set(json.loads(contract_path.read_text(encoding="utf-8"))["contract_ids"])
         required = {
             "StreetBuilding.ArtAuthoring.ProjectOwnedStyleCoverage",
-            "StreetBuilding.ArtAuthoring.DesignPresetSchema",
-            "StreetBuilding.ArtAuthoring.PresetDeterminism",
             "StreetBuilding.ArtAuthoring.NoExternalAssetDependency",
             "StreetBuilding.ArtAuthoring.DirectSaveRollback",
-            "StreetBuilding.ArtAuthoring.UnityVariationShowcase",
+            "StreetBuilding.V12.HdaPanelSingleSource",
+            "StreetBuilding.V12.ExternalParcelOnlyOverride",
+            "StreetBuilding.V12.StyleBridgeHapiVisible",
         }
         self.assertTrue(required.issubset(contract_ids))
 
@@ -108,6 +108,11 @@ class CompareSnapshotsTests(unittest.TestCase):
         self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
         self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
         self.assertIn("reflection-method-call", entrypoint)
+
+    def test_streetbuilding_persistence_uses_v12_builder(self):
+        gate_source = (TOOLS_DIR / "pcg_regression_gate.py").read_text(encoding="utf-8")
+        self.assertIn("patch_streetbuilding_hda_panel_generation_v12.py", gate_source)
+        self.assertNotIn('"builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_versionless_style_payload_v10.py"', gate_source)
 
     def test_unchanged_snapshot_passes(self):
         before = snapshot()
