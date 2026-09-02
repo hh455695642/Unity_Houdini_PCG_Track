@@ -51,7 +51,7 @@
 - 体块只允许 `Rectangle` 与等高 `LShape`，不制作 U 形、退台或分层高度模块。
 - L 形缺口固定在后左或后右，缺口宽/深均为 2m 倍数，并至少保留 4m 宽的两条翼。
 
-## 4. 无版本 StyleConfig 与 StyleLibrary
+## 4. 无版本 StyleConfig
 
 StyleConfig 编译结果使用 UTF-8、Invariant Culture 和稳定排序：
 
@@ -60,8 +60,8 @@ STYLE|<CellWidth>|<GroundFloorHeight>|<TypicalFloorHeight>
 M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|Weight|FacadeMask|FloorMask|BoundsX|BoundsY|BoundsZ|BoundsMinX|BoundsMinY|BoundsMinZ
 ```
 
-- `StreetBuildingStyleLibrary` 只索引多个独立 StyleConfig；列表顺序仅用于 Inspector 展示，不参与配置身份或模块选择。
-- 每套资产只维护自己的 StyleConfig；同一 Role 内 Variant 按 `BuildingId + Seed` 和权重确定性选择。
+- 每个 StreetBuilding HDA 必须显式引用一个独立 StyleConfig，不提供自动风格库或跨风格随机选择。
+- 每套资产只维护自己的 StyleConfig；同一 Role 内 Variant 由 HDA 按生成 Seed 和权重确定性选择。
 - `Weight` 必须大于 0；`Role + VariantId` 在单个 StyleConfig 内必须唯一。
 - Payload 不包含 Schema、Style Id、Display Name 或 Module Family；HDA 只接受上述 `STYLE` 头和 18 字段模块行。
 - Payload 内容直接参与 SHA-256，修改尺寸、权重、路径或局部偏移都会产生新版本。
@@ -163,7 +163,7 @@ M|Group|Role|Variant|PrefabPath|WidthSpan|DepthSpan|HeightType|ResolvedHeight|We
 ## 8. Authoring 流程
 
 1. 美术按本规范创建 FBX 与 Prefab。
-2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Role、Variant、权重与单面模块，并按需加入 `StreetBuildingStyleLibrary`。
+2. 为这套资产创建独立 `StreetBuildingStyleConfig`，登记 Role、Variant、权重与单面模块，并在目标 HDA 的 `StreetBuildingAuthoring` 上显式指定。
 3. 在 `StreetBuildingAuthoring` Inspector 执行 `Validate Style`。
 4. 执行 `Compile Preview`，确认 Payload 和 SHA-256 稳定。
 5. 执行 `Apply, Cook & Save Scene`；该操作更新 `module_source`、`unity_instance_catalog` 和 `unity_bridge_end_marker`，Cook 成功后直接保存 Scene。

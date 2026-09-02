@@ -205,7 +205,7 @@
     "StreetBuilding.V7.RectangleAndLShapeOnly",
     "StreetBuilding.V7.LShapeConcaveCorner",
     "StreetBuilding.V7.LShapeRoofAndParapetCoverage",
-    "StreetBuilding.V7.StyleLibraryIsolation",
+    "StreetBuilding.V11.ExplicitStyleConfigPerHda",
     "StreetBuilding.V7.SingleSidedAssetPolicy",
     "StreetBuilding.V7.UnitySixBuildingShowcase",
     "StreetBuilding.V8.CornerTopologyOrientation",

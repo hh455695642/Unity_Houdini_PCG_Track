@@ -13,11 +13,8 @@ namespace PCGBike.Editor.Buildings
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
-            EditorGUILayout.LabelField("风格解析", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("风格配置", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"), new GUIContent("固定 StyleConfig"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_styleLibrary"), new GUIContent("Style Library"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_buildingId"), new GUIContent("Building ID"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_usageTag"), new GUIContent("用途 Tag"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_variationSeed"), new GUIContent("Variation Seed"));
             EditorGUILayout.Space(4);
             EditorGUILayout.LabelField("生成规则", EditorStyles.boldLabel);
@@ -26,11 +23,9 @@ namespace PCGBike.Editor.Buildings
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
-            string source = authoring.FixedStyleConfig != null ? "Fixed StyleConfig"
-                : authoring.StyleLibrary != null ? "StyleLibrary 稳定加权选择" : "未解析";
             EditorGUILayout.HelpBox(style == null
-                    ? "最终风格：未解析"
-                    : $"最终风格：{style.name}\n来源：{source}\n规则："
+                    ? "必须为当前 HDA 显式指定 StyleConfig。"
+                    : $"最终风格：{style.name}\n来源：当前 HDA 显式 StyleConfig\n规则："
                       + (authoring.GenerationPreset == null ? "HDA 可见参数" : "GenerationPreset > HDA 参数"),
                 style == null ? MessageType.Error : MessageType.Info);
 
