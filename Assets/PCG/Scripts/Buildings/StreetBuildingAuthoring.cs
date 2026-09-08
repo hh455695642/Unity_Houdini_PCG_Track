@@ -13,15 +13,18 @@ namespace PCGBike.Buildings
         [SerializeField] private StreetBuildingStyleConfig _fixedStyleConfig;
         [SerializeField, HideInInspector] private string _lastAppliedPayloadSha256;
         [SerializeField, HideInInspector] private string _lastCookDiagnostic;
+        [SerializeField, HideInInspector] private bool _styleRuleSourceInitialized;
 
         public StreetBuildingStyleConfig FixedStyleConfig => _fixedStyleConfig;
         public string LastAppliedPayloadSha256 => _lastAppliedPayloadSha256;
         public string LastCookDiagnostic => _lastCookDiagnostic;
+        public bool StyleRuleSourceInitialized => _styleRuleSourceInitialized;
 
         /// <summary>每个 HDA 显式绑定唯一 StyleConfig；保留此入口以兼容现有调用方。</summary>
         public StreetBuildingStyleConfig ResolveStyle() => _fixedStyleConfig;
 
 #if UNITY_EDITOR
+        public void SetEditorRuleSourceInitialized(bool initialized) => _styleRuleSourceInitialized = initialized;
         public void SetEditorFixedStyle(StreetBuildingStyleConfig styleConfig)
         {
             _fixedStyleConfig = styleConfig;

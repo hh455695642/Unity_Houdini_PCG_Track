@@ -41,10 +41,13 @@
 
 核心资产存在未提交修改时，当前磁盘文件与已确认的 Live Scene 是不可丢失基线。不得要求为了继续工作而先提交，也不得退回 Git HEAD。
 
+工作区存在未提交改动时，直接以当前磁盘文件为开发基线；目标编辑器存在未保存改动时，先记录并保全磁盘与 Live 状态，再保存有效现场、Capture 和开发。不得要求先提交、stash、清理或回退 Git。保存已有现场不代表验收本次开发结果；本次修改仍须通过 VerifyFast、VerifyFull 后保存。遇到不同有效来源的冲突不得相互覆盖；未命名或空场景的保存、切换遵从用户明确指示。任务前已有 HDA 编辑须先保全 Live 内容，再核对并同步 definition，禁止用旧 definition 覆盖现场。
+
 所有会修改 HDA、HIP、Scene、Prefab、Material、Shader、Renderer 或生成数据的任务，必须执行：
 
 ```text
 确认工作区与 Live Scene
+  -> 保全并保存目标范围内已有未保存现场（无来源冲突时）
   -> Capture 基线
   -> 声明本任务修改白名单与验收合约
   -> 仅做白名单内增量修改
@@ -58,7 +61,7 @@
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Invoke-PcgRegression.ps1 `
-  -Module CityRoad|Track|Terrain `
+  -Module CityRoad|Track|Terrain|StreetBuilding `
   -Stage Capture|VerifyFast|VerifyFull `
   -ChangeManifest <json>
 ```
@@ -70,7 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Invoke-PcgRe
 - 白名单外的节点类型、连接、非默认参数、VEX、公共参数接口或目标文件变化必须使验证失败。
 - 每个已修复 bug 必须新增能复现它的累计合约；只验证本次功能不算完成。
 - 目标输出不允许新增 warning。历史 warning 只能按精确签名登记，禁止宽泛忽略。
-- 验证失败不得保存；保存后复验失败必须恢复 Capture 备份并报告。
+- 本次开发修改验证失败不得保存；保存后复验失败必须恢复本次 Capture 备份并报告，保留任务前已有用户改动。此规则不禁止开发前保全并保存已有现场。
 - HDA/HIP 是实现事实源，累计验证器是行为事实源，DevLog 和历史 patch 只用于审计。
 
 ## 历史 patch 与 builder
@@ -91,9 +94,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Invoke-PcgRe
 powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-HoudiniMcp.ps1
 ```
 
-Preflight 必须确认 18811 RPC、3055 health、当前 HIP 和 Codex Houdini 工具发现。连接层正常但工具未热加载时，必须明确要求重启 Codex，不能假装已通过 MCP 操作。
+连接分为两层，端口不可互换：
+
+- Houdini 内运行 `import hrpyc; hrpyc.start_server(port=18811)`，启动的是 Houdini RPC 服务，不是 HTTP/MCP 服务。
+- 独立 Python 包 `houdini_mcp` 提供 MCP 转接服务；当前 HTTP 配置监听 3055，`/mcp` 接收 MCP 请求，`/health` 仅检查转接服务存活。转接服务再连接 Houdini 的 18811。
+- 当前链路为 `Codex -> HTTP MCP :3055 -> hrpyc RPC :18811 -> Houdini Live Scene`。不要将 Codex MCP URL 改成 18811，也不要把 3055 当作 Houdini 内部服务。
+
+Preflight 必须分别确认 18811 RPC 与当前 HIP、3055 health、转接服务协议工具发现和 Codex 配置解析。脚本的 `tools/list` 成功只证明服务端可发现工具，不证明当前 Codex 会话已加载工具；后者必须由当前会话工具列表及实际调用另行验证。连接层正常但当前会话工具未加载或握手失败时，明确报告该层故障并要求重启 Codex，不能把服务端预检成功报告成当前会话 MCP 操作成功。
 
 Houdini 修改后必须验证目标节点 Cook、error/warning、输出统计与关键 metadata；Unity 修改后必须验证 Editor 状态、Console、场景对象和资产引用。涉及 HDA 时两侧验证都必须完成。
+
+本次 StreetBuilding 三层配置任务已获用户明确授权：当前会话原生 Houdini 工具不可调用时，允许使用标准 MCP 客户端连接现有 `http://127.0.0.1:3055/mcp`，通过协议工具读取和修改现场后继续开发，无需等待会话工具重载。必须报告实际使用的客户端路径，不得声称原生工具已恢复；不得绕过服务端策略。Capture、白名单、累计回归、保存与失败恢复门禁全部保留。
 
 ## 作用域规则
 
@@ -109,12 +120,13 @@ Houdini 修改后必须验证目标节点 Cook、error/warning、输出统计与
 - 不把“编译成功”或“Cook 成功”单独当作验收；必须同时满足累计行为合约。
 - 若存在脏工作区，交付时区分本次改动与原有用户改动，不得把两者混为一谈。
 
-## Sol 主控 + Terra 执行路由
+## Astra 主控 + Terra 执行路由
 
-- Sol 始终负责需求理解、任务拆解、架构判断、结果整合、最终审查和最终答复，掌握完整上下文与最终责任。
+- 用户明确要求单代理或禁止委派时，该要求优先于下列默认路由；由主控亲自实现、验证和交付，不启动任何子代理。本次 StreetBuilding 三层配置任务按此执行。
+- 主控模型（GPT-6 Astra）始终负责需求理解、任务拆解、架构判断、结果整合、最终审查和最终答复，掌握完整上下文与最终责任。
 - 对每个独立、可单独验收的子任务（实现、补测试、重构、检索、日志整理、文档整理），显式启动一个命名的 `terra_worker` 实例执行，不使用未命名默认 Agent。
-- 琐碎、强耦合或需要全局上下文的小任务留在 Sol 内完成；只读任务可并行。
+- 琐碎、强耦合或需要全局上下文的小任务留在主控模型内完成；只读任务可并行。
 - 写文件类 worker 必须使用独立 worktree 或不重叠的文件范围；无法隔离时串行执行。
 - `terra_worker` 不得再 spawn 下级 Agent，不得重定义架构、做破坏性改动或修改无关文件。
 - 每次交接必须包含：范围、输入、预期输出、验收条件、相关文件边界。
-- Sol 必须等待所有 worker 完成，逐个检查结果与 diff，运行或复核相关验证（遵循本文档的防回归门禁与 MCP 验证要求），失败时按需重新派发，最终完成整合与验收。
+- 主控模型必须等待所有 worker 完成，逐个检查结果与 diff，运行或复核相关验证（遵循本文档的防回归门禁与 MCP 验证要求），失败时按需重新派发，最终完成整合与验收。

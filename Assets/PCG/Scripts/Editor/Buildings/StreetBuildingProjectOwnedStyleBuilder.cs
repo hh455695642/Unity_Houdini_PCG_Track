@@ -33,6 +33,7 @@ namespace PCGBike.Editor.Buildings
             if (AssetDatabase.LoadMainAssetAtPath(path) != null)
                 throw new InvalidOperationException("目标资产已存在，拒绝覆盖：" + path);
             var style = ScriptableObject.CreateInstance<StreetBuildingStyleConfig>();
+            style.MigrateLayers();
             AssetDatabase.CreateAsset(style, path);
             AssetDatabase.SaveAssets();
             Selection.activeObject = style;

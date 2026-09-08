@@ -358,6 +358,10 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
         require(point.position()[1] + height <= roof_y + .01,
                 f"{role} exceeds roof plane at {point.position()}")
     first = signature(value)
+    # Measured from the task's original production definition before editing.
+    # Instance-rule migration must not add roof trim or change weighted output.
+    require(first == 'b84502d2b2ba0d13fea24f798ab0e82275790459afc788350adfe90b491b4fc2',
+            'Legacy instance output differs from the captured production signature')
     require(signature(geometry(asset)) == first, "Weighted selection is not deterministic")
     configure(asset, STYLE_CATALOG, seed=47)
     second = signature(geometry(asset))
@@ -804,6 +808,94 @@ def assert_dimension_contract() -> dict[str, Any]:
     return result
 
 
+def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
+    """Independent behavior contracts for style defaults and floor ownership."""
+    import copy
+    def defaults():
+        result = dict(groundUse=0, layoutMode=0, rhythm=0, shopfrontRatio=.65,
+                      entranceMin=1, entranceMax=1, shopDoorMin=0, shopDoorMax=1,
+                      shopfrontMin=1, shopfrontMax=4, windowMin=2, windowMax=8,
+                      blankMin=0, blankMax=4, trimEnabled=True, roofEnabled=True,
+                      attachmentsEnabled=True, parapetHeight=.6, density=1)
+        for key in ('awning', 'sign', 'fireEscape', 'wallAC', 'roofProps'):
+            result[key] = dict(enabled=True, density=1, maxCount=4, facades=15)
+        return result
+    rules = dict(version=1, ground=defaults(), upper=defaults(), roof=defaults())
+    lines = [STYLE_CATALOG.splitlines()[0]]
+    for fields in catalog_module_rows(STYLE_CATALOG):
+        role = int(fields[2])
+        mask = 1 if role in (0, 1, 2, 3, 14, 15) else 2 if role in (4, 5, 16, 17) else 4 if role in (9, 18, 19, 20, 21) else 3
+        for band in (1, 2, 4):
+            if mask & band:
+                row = fields.copy(); row[11] = str(band); lines.append('|'.join(row))
+    catalog = '\n'.join(lines)
+    def setup(payload=catalog, floors=4, seed=31):
+        configure(asset, payload, density=1)
+        asset.parm('floor_count').set(floors)
+        asset.parm('variation_seed').set(seed)
+        asset.parm('style_rule_source').set(1)
+        for layer in ('ground', 'upper', 'roof'):
+            asset.parm('style_override_' + layer).set(0)
+        asset.parm('unity_style_rules').set(json.dumps(rules, sort_keys=True))
+    def records():
+        return [(p.stringAttribValue('module_role'), p.intAttribValue('floor_index'),
+                 p.stringAttribValue('unity_instance'), tuple(p.position()),
+                 tuple(p.attribValue('orient'))) for p in geometry(asset, 'OUT_DETAIL_INSTANCES').points()]
+    def apply_rules():
+        asset.parm('unity_style_rules').set(json.dumps(rules, sort_keys=True))
+    cases=0
+    for floors in (1, 2, 4, 12):
+        for seed in (1, 31, 97):
+            setup(floors=floors, seed=seed)
+            points=records()
+            require(len(points)<=64, 'Layer rules exceeded final instance budget')
+            require(all(floor==0 for role,floor,*_ in points if role in ('Awning','Sign')), 'Ground attachments leaked')
+            require(all(0<floor<floors for role,floor,*_ in points if role in ('FireEscape','ACUnit')), 'Upper attachments leaked')
+            require(all(floor==floors for role,floor,*_ in points if role=='RoofProp'), 'Roof attachment band leaked')
+            require(points==records(), 'Layer style determinism failed')
+            geometry(asset, 'OUT_BUILDING_LOD0')
+            cases+=1
+    # Same Prefab can be referenced again in Upper, independent of Ground.
+    upper_rows=[]
+    for row in catalog_module_rows(catalog):
+        if int(row[2]) in (14,15):
+            row[11]='2'; upper_rows.append('|'.join(row))
+    setup(catalog+'\n'+'\n'.join(upper_rows))
+    points=records()
+    require(any(role=='Awning' and floor>0 for role,floor,*_ in points), 'Explicit upper awning did not generate')
+    require(any(role=='Sign' and floor>0 for role,floor,*_ in points), 'Explicit upper sign did not generate')
+    unaffected=[p for p in points if p[1]>0]
+    rules['ground']['density']=0; apply_rules()
+    reduced=records()
+    require(not any(p[1]==0 for p in reduced), 'Ground density zero ignored')
+    require([p for p in reduced if p[1]>0]==unaffected, 'Changing Ground changed another layer')
+    rules['upper']['attachmentsEnabled']=False; apply_rules()
+    require(all(p[0]=='RoofProp' for p in records()), 'Upper off toggle ignored')
+    rules['roof']['roofProps']['maxCount']=0; apply_rules()
+    require(not records(), 'Roof maximum zero ignored')
+    rules['ground']=defaults(); rules['upper']=defaults(); rules['roof']=defaults(); apply_rules()
+    asset.parm('attachments_enabled').set(0)
+    require(not records(), 'Global off must constrain style defaults')
+    setup()
+    rules['ground']['groundUse']=3; apply_rules()
+    parsed=node(asset,'PARSE_GENERATION_RULES').geometry()
+    require(parsed.intAttribValue('effective_ground_use')==3, 'Style ground use not consumed')
+    asset.parm('ground_floor_use').set(1); asset.parm('style_override_ground').set(1)
+    require(node(asset,'PARSE_GENERATION_RULES').geometry().intAttribValue('effective_ground_use')==1,
+            'Explicit instance layer override did not win')
+    setup()
+    asset.parm('massing_shape').set(1)
+    rules['roof']['roofEnabled']=False; apply_rules()
+    require(not any(p.stringAttribValue('module_role') in ('RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner')
+                    for p in geometry(asset,'OUT_BUILDING_LOD0').points()), 'Disabled L roof still emitted roof modules')
+    require(not any(p[0]=='RoofProp' for p in records()), 'Disabled L roof still emitted props')
+    rules['roof']['roofEnabled']=True; rules['roof']['parapetHeight']=0; apply_rules()
+    require(not any(p.stringAttribValue('module_role').startswith('Parapet')
+                    for p in geometry(asset,'OUT_BUILDING_LOD0').points()), 'L parapet zero still emitted edges')
+    return {'status':'PASS','seed_floor_cases':cases,'upper_awning_sign':True,
+            'independent_layers':True,'density_toggle_budget':True,'instance_override':True}
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -844,7 +936,9 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.V12.HdaPanelSingleSource",
                 "StreetBuilding.V12.ExternalParcelOnlyOverride",
                 "StreetBuilding.V12.StyleBridgeHapiVisible",
-                "StreetBuilding.V13.PrefabFilenameVariant"}
+                "StreetBuilding.V13.PrefabFilenameVariant",
+                "StreetBuilding.Layers.StyleDefaultsAndOverrides", "StreetBuilding.Layers.FloorOwnership",
+                "StreetBuilding.Layers.IndependentSelection", "StreetBuilding.Layers.MigrationAndTransactions"}
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
@@ -860,7 +954,60 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "v6_1_modular_details": assert_details(fresh, contract),
             "l_shape_topology": assert_l_shape(fresh),
             "generation_rules": assert_generation_rules(fresh, contract),
-            "dimension_contract": assert_dimension_contract()}
+            "dimension_contract": assert_dimension_contract(),
+            "three_layer_rules": assert_layer_rules(fresh)}
+
+
+def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
+    """Export Live to scratch files, verify fresh locked candidate before persistence.
+
+    Uses the regression harness RPC connection, never an old patch/builder.
+    This hython process owns only its disposable HIP and definition.
+    """
+    import uuid
+    from pcg_regression_gate import connect_live
+    candidate = root / '.codex_tmp' / 'regression' / ('streetbuilding-candidate-' + uuid.uuid4().hex)
+    candidate.mkdir(parents=True)
+    items = candidate / 'live.cpio'
+    connection = connect_live(host, port)
+    try:
+        connection.execute('''
+import hou
+def _sb_export_candidate(path):
+    a=hou.node('/obj/StreetBuilding_DEV')
+    if a is None or a.type().name()!='pcgbike::StreetBuilding::1.0':
+        raise RuntimeError('Live StreetBuilding instance changed')
+    a.parent().saveItemsToFile((a,),path)
+    return a.type().definition().libraryFilePath()
+''')
+        definition_path = str(connection.eval('_sb_export_candidate({!r})'.format(str(items))))
+        require(Path(definition_path).resolve() == hda, 'Candidate definition differs from expected production HDA')
+    finally:
+        connection.close()
+    hou.hda.installFile(str(hda), change_oplibraries_file=False, force_use_assets=True)
+    hou.node('/obj').loadItemsFromFile(str(items))
+    asset = hou.node('/obj/StreetBuilding_DEV')
+    definition = asset.type().definition()
+    templates = definition.parmTemplateGroup()
+    layer = next(t for t in asset.parmTemplateGroup().entries()
+                 if isinstance(t, hou.FolderParmTemplate)
+                 and any(p.name()=='style_rule_source' for p in t.parmTemplates()))
+    layer.setName('sb_layers')
+    if templates.find('style_rule_source') is None:
+        templates.append(layer)
+    candidate_hda = candidate / 'StreetBuilding.hda'
+    candidate_hip = candidate / 'StreetBuilding.hip'
+    definition.copyToHDAFile(str(candidate_hda))
+    hou.hda.installFile(str(candidate_hda), change_oplibraries_file=False, force_use_assets=True)
+    candidate_definition = hou.hda.definitionsInFile(str(candidate_hda))[0]
+    candidate_definition.updateFromNode(asset)
+    candidate_definition.setParmTemplateGroup(templates)
+    candidate_definition.setIsPreferred(True)
+    hou.hipFile.save(str(candidate_hip))
+    result = validate(candidate_hda, candidate_hip, contract)
+    result['candidate_directory'] = str(candidate)
+    result['production_saved'] = False
+    return result
 
 
 def main() -> int:
@@ -870,12 +1017,17 @@ def main() -> int:
     parser.add_argument("--hda", type=Path)
     parser.add_argument("--hip", type=Path)
     parser.add_argument("--contract", type=Path)
+    parser.add_argument("--source", choices=('fresh', 'live-candidate'), default='fresh')
+    parser.add_argument("--host", default='127.0.0.1')
+    parser.add_argument("--port", type=int, default=18811)
     args = parser.parse_args()
     root = args.project_root.resolve()
     hda = (args.hda or root / "Assets/PCG/HDA/City/StreetBuilding.hda").resolve()
     hip = (args.hip or root / "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip").resolve()
     contract = (args.contract or root / "HoudiniProject/PCG_Track_21.0.440/scripts/contracts/streetbuilding_contract.json").resolve()
-    print(json.dumps(validate(hda, hip, contract), ensure_ascii=False, indent=2))
+    result = (validate_live_candidate(root, hda, contract, args.host, args.port)
+              if args.source == 'live-candidate' else validate(hda, hip, contract))
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 

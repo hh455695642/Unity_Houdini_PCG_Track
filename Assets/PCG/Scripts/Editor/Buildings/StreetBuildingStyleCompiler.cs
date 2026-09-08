@@ -29,11 +29,12 @@ namespace PCGBike.Editor.Buildings
 
     public sealed class StreetBuildingCompiledStyle
     {
-        public StreetBuildingCompiledStyle(string payload, string sha256, int moduleCount)
+        public StreetBuildingCompiledStyle(string payload, string sha256, int moduleCount, string rulesPayload = "")
         {
-            Payload = payload; Sha256 = sha256; ModuleCount = moduleCount;
+            Payload = payload; Sha256 = sha256; ModuleCount = moduleCount; RulesPayload = rulesPayload;
         }
         public string Payload { get; }
+        public string RulesPayload { get; }
         public string Sha256 { get; }
         public int ModuleCount { get; }
     }
@@ -44,15 +45,19 @@ namespace PCGBike.Editor.Buildings
         {
             var report = new StreetBuildingStyleValidationReport();
             if (style == null) { report.Error("StyleConfig is null."); return report; }
+            if (style.NeedsLayerMigration) { report.Error("StyleConfig requires layer migration."); return report; }
             if (style.CellWidth <= 0 || style.GroundFloorHeight <= 0 || style.TypicalFloorHeight <= 0)
                 report.Error("Cell/floor dimensions must be positive.");
+            ValidateRules(report, style.Ground.Rules, "首层");
+            ValidateRules(report, style.Upper.Rules, "上层");
+            ValidateRules(report, style.Roof.Rules, "屋顶");
 
             var keys = new HashSet<string>(StringComparer.Ordinal);
             var roleCounts = new Dictionary<StreetBuildingModuleRole, int>();
             int index = 0;
-            foreach ((StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module) in style.EnumerateModules())
+            foreach ((StreetBuildingFloorMask floor, StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module) in style.EnumerateLayerModules())
             {
-                string label = $"{group}[{index++}]";
+                string label = $"{floor}/{group}[{index++}]";
                 if (module == null) { report.Error(label + " is null."); continue; }
                 if (!module.Enabled) continue;
                 if (module.Prefab == null) { report.Error(label + " has no Prefab."); continue; }
@@ -62,13 +67,11 @@ namespace PCGBike.Editor.Buildings
                 {
                     report.Error(label + $" has invalid Prefab.name '{prefabName}'; it must be non-empty and cannot contain '|', CR, or LF.");
                 }
-                string key = module.ModuleRole + "|" + prefabName;
+                string key = floor + "|" + module.ModuleRole + "|" + prefabName;
                 if (!keys.Add(key)) report.Error("Duplicate Role/Prefab.name: " + key);
                 if (module.Weight <= 0) report.Error(key + " weight must be positive.");
                 if (module.AllowedFacades == StreetBuildingFacadeMask.None)
                     report.Error(key + " has no allowed facade.");
-                if (module.AllowedFloors == StreetBuildingFloorMask.None)
-                    report.Error(key + " has no allowed floor type.");
                 if (!RoleMatchesGroup(module.ModuleRole, group))
                     report.Error($"{key} is in incompatible group {group}.");
 
@@ -97,6 +100,31 @@ namespace PCGBike.Editor.Buildings
                 if (!roleCounts.ContainsKey(role))
                     report.Warning("Optional dedicated body corner role is missing; HDA will use semantic corner fallback: " + role);
             return report;
+        }
+
+        private static void ValidateRules(StreetBuildingStyleValidationReport report,
+            StreetBuildingLayerRules rules, string layer)
+        {
+            if (rules == null) { report.Error(layer + "/默认规则缺失。"); return; }
+            if (rules.layoutMode < 0 || rules.layoutMode > 2 || rules.rhythm < 0 || rules.rhythm > 4)
+                report.Error(layer + "/布局或节奏超出支持范围。");
+            bool Unit(float n) => !float.IsNaN(n) && n >= 0 && n <= 1;
+            if (!Unit(rules.density) || !Unit(rules.shopfrontRatio)) report.Error(layer + "/密度或铺面比例必须在 0–1。");
+            if (float.IsNaN(rules.parapetHeight) || float.IsInfinity(rules.parapetHeight) || rules.parapetHeight < 0)
+                report.Error(layer + "/女儿墙高度必须为有限非负值。");
+            foreach (var range in new[] { ("入口", rules.entranceMin, rules.entranceMax),
+                         ("铺门", rules.shopDoorMin, rules.shopDoorMax), ("铺面", rules.shopfrontMin, rules.shopfrontMax),
+                         ("窗", rules.windowMin, rules.windowMax), ("空白", rules.blankMin, rules.blankMax) })
+                if (range.Item2 < 0 || range.Item3 < range.Item2)
+                    report.Error(layer + "/" + range.Item1 + "数量必须满足 0 ≤ 最小值 ≤ 最大值。");
+            foreach (var pair in new[] { ("雨棚", rules.awning), ("招牌", rules.sign),
+                         ("消防梯", rules.fireEscape), ("空调", rules.wallAC), ("屋顶配件", rules.roofProps) })
+            {
+                var rule = pair.Item2;
+                if (rule == null || !Unit(rule.density) || rule.maxCount < 0 || rule.maxCount > 64
+                    || (rule.facades & ~StreetBuildingFacadeMask.All) != 0)
+                    report.Error(layer + "/" + pair.Item1 + "规则无效（密度 0–1，数量 0–64，合法立面掩码）。");
+            }
         }
 
         public static bool TryGetLocalBounds(GameObject prefab, out Bounds bounds)
@@ -209,23 +237,32 @@ namespace PCGBike.Editor.Buildings
                     F(style.GroundFloorHeight), F(style.TypicalFloorHeight))
             };
             var rows = new List<string>();
-            foreach ((StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module) in style.EnumerateModules())
+            foreach ((StreetBuildingFloorMask floor, StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module) in style.EnumerateLayerModules())
             {
                 if (module == null || !module.Enabled) continue;
                 StreetBuildingStyleValidator.TryGetLocalBounds(module.Prefab, out Bounds bounds);
                 rows.Add(string.Join("|", "M", (int)group, (int)module.ModuleRole, module.Prefab.name,
                     AssetDatabase.GetAssetPath(module.Prefab).Replace('\\', '/'), module.WidthSpan,
                     module.DepthSpan, (int)module.HeightType, F(module.ResolveHeight(style)),
-                    F(module.Weight), (int)module.AllowedFacades, (int)module.AllowedFloors,
+                    F(module.Weight), (int)module.AllowedFacades, (int)floor,
                     F(bounds.size.x), F(bounds.size.y), F(bounds.size.z),
                     F(bounds.min.x), F(bounds.min.y), F(bounds.min.z)));
             }
             lines.AddRange(rows.OrderBy(value => value, StringComparer.Ordinal));
             string payload = string.Join("\n", lines);
             using SHA256 sha = SHA256.Create();
-            string digest = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))
+            string rules = JsonUtility.ToJson(new LayerRulePayload { ground = style.Ground.Rules,
+                upper = style.Upper.Rules, roof = style.Roof.Rules });
+            string digest = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(payload + "\n" + rules))
                 .Select(value => value.ToString("x2", CultureInfo.InvariantCulture)));
-            return new StreetBuildingCompiledStyle(payload, digest, rows.Count);
+            return new StreetBuildingCompiledStyle(payload, digest, rows.Count, rules);
+        }
+
+        [Serializable]
+        private sealed class LayerRulePayload
+        {
+            public int version = 1;
+            public StreetBuildingLayerRules ground, upper, roof;
         }
     }
 }

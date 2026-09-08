@@ -85,8 +85,10 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingStyleValidationReport validation = StreetBuildingStyleValidator.Validate(style);
             if (!validation.IsValid)
                 throw new InvalidOperationException(styleFolder + "\n" + validation);
-            if (style.EnumerateModules().Count() != 42)
-                throw new InvalidOperationException(styleFolder + " requires exactly 42 module definitions.");
+            foreach (StreetBuildingFloorMask floor in new[] { StreetBuildingFloorMask.Ground,
+                         StreetBuildingFloorMask.Upper, StreetBuildingFloorMask.Roof })
+                if (!style.EnumerateLayerModules().Any(item => item.Floor == floor && item.Module.Enabled))
+                    throw new InvalidOperationException(styleFolder + " has no enabled modules in " + floor);
 
             HashSet<StreetBuildingModuleRole> roles = style.EnumerateModules()
                 .Where(item => item.Module != null).Select(item => item.Module.ModuleRole).ToHashSet();

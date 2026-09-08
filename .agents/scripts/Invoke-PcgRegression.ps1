@@ -351,6 +351,23 @@ if ($Stage -eq 'VerifyFast') {
 
 $persisted = $false
 try {
+    if ($Module -eq 'StreetBuilding') {
+        # Export current Live edits and validate a disposable locked candidate
+        # before any production definition/HIP save.
+        Invoke-Hython -Arguments @(
+            $streetBuildingValidator, '--project-root', $projectRoot,
+            '--source', 'live-candidate', '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
+        Invoke-StreetBuildingContractTests
+        $layerResponse = Invoke-UnityTool -Tool 'script-execute' -InputObject @{
+            isMethodBody = $false
+            className = 'StreetBuildingLayerGate'
+            methodName = 'Run'
+            csharpCode = 'public static class StreetBuildingLayerGate { public static string Run() { return PCGBike.Tests.Editor.Buildings.StreetBuildingLayerEditModeTests.Run(); } }'
+        }
+        if (-not ([string]$layerResponse.structured.result.value).StartsWith('PASS|3|')) {
+            throw 'StreetBuilding layer EditMode contracts failed before persistence.'
+        }
+    }
     if ($Module -eq 'CityRoad') {
         Invoke-Hython -Arguments @(
             $cityRoadValidator, '--source', 'live', '--host', $HoudiniHost,
@@ -388,6 +405,15 @@ try {
     if ($Module -eq 'StreetBuilding') {
         Assert-UnityAssetOnly -Snapshot $unityCurrent
         Invoke-StreetBuildingContractTests
+        $transactionResponse = Invoke-UnityTool -Tool 'script-execute' -InputObject @{
+            isMethodBody = $false
+            className = 'StreetBuildingTransactionGate'
+            methodName = 'Run'
+            csharpCode = 'public static class StreetBuildingTransactionGate { public static string Run() { new PCGBike.Tests.Editor.Buildings.StreetBuildingLayerEditModeTests().ApplyFailures_RestoreRulesParametersAndDoNotWriteScene(); return "PASS"; } }'
+        }
+        if ([string]$transactionResponse.structured.result.value -ne 'PASS') {
+            throw 'StreetBuilding transaction rollback contracts failed.'
+        }
         $unityCurrent = Wait-UnityReady
     }
     else {

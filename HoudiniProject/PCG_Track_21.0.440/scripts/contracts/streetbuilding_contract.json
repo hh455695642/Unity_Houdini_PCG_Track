@@ -148,15 +148,50 @@
     "unity_bridge_end_marker": "END"
   },
   "menus": {
-    "site_source": ["internal", "external"],
-    "module_source": ["internal_proxy", "unity_asset_instances"],
-    "massing_shape": ["rectangle", "l_shape"],
-    "l_notch_side": ["rear_left", "rear_right"],
-    "ground_floor_use": ["auto", "residential", "retail", "mixed"],
-    "facade_rhythm": ["auto", "uniform", "alternating", "center_accent", "paired"],
-    "facade_layout_mode": ["auto", "random_range", "manual"],
-    "rear_facade_mode": ["off", "simple_cap", "full_facade"],
-    "side_facade_mode": ["auto", "off", "force"]
+    "site_source": [
+      "internal",
+      "external"
+    ],
+    "module_source": [
+      "internal_proxy",
+      "unity_asset_instances"
+    ],
+    "massing_shape": [
+      "rectangle",
+      "l_shape"
+    ],
+    "l_notch_side": [
+      "rear_left",
+      "rear_right"
+    ],
+    "ground_floor_use": [
+      "auto",
+      "residential",
+      "retail",
+      "mixed"
+    ],
+    "facade_rhythm": [
+      "auto",
+      "uniform",
+      "alternating",
+      "center_accent",
+      "paired"
+    ],
+    "facade_layout_mode": [
+      "auto",
+      "random_range",
+      "manual"
+    ],
+    "rear_facade_mode": [
+      "off",
+      "simple_cap",
+      "full_facade"
+    ],
+    "side_facade_mode": [
+      "auto",
+      "off",
+      "force"
+    ]
   },
   "budgets": {
     "lod0_triangles_per_building": 12000,
@@ -224,6 +259,29 @@
     "StreetBuilding.V12.HdaPanelSingleSource",
     "StreetBuilding.V12.ExternalParcelOnlyOverride",
     "StreetBuilding.V12.StyleBridgeHapiVisible",
-    "StreetBuilding.V13.PrefabFilenameVariant"
-  ]
+    "StreetBuilding.V13.PrefabFilenameVariant",
+    "StreetBuilding.Layers.StyleDefaultsAndOverrides",
+    "StreetBuilding.Layers.FloorOwnership",
+    "StreetBuilding.Layers.IndependentSelection",
+    "StreetBuilding.Layers.MigrationAndTransactions"
+  ],
+  "three_layer_rules": {
+    "version": 1,
+    "parameter": "unity_style_rules",
+    "precedence": [
+      "style_defaults",
+      "explicit_instance_layer_override",
+      "parcel_global",
+      "facade_floor_overrides"
+    ],
+    "hard_constraints": [
+      "module_floor",
+      "module_facade",
+      "global_attachments_enabled",
+      "detail_budget_64"
+    ],
+    "legacy_contract_interpretation": {
+      "StreetBuilding.V12.HdaPanelSingleSource": "Retained ID applies only to instance-rule mode. The former universal HDA-only rule is replaced by StreetBuilding.Layers.StyleDefaultsAndOverrides."
+    }
+  }
 }

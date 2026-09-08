@@ -537,7 +537,9 @@ Test-CodexCliHoudiniMcpConfig -Path $CodexConfigPath -ExpectedUrl $mcpEndpoint
 Write-Step 'OK' 'Codex CLI accepted the complete configuration and resolved the Houdini MCP entry.'
 
 $mcpDiscovery = Test-McpToolDiscovery -Endpoint $mcpEndpoint
-Write-Step 'OK' "Houdini MCP protocol discovery passed: $($mcpDiscovery.ToolCount) tools."
+Write-Step 'OK' "Houdini MCP server-side protocol discovery passed: $($mcpDiscovery.ToolCount) tools."
+Write-Step 'INFO' 'Transport: Codex HTTP MCP -> standalone bridge -> Houdini hrpyc RPC. The ports are not interchangeable.'
+Write-Step 'INFO' 'This script cannot verify tools loaded in the current Codex conversation. Verify a callable Houdini tool there separately.'
 
 [PSCustomObject]@{
     HoudiniProcessId = $houdiniProcess.Id
@@ -550,4 +552,5 @@ Write-Step 'OK' "Houdini MCP protocol discovery passed: $($mcpDiscovery.ToolCoun
     McpService       = $health.Service
     McpEndpoint      = $mcpEndpoint
     McpToolCount     = $mcpDiscovery.ToolCount
+    CodexSessionToolsVerified = $false
 }

@@ -9,19 +9,19 @@ using UnityEditor.SceneManagement;
 namespace PCGBike.Editor.Buildings
 {
     /// <summary>
-    /// StyleConfig 到 HDA 的窄事务桥。体块、立面、附件和随机参数完全由 HDA 面板持有，
-    /// 本类只同步模块目录和 StyleConfig 拥有的尺寸。
+    /// 编辑期事务桥：一次提交三层素材、默认规则和尺寸，然后请求一次 Cook。
+    /// 实例已有的规则来源与覆盖保留；运行时只消费 Bake 结果。
     /// </summary>
     public static class StreetBuildingStyleApplier
     {
         internal static Func<HEU_HoudiniAsset, bool> RequestCook = DefaultRequestCook;
         internal static Func<UnityEngine.SceneManagement.Scene, bool> SaveScene = EditorSceneManager.SaveScene;
 
-        private static readonly string[] IntParameters = { "module_source" };
+        private static readonly string[] IntParameters = { "module_source", "style_rule_source" };
         private static readonly string[] FloatParameters =
             { "floor_height_ground", "floor_height_typical" };
         private static readonly string[] StringParameters =
-            { "unity_style_catalog", "unity_bridge_end_marker" };
+            { "unity_style_catalog", "unity_style_rules", "unity_bridge_end_marker" };
 
         public static string Validate(StreetBuildingStyleConfig style)
         {
@@ -46,13 +46,20 @@ namespace PCGBike.Editor.Buildings
             string oldPayloadSha = authoring.LastAppliedPayloadSha256;
             string oldDiagnostic = authoring.LastCookDiagnostic;
             string oldTag = root.gameObject.tag;
+            bool oldRuleSourceInitialized = authoring.StyleRuleSourceInitialized;
             try
             {
                 Write(parameters, style, compiled.Payload);
+                SetString(parameters, "unity_style_rules", compiled.RulesPayload);
+                // Existing applied instances retain their HDA rules. A newly
+                // bound instance starts from its style's layer defaults.
+                if (!oldRuleSourceInitialized && string.IsNullOrEmpty(oldPayloadSha))
+                    SetInt(parameters, "style_rule_source", 1);
                 if (!RequestCook(asset))
                     throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult);
 
                 authoring.SetEditorAppliedPayloadSha256(compiled.Sha256);
+                authoring.SetEditorRuleSourceInitialized(true);
                 authoring.SetEditorCookDiagnostic("Cook PASS: " + asset.LastCookResult);
                 root.gameObject.tag = "EditorOnly";
                 EditorUtility.SetDirty(authoring);
@@ -68,6 +75,7 @@ namespace PCGBike.Editor.Buildings
                 {
                     snapshot.Restore(parameters);
                     authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
+                    authoring.SetEditorRuleSourceInitialized(oldRuleSourceInitialized);
                     authoring.SetEditorCookDiagnostic(oldDiagnostic);
                     root.gameObject.tag = oldTag;
                     EditorUtility.SetDirty(authoring);

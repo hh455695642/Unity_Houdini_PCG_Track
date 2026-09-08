@@ -61,15 +61,13 @@ MODULES: dict[str, dict[str, Any]] = {
         "outputs": ["TerrainCore/10_TERRAIN_SOURCE/OUT_BASE_HEIGHTFIELD"],
     },
     "StreetBuilding": {
-        # This module is authored and validated in disposable hython processes.
-        # The dirty CityRoad GUI session is an observed dependency, never a
-        # persistence target for StreetBuilding.
-        "isolated": True,
+        # Current StreetBuilding Live Scene is authoritative. Never replay an
+        # historical builder when persisting an incremental task.
+        "isolated": False,
         "asset_path": "/obj/StreetBuilding_DEV",
         "asset_type": "pcgbike::StreetBuilding::1.0",
         "definition": "Assets/PCG/HDA/City/StreetBuilding.hda",
         "hip": "HoudiniProject/PCG_Track_21.0.440/PCG_Bike_StreetBuilding.hip",
-        "builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_hda_panel_generation_v12.py",
         "restore_files": ["Assets/PCG/HDA/City/StreetBuilding.hda.meta"],
         "network_roots": ["StreetBuildingCore"],
         "outputs": [
@@ -106,6 +104,30 @@ def sha256_file(path: Path) -> str:
 
 def normalize_path(path: str | Path) -> str:
     return str(path).replace("\\", "/")
+
+
+def captured_manifest_hash(manifest: dict[str, Any]) -> str:
+    """An explicit additive scope amendment retains the original Capture hash.
+
+    Only exact existing-node names and additional contracts can be appended;
+    original file/interface/diagnostic restrictions cannot be changed here.
+    The manifest records the reason and original hash for review.
+    """
+    original = json.loads(json.dumps(manifest))
+    amendment = original.pop("scope_amendment", None)
+    if amendment:
+        if not amendment.get("reason") or not amendment.get("capture_manifest_sha256"):
+            raise GateFailure("Scope amendment requires an auditable reason and Capture hash")
+        for field in ("allowed_nodes", "required_contracts"):
+            for value in amendment.get("added_" + field, []):
+                if any(char in value for char in "*?[]") or original[field].count(value) != 1:
+                    raise GateFailure("Scope amendments must append unique exact names")
+                original[field].remove(value)
+        digest = sha256_bytes(canonical_json(original).encode("utf-8"))
+        if digest != amendment["capture_manifest_sha256"]:
+            raise GateFailure("Scope amendment changed original Capture restrictions")
+        return digest
+    return sha256_bytes(canonical_json(original).encode("utf-8"))
 
 
 def resolve_scoped_path(project_root: Path, relative_path: str) -> Path:
@@ -818,7 +840,7 @@ def verify_fast(
     port: int,
 ) -> dict[str, Any]:
     baseline = load_baseline(snapshot_path)
-    expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
+    expected_manifest_hash = captured_manifest_hash(manifest)
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
     current = (
@@ -853,7 +875,7 @@ def persist_isolated(
     """Create a new asset in a disposable hython process, never in Live GUI."""
 
     baseline = load_baseline(snapshot_path)
-    expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
+    expected_manifest_hash = captured_manifest_hash(manifest)
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
     definition = config["definition"]
@@ -972,7 +994,7 @@ def persist_live(
         return persist_isolated(project_root, module, config, manifest, snapshot_path)
 
     baseline = load_baseline(snapshot_path)
-    expected_manifest_hash = sha256_bytes(canonical_json(manifest).encode("utf-8"))
+    expected_manifest_hash = captured_manifest_hash(manifest)
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
     for relative in (config["definition"], config["hip"], *config.get("restore_files", [])):
@@ -1007,6 +1029,17 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     if actual_definition.lower() != expected_definition.lower():
         raise RuntimeError('Definition changed before persistence: {} != {}'.format(actual_definition, expected_definition))
     original_templates = definition.parmTemplateGroup()
+    promoted_templates = asset.parmTemplateGroup()
+    if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('style_rule_source') is not None:
+        # Preserve canonical existing definition folders. Unlocked instances
+        # synthesize folder ids; promoting those would rename the public API.
+        promoted_templates = original_templates
+        layer = next(t for t in asset.parmTemplateGroup().entries()
+                     if isinstance(t, hou.FolderParmTemplate)
+                     and any(p.name() == 'style_rule_source' for p in t.parmTemplates()))
+        layer.setName('sb_layers')
+        if promoted_templates.find('style_rule_source') is None:
+            promoted_templates.append(layer)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only
@@ -1017,7 +1050,7 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     else:
         # Only a manifest with an explicit public-parameter allowlist may
         # promote the verified Live template group into the definition.
-        definition.setParmTemplateGroup(asset.parmTemplateGroup())
+        definition.setParmTemplateGroup(promoted_templates)
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),

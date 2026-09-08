@@ -4,10 +4,11 @@
 
 ## Live Scene 工作流
 
-- 开始前运行 `.agents/scripts/Ensure-HoudiniMcp.ps1`，确认 18811 RPC、3055 MCP health、当前 HIP 和工具发现。
+- 开始前运行 `.agents/scripts/Ensure-HoudiniMcp.ps1`，分别确认 Houdini 内部 hrpyc RPC（18811）、独立 HTTP MCP 转接服务（3055）、当前 HIP 和服务端工具发现；当前 Codex 会话的工具加载与调用须另行验证，遵守根目录连接分层规则。
 - 默认操作当前 Houdini session；不得创建新 HIP、清空场景或整包重建 HDA。
 - 默认使用当前选中 HDA；无选择时按类型查找目标实例。存在多个候选时必须列出路径并让用户确认。
 - 修改前记录 HIP 路径、未保存状态、实例路径、类型、definition、节点树、关键连接、参数接口和 error/warning。
+- 开发前先保全磁盘与 Live 状态，在没有来源冲突时保存已有有效现场，再 Capture。不得因 Git 脏状态要求提交、stash 或回退；未命名或空场景的保存、切换遵从用户明确指示。
 - 锁定实例需要编辑时可调用 `allowEditingOfContents()`，但仍必须先 Capture。
 
 ## 节点与 Python
@@ -24,7 +25,7 @@
 - 快速验证必须比较 Capture 快照，白名单外节点类型、连接、关键参数、VEX 和公共接口不得变化。
 - 完整验证必须运行当前模块全部历史合约，而不是只调用本次 patch 的 `_validate()`。
 - 目标输出 force cook 后不得有 error 或新增 warning，并检查输出几何、边界、winding、关键 metadata 和退化数据。
-- VerifyFull 通过后才可更新 HDA definition 和保存 HIP；随后在独立 hython 进程使用全新锁定实例复验。
+- 本次开发修改只有 VerifyFull 通过后才可更新 HDA definition 和保存 HIP；随后在独立 hython 进程使用全新锁定实例复验。此门禁不禁止开发前保全并保存已有现场；保存后复验失败恢复本次 Capture 基线，保留任务前已有编辑。
 - 每个 bug 修复必须先增加独立于 patch 脚本的回归合约。
 
 ## 输出与学习维护
