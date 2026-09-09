@@ -11,11 +11,13 @@ namespace PCGBike.Buildings
     public sealed class StreetBuildingAuthoring : MonoBehaviour
     {
         public enum MissingModuleDisplay { Graybox = 0, Empty = 1 }
-        [SerializeField] private MissingModuleDisplay _missingModuleDisplay;
+        [SerializeField, HideInInspector] private MissingModuleDisplay _missingModuleDisplay;
         public MissingModuleDisplay MissingDisplay => _missingModuleDisplay;
         [SerializeField] private StreetBuildingStyleConfig _fixedStyleConfig;
         [SerializeField, HideInInspector] private string _lastAppliedPayloadSha256;
         [SerializeField, HideInInspector] private string _lastCookDiagnostic;
+        [SerializeField, HideInInspector] private string _missingModuleSummary;
+        public string MissingModuleSummary => _missingModuleSummary;
         [SerializeField, HideInInspector] private bool _styleRuleSourceInitialized;
 
         public StreetBuildingStyleConfig FixedStyleConfig => _fixedStyleConfig;
@@ -27,6 +29,7 @@ namespace PCGBike.Buildings
         public StreetBuildingStyleConfig ResolveStyle() => _fixedStyleConfig;
 
 #if UNITY_EDITOR
+        public void SetEditorMissingModuleSummary(string summary) => _missingModuleSummary = summary ?? string.Empty;
         public void SetEditorRuleSourceInitialized(bool initialized) => _styleRuleSourceInitialized = initialized;
         public void SetEditorFixedStyle(StreetBuildingStyleConfig styleConfig)
         {

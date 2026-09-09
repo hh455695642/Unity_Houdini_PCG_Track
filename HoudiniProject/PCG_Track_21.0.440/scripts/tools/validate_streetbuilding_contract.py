@@ -310,6 +310,8 @@ def assert_internal(asset: hou.Node) -> dict[str, int]:
 def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
     configure(asset, STYLE_CATALOG)
     value = geometry(asset)
+    require(len(geometry(asset, "OUT_BUILDING_PREVIEW").prims()) == 0,
+            "Complete style must not emit missing cells")
     count = len(value.points())
     require(len(value.prims()) == 0 and count > 0, "Versionless shell output is empty")
     faces = {point.intAttribValue("face_index") for point in value.points()}
@@ -900,6 +902,7 @@ def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
 def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     """Empty/sparse catalogs are valid; generated placeholders never enter real instances."""
     configure(asset, "STYLE|2|4|3", attachments=0)
+    asset.parm("style_rule_source").set(0)
     asset.parm("site_source_auto").set(1)
     core=asset.node("StreetBuildingCore")
     real=core.node("OUT_BUILDING_LOD0")
@@ -908,9 +911,27 @@ def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     require(not real.errors() and not preview.errors(), "Empty catalog cook failed")
     require(len(real.geometry().points())==0, "Empty catalog emitted real instances")
     require(len(preview.geometry().prims())>0, "Empty catalog graybox is missing")
+    metadata=geometry(asset,"OUT_BUILDING_METADATA")
+    missing=metadata.intAttribValue("preview_missing_count")
+    require(missing>0 and len(preview.geometry().prims())==missing*30,
+            "Zero-instance diagnostics and merged cell faces disagree")
+    summary=metadata.stringAttribValue("preview_missing_summary")
+    require(sum(int(row.split('|')[2]) for row in summary.splitlines())==missing,
+            "Grouped missing counts disagree")
+    for attr in ("building_id","floor_index","face_index","cell_index","module_role","preview_slot"):
+        require(preview.geometry().findPrimAttrib(attr) is not None, "Missing cell locator: "+attr)
+    materials={p.stringAttribValue('unity_material') for p in preview.geometry().prims()}
+    require(materials=={'Assets/PCG/Materials/SB_MissingCell.mat','Assets/PCG/Materials/SB_MissingCellEdge.mat'},
+            "Cells must use their own face and border materials")
+    require(asset.parmTemplateGroup().find("preview_missing_modules").isHidden(), "Legacy preview selector remains visible")
+    asset.parm('roof_enabled').set(0)
+    preview.cook(force=True)
+    require(not any(p.stringAttribValue('module_role') in ('RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner')
+                    for p in preview.geometry().prims()), "Disabled roof emitted missing cells")
+    asset.parm('roof_enabled').set(1)
     asset.parm("preview_missing_modules").set(1)
     preview.cook(force=True)
-    require(len(preview.geometry().points())==0, "Leave-empty mode emitted grayboxes")
+    require(len(preview.geometry().prims())>0, "Legacy leave-empty must now show automatic cells")
     row=style_row(2, SOURCE_PREFIX+"Brick_Plain_4.fbx",height=4,floors=1,facades=1)
     asset.parm("unity_style_catalog").set("STYLE|2|4|3\n"+row)
     asset.parm("ground_floor_use").set(2)
@@ -1060,6 +1081,8 @@ def _sb_export_candidate(path):
     preview.setName('sb_preview')
     if templates.find('preview_missing_modules') is None:
         templates.append(preview)
+    else:
+        templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
     templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'

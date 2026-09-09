@@ -1,0 +1,227 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b89995859dd1049adca88ae92265a3, type: 3}
+  m_Name: SBStyle_Test
+  m_EditorClassIdentifier: 
+  _cellWidth: 2
+  _groundFloorHeight: 4
+  _typicalFloorHeight: 3
+  _layerSchema: 1
+  _ground:
+    _height: 3
+    _facade:
+    - _prefab: {fileID: 919132149155446097, guid: 91c66cc3bb0325d40a88a366624bd75c,
+        type: 3}
+      _moduleRole: 3
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 1
+      _allowedFloors: 1
+    - _prefab: {fileID: 919132149155446097, guid: c365f10e5e6540c4985c91daafdc471f,
+        type: 3}
+      _moduleRole: 2
+      _widthSpan: 1
+      _depthSpan: 0
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 1
+      _allowedFloors: 0
+    - _prefab: {fileID: 919132149155446097, guid: 166328a33434d634aa1cb11169a6f7c8,
+        type: 3}
+      _moduleRole: 0
+      _widthSpan: 1
+      _depthSpan: 0
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 1
+      _allowedFloors: 0
+    _sideRear:
+    - _prefab: {fileID: 0}
+      _moduleRole: 0
+      _widthSpan: 0
+      _depthSpan: 0
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 0
+      _enabled: 0
+      _allowedFacades: 0
+      _allowedFloors: 0
+    _corners: []
+    _trim: []
+    _roofSurface: []
+    _attachments: []
+    _rules:
+      groundUse: 0
+      layoutMode: 0
+      rhythm: 0
+      shopfrontRatio: 0.65
+      entranceMin: 1
+      entranceMax: 1
+      shopDoorMin: 0
+      shopDoorMax: 1
+      shopfrontMin: 1
+      shopfrontMax: 4
+      windowMin: 2
+      windowMax: 8
+      blankMin: 0
+      blankMax: 4
+      trimEnabled: 1
+      attachmentsEnabled: 1
+      roofEnabled: 1
+      parapetHeight: 0.6
+      density: 0.6
+      awning:
+        enabled: 1
+        density: 1
+        maxCount: 8
+        facades: 15
+      sign:
+        enabled: 1
+        density: 0.72
+        maxCount: 8
+        facades: 15
+      fireEscape:
+        enabled: 1
+        density: 0.5
+        maxCount: 4
+        facades: 15
+      wallAC:
+        enabled: 1
+        density: 0.28
+        maxCount: 16
+        facades: 15
+      roofProps:
+        enabled: 1
+        density: 0.55
+        maxCount: 8
+        facades: 15
+  _upper:
+    _height: 3
+    _facade: []
+    _sideRear: []
+    _corners: []
+    _trim: []
+    _roofSurface: []
+    _attachments: []
+    _rules:
+      groundUse: 0
+      layoutMode: 0
+      rhythm: 0
+      shopfrontRatio: 0.65
+      entranceMin: 1
+      entranceMax: 1
+      shopDoorMin: 0
+      shopDoorMax: 1
+      shopfrontMin: 1
+      shopfrontMax: 4
+      windowMin: 2
+      windowMax: 8
+      blankMin: 0
+      blankMax: 4
+      trimEnabled: 1
+      attachmentsEnabled: 1
+      roofEnabled: 1
+      parapetHeight: 0.6
+      density: 0.6
+      awning:
+        enabled: 1
+        density: 1
+        maxCount: 8
+        facades: 15
+      sign:
+        enabled: 1
+        density: 0.72
+        maxCount: 8
+        facades: 15
+      fireEscape:
+        enabled: 1
+        density: 0.5
+        maxCount: 4
+        facades: 15
+      wallAC:
+        enabled: 1
+        density: 0.28
+        maxCount: 16
+        facades: 15
+      roofProps:
+        enabled: 1
+        density: 0.55
+        maxCount: 8
+        facades: 15
+  _roof:
+    _height: 0
+    _facade: []
+    _sideRear: []
+    _corners: []
+    _trim: []
+    _roofSurface: []
+    _attachments: []
+    _rules:
+      groundUse: 0
+      layoutMode: 0
+      rhythm: 0
+      shopfrontRatio: 0.65
+      entranceMin: 1
+      entranceMax: 1
+      shopDoorMin: 0
+      shopDoorMax: 1
+      shopfrontMin: 1
+      shopfrontMax: 4
+      windowMin: 2
+      windowMax: 8
+      blankMin: 0
+      blankMax: 4
+      trimEnabled: 1
+      attachmentsEnabled: 1
+      roofEnabled: 1
+      parapetHeight: 0.6
+      density: 0.6
+      awning:
+        enabled: 1
+        density: 1
+        maxCount: 8
+        facades: 15
+      sign:
+        enabled: 1
+        density: 0.72
+        maxCount: 8
+        facades: 15
+      fireEscape:
+        enabled: 1
+        density: 0.5
+        maxCount: 4
+        facades: 15
+      wallAC:
+        enabled: 1
+        density: 0.28
+        maxCount: 16
+        facades: 15
+      roofProps:
+        enabled: 1
+        density: 0.55
+        maxCount: 8
+        facades: 15
+  _groundFacade: []
+  _upperFacade: []
+  _sideRear: []
+  _convexConcaveCorners: []
+  _columnTrimCornice: []
+  _roofParapet: []
+  _attachments: []

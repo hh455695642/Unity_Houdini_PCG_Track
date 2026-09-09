@@ -50,13 +50,13 @@ namespace PCGBike.Editor.Buildings
             if (missing < 0)
                 throw new InvalidOperationException("没有可验证的真实模块输出，请补齐兼容模块并重新应用后 Bake。");
             if (missing > 0)
-                throw new InvalidOperationException($"仍有 {missing} 个位置缺少兼容模块；留空预览不会绕过正式 Bake 检查。");
+                throw new InvalidOperationException($"仍有 {missing} 个位置缺少兼容模块，请补齐后 Bake。");
             // A configured role can still lack a compatible candidate at a slot.
             // Never bake visible placeholder geometry through native HEU buttons.
             foreach (var filter in authoring.GetComponentsInChildren<MeshFilter>(true))
                 if (filter.name.Contains("OUT_BUILDING_PREVIEW") && filter.sharedMesh != null
                     && filter.sharedMesh.vertexCount > 0)
-                    throw new InvalidOperationException("仍有缺失模块灰盒，请补齐兼容模块并重新生成后 Bake。");
+                    throw new InvalidOperationException("仍有缺项占位，请补齐兼容模块并重新生成后 Bake。");
         }
 
         // Read the generated contract, not the preview renderer visibility.
@@ -64,16 +64,17 @@ namespace PCGBike.Editor.Buildings
         public static int MissingSlotCount(HEU_HoudiniAsset asset, bool requireSession = true)
         {
             var core = asset.GetObjectNodeByName("StreetBuildingCore");
-            if (core == null) return 0;
+            if (core == null) return -1;
             var session = asset.GetAssetSession(false);
             if (session == null)
             {
                 if (requireSession) throw new InvalidOperationException("Houdini session unavailable for Bake validation.");
                 return -1; // Diagnostics may run with a mocked Cook; Bake remains strict.
             }
+            foreach (string output in new[] { "OUT_BUILDING_METADATA", "OUT_BUILDING_LOD0" })
             foreach (var geo in core.GeoNodes)
             {
-                if (geo.GeoName != "OUT_BUILDING_LOD0") continue;
+                if (geo.GeoName != output) continue;
                 foreach (var part in geo.GetParts())
                 {
                     var info = new HAPI_AttributeInfo();
@@ -86,7 +87,36 @@ namespace PCGBike.Editor.Buildings
                 }
             }
             // HEU omits zero-point output parts. Unknown must fail closed for Bake.
-            return asset.Parameters.GetParameter("preview_missing_modules") != null ? -1 : 0;
+            return -1;
+        }
+        public static string MissingSummary(HEU_HoudiniAsset asset)
+        {
+            var session = asset.GetAssetSession(false);
+            var core = asset.GetObjectNodeByName("StreetBuildingCore");
+            if (session == null || core == null) return "缺项统计不可用，请重新应用。";
+            foreach (var geo in core.GeoNodes)
+            {
+                if (geo.GeoName != "OUT_BUILDING_METADATA") continue;
+                foreach (var part in geo.GetParts())
+                {
+                    var info = new HAPI_AttributeInfo();
+                    if (!session.GetAttributeInfo(geo.GeoID, part.PartID, "preview_missing_summary",
+                        HAPI_AttributeOwner.HAPI_ATTROWNER_DETAIL, ref info) || !info.exists) continue;
+                    var handles = new int[info.count * info.tupleSize];
+                    if (!session.GetAttributeStringData(geo.GeoID, part.PartID, "preview_missing_summary",
+                        ref info, handles, 0, info.count) || handles.Length == 0) continue;
+                    string raw = HEU_SessionManager.GetString(handles[0], session);
+                    string result = $"缺失位置：{MissingSlotCount(asset)}";
+                    foreach (string line in raw.Split('\n'))
+                    {
+                        var fields = line.Split('|');
+                        if (fields.Length == 3)
+                            result += $"\n楼层索引 {fields[0]} · {fields[1]}：{fields[2]}";
+                    }
+                    return result;
+                }
+            }
+            return "此实例尚未加载自动占位诊断，请 Rebuild 后应用。";
         }
     }
 }

@@ -118,7 +118,7 @@ def captured_manifest_hash(manifest: dict[str, Any]) -> str:
     if amendment:
         if not amendment.get("reason") or not amendment.get("capture_manifest_sha256"):
             raise GateFailure("Scope amendment requires an auditable reason and Capture hash")
-        for field in ("allowed_nodes", "required_contracts", "allowed_files"):
+        for field in ("allowed_nodes", "required_contracts", "allowed_files", "allowed_public_parameters"):
             for value in amendment.get("added_" + field, []):
                 if any(char in value for char in "*?[]") or original[field].count(value) != 1:
                     raise GateFailure("Scope amendments must append unique exact names")
@@ -1059,6 +1059,8 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             preview.setName('sb_preview')
             if promoted_templates.find('preview_missing_modules') is None:
                 promoted_templates.append(preview)
+            else:
+                promoted_templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
             promoted_templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
     definition.updateFromNode(asset)
     if preserve_public_interface:

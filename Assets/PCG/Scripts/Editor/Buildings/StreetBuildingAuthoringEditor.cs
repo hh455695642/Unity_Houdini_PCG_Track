@@ -16,11 +16,11 @@ namespace PCGBike.Editor.Buildings
             EditorGUILayout.LabelField("风格 / Style", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"),
                 new GUIContent("固定风格配置 / Fixed StyleConfig"));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_missingModuleDisplay"),
-                new GUIContent("缺失模块：灰盒 / 留空"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
+            if (!string.IsNullOrEmpty(authoring.MissingModuleSummary))
+                EditorGUILayout.HelpBox("自动缺项占位（上次成功应用）：\n" + authoring.MissingModuleSummary, MessageType.Info);
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
             var root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
             var parameters = root != null && root.HoudiniAsset != null ? root.HoudiniAsset.Parameters : null;
