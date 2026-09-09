@@ -2,7 +2,7 @@
 
 ## 项目身份与优先级
 
-本项目是面向移动端的 Unity 2022.3.62f2 + URP 14.0.12 自行车竞速程序化场景项目。
+本项目是面向移动端的 Unity 6000.3.22f1 + URP 17.3.0 自行车竞速程序化场景项目。
 
 优先级固定为：
 
@@ -16,7 +16,7 @@
 
 ## 全局硬边界
 
-- 禁止修改 `Assets/Plugins/HoudiniEngineUnity/` 下任何文件、程序集、序列化结构、Inspector 或 `.meta`。
+- 禁止修改 `Assets/Plugins/HoudiniEngineUnity/` 下任何文件、程序集、序列化结构、Inspector 或 `.meta`。唯一已授权例外是 Unity 6.3 兼容补丁：`HEU_HoudiniAsset.cs` 中 `WarnedPrefabNotSupported` 使用 `[field: SerializeField]`，并移除 `InstanceInputUIState` 属性上重复且非法的 `[SerializeField]`；不得借此扩展插件修改范围。
 - 项目专用兼容逻辑必须放在 `Assets/PCG/`、项目自有工具或 HDA 节点网络中。
 - 禁止覆盖、回退、格式化或清理与当前任务无关的用户改动和未跟踪文件。
 - 禁止把 Git HEAD、历史提交、备份 HDA、旧 patch 或 builder 当作当前现场的默认事实源。
@@ -86,7 +86,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Invoke-PcgRe
 
 ## MCP 与验证
 
-涉及 Unity Editor、Scene、GameObject、Component、Prefab、Material、URP、测试或 Console 时，必须主动使用 Unity MCP 获取真实状态并验证。
+### Unity Pipeline CLI 强制前置门禁
+
+每次在本项目开始任何任务时，无论任务是否预计修改 Unity 内容，都必须先执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-UnityPipeline.ps1
+```
+
+该脚本必须验证 Unity CLI、项目对应的 Editor 主进程、`com.unity.pipeline` Server 和 `editor_status`。Editor 未运行时由脚本自动执行 `unity open <project>` 并等待正确 Unity 版本、首次导入、编译和 domain reload 完成，不要求用户手动启动。Editor 已运行但 Pipeline Server 不可达时，脚本允许用 Unity MCP 自动刷新 AssetDatabase，并在仍不可达时调用 `Window/Pipeline/Start Server` 完成自举；这些恢复动作只允许改变 Editor 会话状态，不得修改场景或资产。门禁未通过时禁止继续 Unity 修改，也禁止仅因 CLI/Server 未启动而直接回退 Unity MCP。不得把 AssetImportWorker 当成 Editor 主实例。
+
+门禁通过后，`unity command` 已有类型化命令能够完成的操作必须优先使用 Unity Pipeline CLI；禁止用通用 `eval` 绕过已有命令。只有 Pipeline 已健康但确实缺少目标命令时才允许回退 Unity MCP，并记录缺失命令和回退原因。每次任务结束后必须再次运行 `Ensure-UnityPipeline.ps1`，确认本次修改没有破坏 CLI 链路。
+
+首次修复导致 Pipeline Server 无法启动的编译错误属于引导例外：允许先应用已经明确授权的最小源码补丁，再立即恢复上述 CLI 门禁。脚本不得自动关闭、强制终止或重启已有 Editor，不得丢弃未保存 Scene，也不得删除 `Library/`。
+
+Pipeline 健康且目标操作缺少 CLI 命令时，必须主动使用 Unity MCP 获取真实状态并验证；CLI 能完成的状态、Console、编译、测试与资产操作仍以 CLI 为准。
 
 涉及 Houdini、HDA、HIP、SOP、Cook、Bake 或 Houdini 到 Unity 数据链路时，必须先运行：
 
