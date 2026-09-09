@@ -118,11 +118,13 @@ def captured_manifest_hash(manifest: dict[str, Any]) -> str:
     if amendment:
         if not amendment.get("reason") or not amendment.get("capture_manifest_sha256"):
             raise GateFailure("Scope amendment requires an auditable reason and Capture hash")
-        for field in ("allowed_nodes", "required_contracts"):
+        for field in ("allowed_nodes", "required_contracts", "allowed_files"):
             for value in amendment.get("added_" + field, []):
                 if any(char in value for char in "*?[]") or original[field].count(value) != 1:
                     raise GateFailure("Scope amendments must append unique exact names")
                 original[field].remove(value)
+                if field == "allowed_files" and not amendment.get("added_file_backups", {}).get(value):
+                    raise GateFailure("File scope amendment requires a pre-edit backup: " + value)
         digest = sha256_bytes(canonical_json(original).encode("utf-8"))
         if digest != amendment["capture_manifest_sha256"]:
             raise GateFailure("Scope amendment changed original Capture restrictions")
@@ -851,6 +853,16 @@ def verify_fast(
     assert_identity(current, project_root, config)
     scoped_files = baseline.get("files", {}).keys()
     current["files"] = file_state(project_root, scoped_files)
+    # Additive file scopes never rewrite Capture. Compare against the preserved
+    # pre-edit copies and keep the original manifest hash verifiable.
+    amendment = manifest.get("scope_amendment", {})
+    for relative in amendment.get("added_allowed_files", []):
+        backup = resolve_scoped_path(project_root, amendment["added_file_backups"][relative])
+        if not backup.is_file():
+            raise GateFailure("Missing file scope backup: " + relative)
+        if relative not in baseline["files"]:
+            baseline["files"][relative] = {"exists": True, "sha256": sha256_file(backup)}
+        current["files"].update(file_state(project_root, [relative]))
     violations = compare_snapshots(baseline, current, manifest)
     if violations:
         raise GateFailure("VerifyFast failed:\n- " + "\n- ".join(violations))
@@ -1040,6 +1052,14 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         layer.setName('sb_layers')
         if promoted_templates.find('style_rule_source') is None:
             promoted_templates.append(layer)
+        if asset.parm('preview_missing_modules') is not None:
+            preview = next(t for t in asset.parmTemplateGroup().entries()
+                           if isinstance(t, hou.FolderParmTemplate)
+                           and any(p.name() == 'preview_missing_modules' for p in t.parmTemplates()))
+            preview.setName('sb_preview')
+            if promoted_templates.find('preview_missing_modules') is None:
+                promoted_templates.append(preview)
+            promoted_templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only

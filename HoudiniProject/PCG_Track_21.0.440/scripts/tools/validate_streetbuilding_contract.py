@@ -205,7 +205,7 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
         "side_facade_mode": side, "roof_enabled": roof, "lod_outputs_enabled": 0,
         "variation_seed": seed, "massing_shape": shape, "l_notch_width": notch_width,
         "l_notch_depth": notch_depth, "l_notch_side": notch_side,
-        "site_source": 0, "corner_building": 0,
+        "site_source": 0, "site_source_auto": 0, "corner_building": 0,
     }
     for name, value in values.items():
         asset.parm(name).set(value)
@@ -274,7 +274,8 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
         core.node("BUILD_DIRECT_ROOF_INSTANCES"),
         core.node("BUILD_DIRECT_ROOF_EDGE_INSTANCES")), "Full-envelope merge wiring failed")
     require(core.node("VALIDATE_DIRECT_BUILDING_INSTANCES").input(0)
-            == core.node("MERGE_DIRECT_BUILDING_INSTANCES"), "Validator wiring failed")
+            == core.node("FILTER_REAL_INSTANCES") and core.node("FILTER_REAL_INSTANCES").input(0)
+            == core.node("MERGE_DIRECT_BUILDING_INSTANCES"), "Preview filter/validator wiring failed")
     require(core.node("LOD0_MODULE_SOURCE_SWITCH").input(1)
             == core.node("VALIDATE_DIRECT_BUILDING_INSTANCES"), "V6 shell switch wiring failed")
     require(core.node("DETAIL_INSTANCE_POINTS").input(0)
@@ -896,6 +897,61 @@ def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
             'independent_layers':True,'density_toggle_budget':True,'instance_override':True}
 
 
+def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
+    """Empty/sparse catalogs are valid; generated placeholders never enter real instances."""
+    configure(asset, "STYLE|2|4|3", attachments=0)
+    asset.parm("site_source_auto").set(1)
+    core=asset.node("StreetBuildingCore")
+    real=core.node("OUT_BUILDING_LOD0")
+    preview=core.node("OUT_BUILDING_PREVIEW")
+    real.cook(force=True); preview.cook(force=True)
+    require(not real.errors() and not preview.errors(), "Empty catalog cook failed")
+    require(len(real.geometry().points())==0, "Empty catalog emitted real instances")
+    require(len(preview.geometry().prims())>0, "Empty catalog graybox is missing")
+    asset.parm("preview_missing_modules").set(1)
+    preview.cook(force=True)
+    require(len(preview.geometry().points())==0, "Leave-empty mode emitted grayboxes")
+    row=style_row(2, SOURCE_PREFIX+"Brick_Plain_4.fbx",height=4,floors=1,facades=1)
+    asset.parm("unity_style_catalog").set("STYLE|2|4|3\n"+row)
+    asset.parm("ground_floor_use").set(2)
+    real.cook(force=True)
+    points=real.geometry().points()
+    require(len(points)>0, "Sparse ground module did not generate")
+    require(all(p.stringAttribValue("module_role")=="GroundWall" and p.intAttribValue("floor_index")==0 for p in points), "Sparse catalog borrowed another floor/role")
+    before=[tuple(p.position()) for p in points]
+    asset.parm("preview_missing_modules").set(0)
+    real.cook(force=True); preview.cook(force=True)
+    require(before==[tuple(p.position()) for p in real.geometry().points()], "Preview display changed real instances")
+    require(len(preview.geometry().prims())>0, "Sparse missing modules have no grayboxes")
+    require(preview.geometry().intAttribValue("streetbuilding_preview_only")==1, "Preview output lacks Bake exclusion marker")
+    # A connected empty input is invalid, not an implicit standalone fallback.
+    site=asset.parent().createNode("geo", "VERIFY_PARTIAL_SITE")
+    try:
+        empty=site.createNode("null")
+        asset.setInput(0,site)
+        canonical=core.node("CANONICALIZE_PARCELS")
+        try: canonical.cook(force=True)
+        except hou.OperationFailed: pass
+        require(bool(canonical.errors()), "Connected empty site silently fell back")
+        grid=site.createNode("grid")
+        grid.parm("rows").set(2); grid.parm("cols").set(2)
+        grid.setDisplayFlag(True); grid.setRenderFlag(True)
+        canonical.cook(force=True)
+        require(not canonical.errors() and len(canonical.geometry().prims())==1,
+                "Connected valid parcel was not consumed")
+        line=site.createNode("line")
+        line.setDisplayFlag(True); line.setRenderFlag(True)
+        try: canonical.cook(force=True)
+        except hou.OperationFailed: pass
+        require(bool(canonical.errors()), "Invalid line site silently fell back")
+        asset.setInput(0,None)
+        canonical.cook(force=True)
+        require(not canonical.errors(), "Disconnected standalone did not recover")
+    finally:
+        asset.setInput(0,None); site.destroy()
+    return {"empty":True,"sparse_real_instances":len(before),"preview_isolated":True,"auto_site":True}
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -955,7 +1011,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "l_shape_topology": assert_l_shape(fresh),
             "generation_rules": assert_generation_rules(fresh, contract),
             "dimension_contract": assert_dimension_contract(),
-            "three_layer_rules": assert_layer_rules(fresh)}
+            "three_layer_rules": assert_layer_rules(fresh),
+            "partial_preview": assert_partial_preview(fresh)}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
@@ -995,6 +1052,15 @@ def _sb_export_candidate(path):
     layer.setName('sb_layers')
     if templates.find('style_rule_source') is None:
         templates.append(layer)
+    # Candidate interface must include the new Live preview controls; do not
+    # silently validate new node code against an old definition interface.
+    preview = next(t for t in asset.parmTemplateGroup().entries()
+                   if isinstance(t, hou.FolderParmTemplate)
+                   and any(p.name() == 'preview_missing_modules' for p in t.parmTemplates()))
+    preview.setName('sb_preview')
+    if templates.find('preview_missing_modules') is None:
+        templates.append(preview)
+    templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))

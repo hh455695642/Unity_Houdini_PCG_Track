@@ -41,7 +41,8 @@ namespace PCGBike.Editor.Buildings
 
     public static class StreetBuildingStyleValidator
     {
-        public static StreetBuildingStyleValidationReport Validate(StreetBuildingStyleConfig style)
+        // 编辑期预览允许角色缺失；正式 Bake 显式要求完整性。
+        public static StreetBuildingStyleValidationReport Validate(StreetBuildingStyleConfig style, bool requireComplete = false)
         {
             var report = new StreetBuildingStyleValidationReport();
             if (style == null) { report.Error("StyleConfig is null."); return report; }
@@ -76,12 +77,13 @@ namespace PCGBike.Editor.Buildings
                     report.Error($"{key} is in incompatible group {group}.");
 
                 string path = (AssetDatabase.GetAssetPath(module.Prefab) ?? string.Empty).Replace('\\', '/');
-                if (!path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
-                    report.Error(key + " must reference one project Prefab: " + path);
+                // Imported FBX Model Prefabs are valid native Unity assets too.
+                if (!PrefabUtility.IsPartOfPrefabAsset(module.Prefab))
+                    report.Error(key + " must reference one project Prefab or Model Prefab: " + path);
                 if (path.Contains("|") || path.Contains("\n") || path.Contains("\r"))
                     report.Error(key + " path contains a payload delimiter.");
 
-                ValidatePrefab(report, style, module, key);
+                ValidatePrefab(report, style, module, key, requireComplete);
                 roleCounts[module.ModuleRole] = roleCounts.TryGetValue(module.ModuleRole, out int count) ? count + 1 : 1;
             }
 
@@ -93,6 +95,7 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingModuleRole.Cornice, StreetBuildingModuleRole.RoofSurface,
                 StreetBuildingModuleRole.Parapet,
             };
+            if (!requireComplete) return report;
             foreach (StreetBuildingModuleRole role in required)
                 if (!roleCounts.ContainsKey(role)) report.Error("Required role is missing: " + role);
             foreach (StreetBuildingModuleRole role in new[]
@@ -177,7 +180,7 @@ namespace PCGBike.Editor.Buildings
         }
 
         private static void ValidatePrefab(StreetBuildingStyleValidationReport report,
-            StreetBuildingStyleConfig style, StreetBuildingModuleDefinition module, string key)
+            StreetBuildingStyleConfig style, StreetBuildingModuleDefinition module, string key, bool production)
         {
             Transform root = module.Prefab.transform;
             if (root.localPosition.sqrMagnitude > 1e-8f
@@ -216,11 +219,11 @@ namespace PCGBike.Editor.Buildings
                 if (material == null) { report.Error(key + " has a missing material."); continue; }
                 if (material.shader == null || material.shader.name != "Universal Render Pipeline/Lit")
                     report.Error(key + " material must use URP/Lit: " + material.name);
-                if (!material.enableInstancing) report.Error(key + " material must enable GPU Instancing: " + material.name);
+                if (production && !material.enableInstancing) report.Error(key + " material must enable GPU Instancing: " + material.name);
             }
             int slots = renderers.SelectMany(value => value.sharedMaterials).Where(value => value != null)
                 .Distinct().Count();
-            if (slots > 3) report.Warning(key + $" uses {slots} materials; mobile target recommends <= 3.");
+            if (production && slots > 3) report.Warning(key + $" uses {slots} materials; mobile target recommends <= 3.");
         }
     }
 

@@ -263,7 +263,10 @@
     "StreetBuilding.Layers.StyleDefaultsAndOverrides",
     "StreetBuilding.Layers.FloorOwnership",
     "StreetBuilding.Layers.IndependentSelection",
-    "StreetBuilding.Layers.MigrationAndTransactions"
+    "StreetBuilding.Layers.MigrationAndTransactions",
+    "StreetBuilding.Partial.EmptyAndSparse",
+    "StreetBuilding.Partial.PreviewIsolation",
+    "StreetBuilding.Partial.AutoSite"
   ],
   "three_layer_rules": {
     "version": 1,

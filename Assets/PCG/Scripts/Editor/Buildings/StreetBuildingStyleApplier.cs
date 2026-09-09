@@ -17,7 +17,7 @@ namespace PCGBike.Editor.Buildings
         internal static Func<HEU_HoudiniAsset, bool> RequestCook = DefaultRequestCook;
         internal static Func<UnityEngine.SceneManagement.Scene, bool> SaveScene = EditorSceneManager.SaveScene;
 
-        private static readonly string[] IntParameters = { "module_source", "style_rule_source" };
+        private static readonly string[] IntParameters = { "module_source", "style_rule_source", "preview_missing_modules" };
         private static readonly string[] FloatParameters =
             { "floor_height_ground", "floor_height_typical" };
         private static readonly string[] StringParameters =
@@ -31,7 +31,7 @@ namespace PCGBike.Editor.Buildings
         }
 
         public static StreetBuildingCompiledStyle ApplyAndSave(
-            HEU_HoudiniAssetRoot root, StreetBuildingAuthoring authoring)
+            HEU_HoudiniAssetRoot root, StreetBuildingAuthoring authoring, bool saveScene = true)
         {
             if (root == null || root.HoudiniAsset == null || authoring == null)
                 throw new InvalidOperationException("StreetBuilding HDA root/Authoring is unavailable.");
@@ -50,6 +50,12 @@ namespace PCGBike.Editor.Buildings
             try
             {
                 Write(parameters, style, compiled.Payload);
+                // Loaded legacy instances retain their old parameter cache until
+                // an explicit rebuild. Complete legacy styles remain compatible.
+                if (parameters.GetParameter("preview_missing_modules") != null)
+                    SetInt(parameters, "preview_missing_modules", (int)authoring.MissingDisplay);
+                else if (!StreetBuildingStyleValidator.Validate(style, true).IsValid)
+                    throw new InvalidOperationException("此 HDA 实例尚未加载部分预览接口，请先 Rebuild 再应用风格。");
                 SetString(parameters, "unity_style_rules", compiled.RulesPayload);
                 // Existing applied instances retain their HDA rules. A newly
                 // bound instance starts from its style's layer defaults.
@@ -58,13 +64,20 @@ namespace PCGBike.Editor.Buildings
                 if (!RequestCook(asset))
                     throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult);
 
+                // Rebuild/domain reload can replace UnityEvent instances. Attach
+                // synchronously before exposing freshly generated outputs to Bake.
+                StreetBuildingPartialBake.Attach();
+
                 authoring.SetEditorAppliedPayloadSha256(compiled.Sha256);
                 authoring.SetEditorRuleSourceInitialized(true);
-                authoring.SetEditorCookDiagnostic("Cook PASS: " + asset.LastCookResult);
+                int missing = StreetBuildingPartialBake.MissingSlotCount(asset, false);
+                authoring.SetEditorCookDiagnostic("Cook PASS: " + asset.LastCookResult
+                    + "；模块条目 " + compiled.ModuleCount
+                    + (missing < 0 ? "；无可验证的真实模块输出，可继续预览；正式 Bake 需要有效输出。" : "；缺失位置 " + missing));
                 root.gameObject.tag = "EditorOnly";
                 EditorUtility.SetDirty(authoring);
                 EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
-                if (!SaveScene(root.gameObject.scene))
+                if (saveScene && !SaveScene(root.gameObject.scene))
                     throw new InvalidOperationException("StyleConfig Scene save failed.");
                 return compiled;
             }
@@ -128,7 +141,7 @@ namespace PCGBike.Editor.Buildings
             {
                 var result = new ParameterSnapshot();
                 foreach (string name in IntParameters)
-                    if (p.GetIntParameterValue(name, out int value)) result._ints[name] = value;
+                    if (p.GetParameter(name) != null && p.GetIntParameterValue(name, out int value)) result._ints[name] = value;
                 foreach (string name in FloatParameters)
                     if (p.GetFloatParameterValue(name, out float value)) result._floats[name] = value;
                 foreach (string name in StringParameters)

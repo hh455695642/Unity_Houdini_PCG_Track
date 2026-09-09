@@ -10,6 +10,9 @@ namespace PCGBike.Buildings
     [AddComponentMenu("PCG Bike/Street Building/Authoring")]
     public sealed class StreetBuildingAuthoring : MonoBehaviour
     {
+        public enum MissingModuleDisplay { Graybox = 0, Empty = 1 }
+        [SerializeField] private MissingModuleDisplay _missingModuleDisplay;
+        public MissingModuleDisplay MissingDisplay => _missingModuleDisplay;
         [SerializeField] private StreetBuildingStyleConfig _fixedStyleConfig;
         [SerializeField, HideInInspector] private string _lastAppliedPayloadSha256;
         [SerializeField, HideInInspector] private string _lastCookDiagnostic;

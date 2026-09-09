@@ -16,10 +16,42 @@ namespace PCGBike.Editor.Buildings
             EditorGUILayout.LabelField("风格 / Style", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"),
                 new GUIContent("固定风格配置 / Fixed StyleConfig"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_missingModuleDisplay"),
+                new GUIContent("缺失模块：灰盒 / 留空"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
+            var root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
+            var parameters = root != null && root.HoudiniAsset != null ? root.HoudiniAsset.Parameters : null;
+            var automatic = parameters?.GetParameter("site_source_auto");
+            var siteInput = root?.HoudiniAsset?.GetInputNodeByIndex(0);
+            string resolvedSite = siteInput != null && siteInput.GetConnectedInputCount() > 0
+                ? "输入地块（有效性由 Cook 检查）" : "独栋（宽度、进深和轮廓参数）";
+            if (automatic != null && !automatic._toggle)
+            {
+                EditorGUILayout.HelpBox("旧实例使用手动地块来源。按当前连接迁移后：" + resolvedSite + "。无效输入报错。", MessageType.Info);
+                if (GUILayout.Button("迁移为自动地块来源"))
+                {
+                    Undo.RecordObject(parameters, "自动地块来源迁移");
+                    parameters.SetBoolParameterValue("site_source_auto", true);
+                    EditorUtility.SetDirty(parameters);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(authoring.gameObject.scene);
+                }
+            }
+            else if (automatic != null)
+                EditorGUILayout.HelpBox("地块来源：自动 → " + resolvedSite, MessageType.Info);
+            if (style != null)
+            {
+                var complete = StreetBuildingStyleValidator.Validate(style, true);
+                var preview = StreetBuildingStyleValidator.Validate(style);
+                if (!preview.IsValid)
+                    EditorGUILayout.HelpBox("配置数据无效：\n" + string.Join("\n", preview.Errors), MessageType.Error);
+                else if (!complete.IsValid)
+                    EditorGUILayout.HelpBox("部分模块预览可用；正式 Bake 需要补齐：\n" + string.Join("\n", complete.Errors), MessageType.Info);
+                if (GUILayout.Button("完整建筑检查"))
+                    EditorUtility.DisplayDialog("完整建筑检查", complete.ToString(), "确定");
+            }
             EditorGUILayout.HelpBox(style == null
                     ? "必须为当前 HDA 显式指定 StyleConfig。"
                     : $"当前风格：{style.name}\n体块、立面、附件与 Variation Seed 请直接在 HDA 参数面板调整。",
