@@ -201,6 +201,8 @@
     "detail_instances_per_building": 64
   },
   "contract_ids": [
+    "StreetBuilding.Preview.OutwardNormals",
+    "StreetBuilding.Preview.ParapetCornerEnvelope",
     "StreetBuilding.Interface.Inputs",
     "StreetBuilding.Interface.PublicParameters",
     "StreetBuilding.Network.Readable",
@@ -266,7 +268,12 @@
     "StreetBuilding.Layers.MigrationAndTransactions",
     "StreetBuilding.Partial.EmptyAndSparse",
     "StreetBuilding.Partial.PreviewIsolation",
-    "StreetBuilding.Partial.AutoSite"
+    "StreetBuilding.Partial.AutoSite",
+    "StreetBuilding.UnifiedGround.AllFaces",
+    "StreetBuilding.UnifiedGround.SingleEntrance",
+    "StreetBuilding.UnifiedGround.RecookDiversity",
+    "StreetBuilding.UnifiedGround.Migration",
+    "StreetBuilding.UpperWall.SideRearFallback"
   ],
   "three_layer_rules": {
     "version": 1,

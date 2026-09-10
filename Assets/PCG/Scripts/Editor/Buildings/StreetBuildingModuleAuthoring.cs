@@ -11,7 +11,7 @@ namespace PCGBike.Editor.Buildings
     public static class StreetBuildingModuleAuthoring
     {
         public static readonly string[] Lists = { "_facade", "_sideRear", "_corners", "_trim", "_roofSurface", "_attachments" };
-        public static readonly string[] Names = { "商铺立面", "店铺门", "首层实墙", "建筑主入口", "标准层窗", "标准层实墙",
+        public static readonly string[] Names = { "商铺立面", "店铺门", "墙面", "建筑主入口", "标准层窗", "墙面",
             "建筑阳角", "建筑阴角", "檐口", "女儿墙", "侧墙", "背墙", "立面柱", "层间腰线",
             "雨棚", "招牌", "消防梯", "外墙空调", "屋顶设备", "屋面板", "女儿墙阳角", "女儿墙阴角" };
         public static string RoleName(int role) => role >= 0 && role < Names.Length ? Names[role] : $"未知用途 ({role})";

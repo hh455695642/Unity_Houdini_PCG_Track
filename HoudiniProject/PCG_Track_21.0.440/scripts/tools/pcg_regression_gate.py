@@ -1062,6 +1062,14 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             else:
                 promoted_templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
             promoted_templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
+    if expected_type == 'pcgbike::StreetBuilding::1.0':
+        for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
+            template = asset.parmTemplateGroup().find(name)
+            if template is not None:
+                if promoted_templates.find(name) is None:
+                    promoted_templates.append(template)
+                else:
+                    promoted_templates.replace(name, template)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only

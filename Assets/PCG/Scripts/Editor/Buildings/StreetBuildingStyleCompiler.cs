@@ -68,7 +68,7 @@ namespace PCGBike.Editor.Buildings
                 {
                     report.Error(label + $" has invalid Prefab.name '{prefabName}'; it must be non-empty and cannot contain '|', CR, or LF.");
                 }
-                string key = floor + "|" + module.ModuleRole + "|" + prefabName;
+                string key = floor + "|" + module.ModuleRole + "|" + prefabName + "|" + module.AllowedFacades;
                 if (!keys.Add(key)) report.Error("Duplicate Role/Prefab.name: " + key);
                 if (module.Weight <= 0) report.Error(key + " weight must be positive.");
                 if (module.AllowedFacades == StreetBuildingFacadeMask.None)
@@ -97,12 +97,26 @@ namespace PCGBike.Editor.Buildings
             };
             if (!requireComplete) return report;
             foreach (StreetBuildingModuleRole role in required)
-                if (!roleCounts.ContainsKey(role)) report.Error("Required role is missing: " + role);
+                if (!roleCounts.ContainsKey(role) && !HasUnifiedWallCoverage(style, role))
+                    report.Error("Required role is missing: " + role);
             foreach (StreetBuildingModuleRole role in new[]
                      { StreetBuildingModuleRole.CornerConvex, StreetBuildingModuleRole.CornerConcave })
                 if (!roleCounts.ContainsKey(role))
                     report.Warning("Optional dedicated body corner role is missing; HDA will use semantic corner fallback: " + role);
             return report;
+        }
+
+        // Legacy role requirements are fulfilled by direction-compatible walls in both layers.
+        internal static bool HasUnifiedWallCoverage(StreetBuildingStyleConfig style, StreetBuildingModuleRole role)
+        {
+            if (role is not (StreetBuildingModuleRole.SideWall or StreetBuildingModuleRole.RearWall)) return false;
+            var facade = role == StreetBuildingModuleRole.SideWall ? StreetBuildingFacadeMask.Side : StreetBuildingFacadeMask.Rear;
+            return new[] { StreetBuildingFloorMask.Ground, StreetBuildingFloorMask.Upper }.All(floor =>
+                style.EnumerateLayerModules().Any(item => item.Floor == floor && item.Module != null
+                    && item.Module.Enabled && item.Module.Prefab != null && item.Module.Weight > 0
+                    && (item.Module.AllowedFacades & facade) != 0
+                    && item.Module.ModuleRole == (floor == StreetBuildingFloorMask.Ground
+                        ? StreetBuildingModuleRole.GroundWall : StreetBuildingModuleRole.MiddleBlank)));
         }
 
         private static void ValidateRules(StreetBuildingStyleValidationReport report,

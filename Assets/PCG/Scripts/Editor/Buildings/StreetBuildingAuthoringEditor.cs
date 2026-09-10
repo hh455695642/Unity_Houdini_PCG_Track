@@ -16,6 +16,8 @@ namespace PCGBike.Editor.Buildings
             EditorGUILayout.LabelField("风格 / Style", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"),
                 new GUIContent("固定风格配置 / Fixed StyleConfig"));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_randomizeOnRecook"),
+                new GUIContent("Recook 随机布局", "关闭后锁定当前布局；保存和 Bake 不改变随机结果。"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
@@ -54,7 +56,7 @@ namespace PCGBike.Editor.Buildings
             }
             EditorGUILayout.HelpBox(style == null
                     ? "必须为当前 HDA 显式指定 StyleConfig。"
-                    : $"当前风格：{style.name}\n体块、立面、附件与 Variation Seed 请直接在 HDA 参数面板调整。",
+                    : $"当前风格：{style.name}\nRecook 自动同步配置。随机仅影响墙面模块，体块尺寸保留。",
                 style == null ? MessageType.Error : MessageType.Info);
 
             using (new EditorGUI.DisabledScope(style == null))

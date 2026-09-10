@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('CityRoad', 'Track', 'Terrain', 'StreetBuilding')]
     [string]$Module,
@@ -297,6 +297,22 @@ function Invoke-StreetBuildingContractTests {
     Write-Step 'PASS' 'StreetBuilding EditMode contracts: 7 passed'
 }
 
+# Invoke precompiled contract methods. Avoid Roslyn runtime assembly conflicts.
+# Same assertions as the old dynamic wrappers; no test is skipped.
+function Invoke-StreetBuildingCompiledTest {
+    param([string]$TypeName, [string]$MethodName = 'Run')
+    $filter = @{ namespace = 'PCGBike.Tests.Editor.Buildings'; typeName = $TypeName; methodName = $MethodName; inputParameters = @() }
+    $discovery = Invoke-UnityTool -Tool 'reflection-method-find' -InputObject @{
+        filter = $filter; knownNamespace = $true; typeNameMatchLevel = 6; methodNameMatchLevel = 6; parametersMatchLevel = 2
+    }
+    if (-not ([string]$discovery.structured.result).Contains('Found 1 method')) {
+        throw "Compiled test method is unavailable: $TypeName.$MethodName"
+    }
+    return Invoke-UnityTool -Tool 'reflection-method-call' -InputObject @{
+        filter = $filter; knownNamespace = $true; typeNameMatchLevel = 6; methodNameMatchLevel = 6; parametersMatchLevel = 2; executeInMainThread = $true
+    }
+}
+
 if ($Stage -eq 'Capture') {
     $taskSlug = (($manifest.task -replace '[^A-Za-z0-9_-]', '-') -replace '-+', '-').Trim('-')
     if ([string]::IsNullOrWhiteSpace($taskSlug)) { $taskSlug = 'task' }
@@ -358,12 +374,7 @@ try {
             $streetBuildingValidator, '--project-root', $projectRoot,
             '--source', 'live-candidate', '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
         Invoke-StreetBuildingContractTests
-        $layerResponse = Invoke-UnityTool -Tool 'script-execute' -InputObject @{
-            isMethodBody = $false
-            className = 'StreetBuildingLayerGate'
-            methodName = 'Run'
-            csharpCode = 'public static class StreetBuildingLayerGate { public static string Run() { return PCGBike.Tests.Editor.Buildings.StreetBuildingLayerEditModeTests.Run(); } }'
-        }
+        $layerResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingLayerEditModeTests'
         if (-not ([string]$layerResponse.structured.result.value).StartsWith('PASS|3|')) {
             throw 'StreetBuilding layer EditMode contracts failed before persistence.'
         }
@@ -372,6 +383,12 @@ try {
         Invoke-Hython -Arguments @(
             $cityRoadValidator, '--source', 'live', '--host', $HoudiniHost,
             '--port', [string]$HoudiniPort)
+    }
+    if ($Module -eq 'StreetBuilding') {
+        $unifiedResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingUnifiedTests'
+        if (-not ([string]$unifiedResponse.structured.result.value).StartsWith('PASS|UnifiedMigration|')) {
+            throw 'Unified ground migration contracts failed.'
+        }
     }
     Invoke-Hython -Arguments @(
         $gateScript, '--module', $Module, '--stage', 'persist',
@@ -405,12 +422,7 @@ try {
     if ($Module -eq 'StreetBuilding') {
         Assert-UnityAssetOnly -Snapshot $unityCurrent
         Invoke-StreetBuildingContractTests
-        $transactionResponse = Invoke-UnityTool -Tool 'script-execute' -InputObject @{
-            isMethodBody = $false
-            className = 'StreetBuildingTransactionGate'
-            methodName = 'Run'
-            csharpCode = 'public static class StreetBuildingTransactionGate { public static string Run() { new PCGBike.Tests.Editor.Buildings.StreetBuildingLayerEditModeTests().ApplyFailures_RestoreRulesParametersAndDoNotWriteScene(); return "PASS"; } }'
-        }
+        $transactionResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingUnifiedTests' -MethodName 'RunTransactions'
         if ([string]$transactionResponse.structured.result.value -ne 'PASS') {
             throw 'StreetBuilding transaction rollback contracts failed.'
         }

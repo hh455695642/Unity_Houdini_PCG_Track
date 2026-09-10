@@ -37,9 +37,9 @@ MonoBehaviour:
       _depthSpan: 0
       _heightType: 0
       _absoluteHeight: 0
-      _weight: 1
+      _weight: 0.5
       _enabled: 1
-      _allowedFacades: 1
+      _allowedFacades: 15
       _allowedFloors: 0
     - _prefab: {fileID: 919132149155446097, guid: 166328a33434d634aa1cb11169a6f7c8,
         type: 3}
@@ -52,17 +52,7 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 1
       _allowedFloors: 0
-    _sideRear:
-    - _prefab: {fileID: 0}
-      _moduleRole: 0
-      _widthSpan: 0
-      _depthSpan: 0
-      _heightType: 0
-      _absoluteHeight: 0
-      _weight: 0
-      _enabled: 0
-      _allowedFacades: 0
-      _allowedFloors: 0
+    _sideRear: []
     _corners: []
     _trim: []
     _roofSurface: []
@@ -114,7 +104,51 @@ MonoBehaviour:
         facades: 15
   _upper:
     _height: 3
-    _facade: []
+    _facade:
+    - _prefab: {fileID: 919132149155446097, guid: 9beabd081bbb87942871ea90e6ad0045,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 2
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 3
+      _allowedFloors: 2
+    - _prefab: {fileID: 919132149155446097, guid: 803a8bcc072bb5a4ab16f2ad831f72ce,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+    - _prefab: {fileID: 919132149155446097, guid: 909c0d29465788547a1581a90877352b,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+    - _prefab: {fileID: 919132149155446097, guid: c365f10e5e6540c4985c91daafdc471f,
+        type: 3}
+      _moduleRole: 5
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
     _sideRear: []
     _corners: []
     _trim: []

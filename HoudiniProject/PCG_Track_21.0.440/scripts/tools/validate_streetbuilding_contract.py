@@ -899,6 +899,42 @@ def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
             'independent_layers':True,'density_toggle_budget':True,'instance_override':True}
 
 
+def assert_preview_normals_and_corners(asset: hou.Node) -> None:
+    """Measure actual polygon normals and corner envelopes, independent of VEX text."""
+    core = asset.node('StreetBuildingCore')
+    preview = core.node('PREVIEW_MISSING_MODULES')
+    preview.cook(force=True)
+    require(not preview.errors() and not preview.warnings(), 'Preview cook diagnostics')
+    slots = preview.inputs()[0].geometry().points()
+    groups = {}
+    for prim in preview.geometry().prims():
+        groups.setdefault(prim.intAttribValue('preview_slot'), []).append(prim)
+    for slot, faces in groups.items():
+        point = slots[slot]
+        role = point.stringAttribValue('module_role')
+        corner = role in ('ParapetCorner', 'ParapetConcaveCorner')
+        require(len(faces) == (60 if corner else 30), 'Missing corner must contain both wall arms')
+        for start in range(0, len(faces), 30):
+            arm = faces[start:start+30]
+            positions = [v.point().position() for f in arm for v in f.vertices()]
+            lo = hou.Vector3(tuple(min(p[i] for p in positions) for i in range(3)))
+            hi = hou.Vector3(tuple(max(p[i] for p in positions) for i in range(3)))
+            center = (lo + hi) * .5
+            for face in arm:
+                vertices = [v.point().position() for v in face.vertices()]
+                face_center = sum(vertices, hou.Vector3()) / len(vertices)
+                require(face.normal().dot(face_center-center) > 1e-5,
+                        'Inward or degenerate preview normal: ' + role)
+        if corner:
+            inverse = hou.Quaternion(point.attribValue('orient')).inverse()
+            positions = [inverse.rotate(v.point().position()-point.position())
+                         for f in faces for v in f.vertices()]
+            actual = [min(p[i] for p in positions) for i in (0,2)] + [max(p[i] for p in positions) for i in (0,2)]
+            expected = [-2, -.08, .08, 2] if role == 'ParapetConcaveCorner' else [-2, -2, .08, .08]
+            require(all(abs(a-b)<1e-4 for a,b in zip(actual,expected)),
+                    'Parapet corner extends outside its two reserved cells: ' + str(actual))
+
+
 def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     """Empty/sparse catalogs are valid; generated placeholders never enter real instances."""
     configure(asset, "STYLE|2|4|3", attachments=0)
@@ -913,7 +949,11 @@ def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     require(len(preview.geometry().prims())>0, "Empty catalog graybox is missing")
     metadata=geometry(asset,"OUT_BUILDING_METADATA")
     missing=metadata.intAttribValue("preview_missing_count")
-    require(missing>0 and len(preview.geometry().prims())==missing*30,
+    assert_preview_normals_and_corners(asset)
+    corner_count = sum(p.intAttribValue('preview_missing') and p.stringAttribValue('module_role') in
+                       ('ParapetCorner', 'ParapetConcaveCorner')
+                       for p in core.node('PREVIEW_MISSING_MODULES').inputs()[0].geometry().points())
+    require(missing>0 and len(preview.geometry().prims())==(missing+corner_count)*30,
             "Zero-instance diagnostics and merged cell faces disagree")
     summary=metadata.stringAttribValue("preview_missing_summary")
     require(sum(int(row.split('|')[2]) for row in summary.splitlines())==missing,
@@ -924,6 +964,11 @@ def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     require(materials=={'Assets/PCG/Materials/SB_MissingCell.mat','Assets/PCG/Materials/SB_MissingCellEdge.mat'},
             "Cells must use their own face and border materials")
     require(asset.parmTemplateGroup().find("preview_missing_modules").isHidden(), "Legacy preview selector remains visible")
+    for notch_side in (0, 1):
+        asset.parm('massing_shape').set(1)
+        asset.parm('l_notch_side').set(notch_side)
+        assert_preview_normals_and_corners(asset)
+    asset.parm('massing_shape').set(0)
     asset.parm('roof_enabled').set(0)
     preview.cook(force=True)
     require(not any(p.stringAttribValue('module_role') in ('RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner')
@@ -971,6 +1016,120 @@ def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     finally:
         asset.setInput(0,None); site.destroy()
     return {"empty":True,"sparse_real_instances":len(before),"preview_isolated":True,"auto_site":True}
+
+
+def assert_unified_ground(parent_asset: hou.Node) -> dict[str, Any]:
+    asset = parent_asset.parent().createNode(ASSET_TYPE, 'VERIFY_UNIFIED_GROUND')
+    try:
+        rows = []
+        for row in catalog_module_rows(STYLE_CATALOG):
+            if int(row[2]) in (0, 1, 2, 3):
+                row[11] = '1'
+            rows.append('|'.join(row))
+        payload = STYLE_CATALOG.splitlines()[0] + '\n' + '\n'.join(rows)
+        configure(asset, payload, rhythm=0)
+        asset.parm('unified_ground_walls').set(1)
+        previous = -1
+        variants = set()
+        positions = []
+        for seed in range(20):
+            asset.parm('layout_seed').set(seed * 311 + 7)
+            asset.parm('previous_entrance_cell').set(previous)
+            geo = geometry(asset, 'SELECT_FACADE_MODULES')
+            points = list(geo.points())
+            entrances = [p for p in points if p.intAttribValue('is_building_entrance')]
+            require(len(entrances) == 1, 'Unified entrance must be exactly one')
+            entry = entrances[0]
+            require(entry.intAttribValue('preview_missing') == 0, 'Unified entrance is a placeholder')
+            current = entry.intAttribValue('cell_index')
+            require(current != previous, 'Unified entrance repeats previous legal cell')
+            previous = current
+            positions.append(current)
+            variants.add(entry.stringAttribValue('module_variant'))
+            ground = [p for p in points if p.intAttribValue('floor_index') == 0]
+            front = [p for p in ground if p.intAttribValue('facade_target') == 0]
+            roles = {p.stringAttribValue('module_role') for p in front}
+            require({'Entrance', 'GroundShop', 'GroundWall'} <= roles, 'Unified front omitted door/window/wall')
+            for target in (2, 3):
+                walls = [p for p in ground if p.intAttribValue('facade_target') == target and p.stringAttribValue('module_role') == 'GroundWall']
+                require(walls and all(p.intAttribValue('preview_missing') == 0 for p in walls), 'Unified side/rear walls missing')
+            signature = [(p.stringAttribValue('name'), tuple(p.position())) for p in points]
+            same = geometry(asset, 'SELECT_FACADE_MODULES')
+            require(signature == [(p.stringAttribValue('name'), tuple(p.position())) for p in same.points()], 'Locked layout is not deterministic')
+            geometry(asset, 'OUT_BUILDING_LOD0')
+        require(len(variants) > 1 and len(set(positions)) > 1, 'Entrance variants/positions do not vary')
+        # Unity legacy instances can retain random-range/manual rules instead of style defaults.
+        for mode in (1, 2):
+            asset.parm('facade_layout_mode').set(mode)
+            asset.parm('entrance_count_min').set(1)
+            asset.parm('entrance_count_max').set(1)
+            previous = -1
+            for seed in range(20):
+                asset.parm('layout_seed').set(30000 + seed * 137)
+                asset.parm('previous_entrance_cell').set(previous)
+                geo = geometry(asset, 'OUT_BUILDING_LOD0')
+                entries = [p for p in geo.points() if p.intAttribValue('is_building_entrance')]
+                require(len(entries) == 1, 'Legacy rule mode lost unique entrance')
+                cell = entries[0].intAttribValue('cell_index')
+                require(cell != previous, 'Legacy rule mode repeats previous entrance')
+                previous = cell
+        asset.parm('facade_layout_mode').set(0)
+        # A two-cell entrance must occupy real adjacent cells without swallowing walls/windows.
+        wide = []
+        for row in catalog_module_rows(payload):
+            if int(row[2]) == 3: row[5] = '2'
+            wide.append('|'.join(row))
+        asset.parm('unity_style_catalog').set('STYLE|2|4|3\n' + '\n'.join(wide))
+        geo = geometry(asset, 'SELECT_FACADE_MODULES')
+        entrances = [p for p in geo.points() if p.intAttribValue('is_building_entrance')]
+        require(len(entrances) == 1 and entrances[0].intAttribValue('module_span') == 2, 'Wide entrance span lost')
+        front = [p for p in geo.points() if p.intAttribValue('floor_index') == 0 and p.intAttribValue('facade_target') == 0 and p.stringAttribValue('module_role') in ('GroundWall', 'GroundShop', 'GroundShopDoor', 'Entrance')]
+        occupied = []
+        for p in front: occupied.extend(range(p.intAttribValue('cell_index'), p.intAttribValue('cell_index') + p.intAttribValue('module_span')))
+        require(sorted(occupied) == list(range(6)), 'Unified spans overlap or leave holes')
+        asset.parm('unity_style_catalog').set('STYLE|2|4|3\n' + '\n'.join(row for row in wide if row.split('|')[2] != '3'))
+        failed = False
+        try:
+            target = node(asset, 'SELECT_FACADE_MODULES')
+            target.cook(force=True)
+            failed = bool(target.errors())
+        except hou.OperationFailed:
+            failed = True
+        require(failed, 'Missing entrance was accepted')
+        return dict(cases=20, positions=positions, entrance_variants=len(variants), wide_entrance=True, missing_entrance='rejected')
+    finally:
+        asset.destroy()
+
+
+def assert_upper_wall_fallback(parent_asset: hou.Node) -> dict[str, Any]:
+    asset = parent_asset.parent().createNode(ASSET_TYPE, 'VERIFY_UPPER_WALLS')
+    try:
+        rows = [r for r in catalog_module_rows(STYLE_CATALOG) if int(r[2]) not in (10, 11)]
+        for r in rows:
+            if int(r[2]) == 5:
+                r[10], r[11] = '15', '2'
+        def check(mask):
+            for r in rows:
+                if int(r[2]) == 5: r[10] = str(mask)
+            configure(asset, 'STYLE|2|4|3\n' + '\n'.join('|'.join(r) for r in rows))
+            points = list(geometry(asset, 'SELECT_FACADE_MODULES').points())
+            for target in (2, 3):
+                walls = [p for p in points if p.intAttribValue('floor_index') > 0
+                         and p.intAttribValue('facade_target') == target
+                         and p.stringAttribValue('module_role') in ('SideWall', 'RearWall', 'MiddleBlank')]
+                require(walls, 'Upper side/rear output absent')
+                allowed = bool(mask & (1 << target))
+                require(all((p.intAttribValue('preview_missing') == 0) == allowed for p in walls),
+                        'Upper wall direction filtering/fallback failed')
+                if allowed:
+                    require(all(p.stringAttribValue('module_role') == 'MiddleBlank' for p in walls),
+                            'Upper fallback used wrong floor role')
+        check(15)
+        check(4)
+        check(3)
+        return dict(all_faces=True, side_only=True, front_only_excluded=True)
+    finally:
+        asset.destroy()
 
 
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
@@ -1033,7 +1192,9 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "generation_rules": assert_generation_rules(fresh, contract),
             "dimension_contract": assert_dimension_contract(),
             "three_layer_rules": assert_layer_rules(fresh),
-            "partial_preview": assert_partial_preview(fresh)}
+            "partial_preview": assert_partial_preview(fresh),
+            "unified_ground": assert_unified_ground(fresh),
+            "upper_wall_fallback": assert_upper_wall_fallback(fresh)}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
@@ -1084,6 +1245,13 @@ def _sb_export_candidate(path):
     else:
         templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
     templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
+    for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
+        template = asset.parmTemplateGroup().find(name)
+        require(template is not None, 'Unified ground interface is missing: ' + name)
+        if templates.find(name) is None:
+            templates.append(template)
+        else:
+            templates.replace(name, template)
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))

@@ -93,7 +93,7 @@ namespace PCGBike.Editor.Buildings
             HashSet<StreetBuildingModuleRole> roles = style.EnumerateModules()
                 .Where(item => item.Module != null).Select(item => item.Module.ModuleRole).ToHashSet();
             StreetBuildingModuleRole[] missingRoles = RequiredRoles
-                .Where(role => !roles.Contains(role)).ToArray();
+                .Where(role => !roles.Contains(role) && !StreetBuildingStyleValidator.HasUnifiedWallCoverage(style, role)).ToArray();
             if (missingRoles.Length > 0)
                 throw new InvalidOperationException(styleFolder + " missing roles: " + string.Join(", ", missingRoles));
 

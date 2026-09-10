@@ -23,6 +23,13 @@ namespace PCGBike.Editor.Buildings
 
         public override void OnInspectorGUI()
         {
+            var currentStyle = (StreetBuildingStyleConfig)target;
+            if (currentStyle.Ground.Enumerate(StreetBuildingFloorMask.Ground).Any(x => x.Group == StreetBuildingModuleGroup.SideRear)
+                || currentStyle.Upper.Enumerate(StreetBuildingFloorMask.Upper).Any(x => x.Group == StreetBuildingModuleGroup.SideRear))
+            {
+                Undo.RecordObject(currentStyle, "迁移统一墙面");
+                if (currentStyle.MigrateGroundWalls() | currentStyle.MigrateUpperWalls()) EditorUtility.SetDirty(currentStyle);
+            }
             serializedObject.Update();
             if (((StreetBuildingStyleConfig)target).NeedsLayerMigration)
             {
@@ -49,9 +56,11 @@ namespace PCGBike.Editor.Buildings
                              ("_roofSurface", "屋面 / 女儿墙及转角"), ("_attachments", "配件") })
                 {
                     var list = layer.FindPropertyRelative(field.Item1);
+                    if (property != "_roof" && field.Item1 == "_sideRear") continue;
                     if (property == "_roof" && (field.Item1 is "_facade" or "_sideRear" or "_corners") && list.arraySize == 0) continue;
                     if (property != "_roof" && field.Item1 == "_roofSurface" && list.arraySize == 0) continue;
-                    DrawModules(list, property, field.Item1, field.Item2);
+                    DrawModules(list, property, field.Item1,
+                        property != "_roof" && field.Item1 == "_facade" ? "墙面 / 门窗" : field.Item2);
                 }
                 DrawRules(layer.FindPropertyRelative("_rules"), property);
                 EditorGUI.indentLevel--;

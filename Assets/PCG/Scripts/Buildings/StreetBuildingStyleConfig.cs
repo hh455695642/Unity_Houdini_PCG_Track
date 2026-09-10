@@ -111,6 +111,10 @@ namespace PCGBike.Buildings
         }
 
 #if UNITY_EDITOR
+        // 首层旧分组仅用于兼容读取；迁移保留方向、权重和原始序列化值。
+        public bool MigrateGroundWalls() => _ground.MigrateWalls(StreetBuildingModuleRole.GroundWall);
+        public bool MigrateUpperWalls() => _upper.MigrateWalls(StreetBuildingModuleRole.MiddleBlank);
+
         // Editor-only incremental migration. Build all destination lists before
         // replacing the live data; never duplicate Prefab assets or their GUIDs.
         public bool MigrateLayers()
@@ -188,6 +192,23 @@ namespace PCGBike.Buildings
             foreach (var m in _attachments) yield return (StreetBuildingModuleGroup.Attachments, m);
         }
 #if UNITY_EDITOR
+        internal bool MigrateWalls(StreetBuildingModuleRole wallRole)
+        {
+            if (_sideRear.Count == 0) return false;
+            var migrated = new List<StreetBuildingModuleDefinition>(_facade);
+            foreach (var source in _sideRear)
+            {
+                if (source == null || source.ModuleRole is not (StreetBuildingModuleRole.SideWall or StreetBuildingModuleRole.RearWall))
+                    throw new InvalidOperationException("旧侧墙分组存在未知用途，无法无损迁移。");
+                var copy = JsonUtility.FromJson<StreetBuildingModuleDefinition>(JsonUtility.ToJson(source));
+                copy.SetWallRole(wallRole);
+                migrated.Add(copy);
+            }
+            _facade = migrated;
+            _sideRear.Clear();
+            return true;
+        }
+
         internal void Add(StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module)
         {
             var list = group switch {
@@ -272,6 +293,7 @@ namespace PCGBike.Buildings
         };
 
 #if UNITY_EDITOR
+        internal void SetWallRole(StreetBuildingModuleRole role) => _moduleRole = role;
         internal StreetBuildingModuleDefinition CopyForFloor(StreetBuildingFloorMask floor) =>
             new(_prefab, _moduleRole, _widthSpan, _depthSpan, _heightType, _absoluteHeight,
                 _weight, _enabled, _allowedFacades, floor);
