@@ -273,7 +273,10 @@
     "StreetBuilding.UnifiedGround.SingleEntrance",
     "StreetBuilding.UnifiedGround.RecookDiversity",
     "StreetBuilding.UnifiedGround.Migration",
-    "StreetBuilding.UpperWall.SideRearFallback"
+    "StreetBuilding.UpperWall.SideRearFallback",
+    "StreetBuilding.UpperWindows.FacadeMask",
+    "StreetBuilding.UpperWindows.ContinuousSpan",
+    "StreetBuilding.UpperWindows.FallbackDeterminism"
   ],
   "three_layer_rules": {
     "version": 1,

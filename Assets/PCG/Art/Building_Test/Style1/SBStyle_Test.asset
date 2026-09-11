@@ -136,7 +136,7 @@ MonoBehaviour:
       _absoluteHeight: 1
       _weight: 1
       _enabled: 1
-      _allowedFacades: 15
+      _allowedFacades: 7
       _allowedFloors: 2
     - _prefab: {fileID: 919132149155446097, guid: c365f10e5e6540c4985c91daafdc471f,
         type: 3}
@@ -205,7 +205,18 @@ MonoBehaviour:
     _sideRear: []
     _corners: []
     _trim: []
-    _roofSurface: []
+    _roofSurface:
+    - _prefab: {fileID: 919132149155446097, guid: 8688082241e51bc46b28a1ede26b6972,
+        type: 3}
+      _moduleRole: 19
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
     _attachments: []
     _rules:
       groundUse: 0

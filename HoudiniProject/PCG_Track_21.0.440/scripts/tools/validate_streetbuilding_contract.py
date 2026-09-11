@@ -361,10 +361,16 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
         require(point.position()[1] + height <= roof_y + .01,
                 f"{role} exceeds roof plane at {point.position()}")
     first = signature(value)
-    # Measured from the task's original production definition before editing.
-    # Instance-rule migration must not add roof trim or change weighted output.
-    require(first == 'b84502d2b2ba0d13fea24f798ab0e82275790459afc788350adfe90b491b4fc2',
+    # Preserve the exact legacy signature when side/rear windows are disabled.
+    # The new mask-enabled behavior is covered independently by assert_upper_windows.
+    legacy_rows = catalog_module_rows(STYLE_CATALOG)
+    for row in legacy_rows:
+        if int(row[2]) == 4:
+            row[10] = '3'
+    configure(asset, 'STYLE|2|4|3\n' + '\n'.join('|'.join(row) for row in legacy_rows))
+    require(signature(geometry(asset)) == 'b84502d2b2ba0d13fea24f798ab0e82275790459afc788350adfe90b491b4fc2',
             'Legacy instance output differs from the captured production signature')
+    configure(asset, STYLE_CATALOG)
     require(signature(geometry(asset)) == first, "Weighted selection is not deterministic")
     configure(asset, STYLE_CATALOG, seed=47)
     second = signature(geometry(asset))
@@ -1132,6 +1138,87 @@ def assert_upper_wall_fallback(parent_asset: hou.Node) -> dict[str, Any]:
         asset.destroy()
 
 
+def assert_upper_windows(parent_asset: hou.Node) -> dict[str, Any]:
+    """Reproduce ignored facade masks and reject cross-run window footprints."""
+    asset = parent_asset.parent().createNode(ASSET_TYPE, 'VERIFY_UPPER_WINDOWS')
+    cases = 0
+    try:
+        for shape in (0, 1):
+            for target in (2, 3):
+                for mask, width, walls in ((3, 1, True), (4, 1, True), (8, 1, True),
+                                            (12, 1, True), (15, 2, True), (15, 2, False)):
+                    rows = [r for r in catalog_module_rows(STYLE_CATALOG) if int(r[2]) != 4
+                            and (walls or int(r[2]) not in (5, 10, 11))]
+                    path = SOURCE_PREFIX + ('Brick_Window_CurvedDouble.fbx' if width == 2
+                                            else 'Brick_Window_Trim_Single.fbx')
+                    catalog = 'STYLE|2|4|3\n' + '\n'.join('|'.join(r) for r in rows)
+                    catalog += '\n' + style_row(4, path, width=width, facades=mask, floors=2)
+                    configure(asset, catalog, shape=shape, attachments=0)
+                    set_facade_override(asset, floor_from=2, floor_to=4, mode=2,
+                                        rhythm=1, window=(64, 64))
+                    asset.parm('facade_override_target1').set(target)
+                    source = geometry(asset, 'ALLOCATE_FACADE_CAPACITY').freeze()
+                    output = geometry(asset, 'SELECT_FACADE_MODULES').freeze()
+                    eligible = [p for p in source.points() if p.intAttribValue('floor_index') > 0
+                                and p.intAttribValue('facade_target') == target]
+                    emitted = [p for p in output.points() if p.intAttribValue('floor_index') > 0
+                               and p.intAttribValue('facade_target') == target
+                               and p.stringAttribValue('semantic_role') in ('window', 'blank')]
+                    require(eligible and emitted, 'Upper-window fixture has no facade cells')
+                    occupied = set()
+                    windows = 0
+                    for p in emitted:
+                        cell, floor = p.intAttribValue('cell_index'), p.intAttribValue('floor_index')
+                        first = next(q for q in eligible if q.intAttribValue('cell_index') == cell
+                                     and q.intAttribValue('floor_index') == floor)
+                        span = p.intAttribValue('module_span')
+                        role = p.stringAttribValue('module_role')
+                        if role == 'MiddleWindow':
+                            windows += 1
+                            require(mask & (1 << target), 'Disabled side/rear window was emitted')
+                            require(span == width and not p.intAttribValue('preview_missing'),
+                                    'Window span or instance path was lost')
+                        origin = hou.Vector3(first.attribValue('placement_origin'))
+                        right = hou.Vector3(first.attribValue('placement_right'))
+                        run_cell = first.intAttribValue('run_local_cell')
+                        require(run_cell + span <= first.intAttribValue('run_cell_count'),
+                                'Window crosses the end of its wall run')
+                        for offset in range(span):
+                            candidates = [q for q in eligible
+                                          if q.intAttribValue('floor_index') == floor
+                                          and q.intAttribValue('face_index') == first.intAttribValue('face_index')
+                                          and q.intAttribValue('run_local_cell') == run_cell + offset
+                                          and q.attribValue('placement_origin') == first.attribValue('placement_origin')
+                                          and q.attribValue('placement_right') == first.attribValue('placement_right')]
+                            require(len(candidates) == 1, 'Window crossed a corner or disconnected wall run')
+                            q = candidates[0]
+                            require(q.stringAttribValue('semantic_role') == first.stringAttribValue('semantic_role'),
+                                    'Window consumed a blank cell')
+                            key = (floor, q.intAttribValue('cell_index'))
+                            require(key not in occupied, 'Two modules occupy the same facade cell')
+                            occupied.add(key)
+                        expected = origin + right * (first.floatAttribValue('local_u') + (span - 1))
+                        expected[1] = 4 + (floor - 1) * 3
+                        expected[0] = -expected[0]
+                        require((p.position() - expected).length() < .001, 'Window pivot is not centered on its span')
+                        if role != 'MiddleWindow':
+                            require(bool(p.intAttribValue('preview_missing')) == (not walls),
+                                    'Missing window broke wall fallback/preview isolation')
+                    require(len(occupied) == len(eligible), 'Facade cells were lost during span consumption')
+                    require((windows > 0) == bool(mask & (1 << target)),
+                            'Allowed side/rear windows were ignored in favor of walls')
+                    if width == 1 and mask & (1 << target):
+                        require(windows == len(eligible), 'Single-cell windows did not honor all window semantics')
+                    require(signature(output) == signature(geometry(asset, 'SELECT_FACADE_MODULES')),
+                            'Upper side/rear windows are nondeterministic')
+                    geometry(asset)  # final instance validation, including no Cook diagnostics
+                    cases += 1
+        return {'cases': cases, 'facade_masks': True, 'continuous_spans': True,
+                'wall_and_preview_fallback': True, 'deterministic': True}
+    finally:
+        asset.destroy()
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -1194,7 +1281,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "three_layer_rules": assert_layer_rules(fresh),
             "partial_preview": assert_partial_preview(fresh),
             "unified_ground": assert_unified_ground(fresh),
-            "upper_wall_fallback": assert_upper_wall_fallback(fresh)}
+            "upper_wall_fallback": assert_upper_wall_fallback(fresh),
+            "upper_windows": assert_upper_windows(fresh)}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
