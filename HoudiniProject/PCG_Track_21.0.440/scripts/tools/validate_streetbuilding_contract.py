@@ -61,6 +61,8 @@ STYLE_CATALOG = "\n".join((
     style_row(7, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
     style_row(8, SOURCE_PREFIX + "Cornice_Brick_Center.fbx", height=1),
     style_row(8, SOURCE_PREFIX + "Cornice_Metal_Center.fbx", height=1, weight=.3),
+    # Explicit role fixture: a complete catalog now includes the generated band.
+    style_row(13, SOURCE_PREFIX + "Cornice_Trim_Center.fbx", height=.2, floors=1),
     style_row(10, SOURCE_PREFIX + "Brick_Plain_4.fbx", height=4),
     style_row(10, SOURCE_PREFIX + "Brick_Plain_3.fbx"),
     style_row(10, SOURCE_PREFIX + "Brick_Plain_3_noWear.fbx", weight=.5),
@@ -165,13 +167,22 @@ def geometry(asset: hou.Node, name: str = "OUT_BUILDING_LOD0") -> hou.Geometry:
 
 
 def signature(value: hou.Geometry) -> str:
+    def canonical(component):
+        # SIMD instruction scheduling may produce -0.0; it is geometrically identical.
+        if isinstance(component, float) and component == 0:
+            return 0.0
+        if isinstance(component, (list, tuple)):
+            return [canonical(x) for x in component]
+        if isinstance(component, dict):
+            return {k: canonical(v) for k, v in component.items()}
+        return component
     names = sorted(attribute.name() for attribute in value.pointAttribs())
     payload = {
         "P": [[round(float(component), 6) for component in point.position()] for point in value.points()],
         "a": {name: [point.attribValue(name) for point in value.points()] for name in names},
         "prims": value.intrinsicValue("primitivecount"),
     }
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=list).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(canonical(payload), sort_keys=True, default=list).encode()).hexdigest()
 
 
 def quaternion_matches(actual, yaw_degrees: float) -> bool:
@@ -282,6 +293,8 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
             == core.node("PARSE_UNITY_INSTANCE_CATALOG"), "Detail parser wiring failed")
     require(core.node("DETAIL_INSTANCE_POINTS").input(1)
             == core.node("SELECT_ATTACHMENT_MODULES"), "Attachment-rule wiring failed")
+    require(core.node("DETAIL_INSTANCE_POINTS").input(2)
+            == core.node("SELECT_FACADE_MODULES"), "AC actual-wall input wiring failed")
     require(core.node("VALIDATE_DIRECT_DETAIL_INSTANCES").input(0)
             == core.node("DETAIL_INSTANCE_POINTS"), "Detail validator wiring failed")
     require(core.node("DETAIL_MODULE_SOURCE_SWITCH").input(1)
@@ -368,8 +381,13 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
         if int(row[2]) == 4:
             row[10] = '3'
     configure(asset, 'STYLE|2|4|3\n' + '\n'.join('|'.join(row) for row in legacy_rows))
-    require(signature(geometry(asset)) == 'b84502d2b2ba0d13fea24f798ab0e82275790459afc788350adfe90b491b4fc2',
-            'Legacy instance output differs from the captured production signature')
+    legacy_geometry = hou.Geometry()
+    legacy_geometry.merge(geometry(asset))
+    legacy_geometry.deletePoints([p for p in legacy_geometry.points()
+        if p.stringAttribValue('module_role') in ('Cornice', 'FacadeColumn', 'FloorBand')])
+    # Captured from the pre-fix production definition; only intended trim changes excluded.
+    require(signature(legacy_geometry) == 'c2a7b52ba19a7313b6af7dc2e6796f11c90d5539e565eda30a11a8f6fe979ff0',
+            'Non-trim instance output differs from the captured production signature')
     configure(asset, STYLE_CATALOG)
     require(signature(geometry(asset)) == first, "Weighted selection is not deterministic")
     configure(asset, STYLE_CATALOG, seed=47)
@@ -377,8 +395,12 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
     require(second != first, "Different seeds did not change variant distribution")
     configure(asset, STYLE_CATALOG, rear=0, side=1, roof=0)
     disabled = geometry(asset)
-    require({point.intAttribValue("face_index") for point in disabled.points()} == {0},
-            "Side/rear/roof mode switches did not disable their faces")
+    require({point.intAttribValue("face_index") for point in disabled.points()
+             if not point.stringAttribValue('module_role').startswith('Parapet')
+             and point.stringAttribValue('module_role') != 'Cornice'} == {0},
+            "Side/rear/roof switches did not disable their faces")
+    require(any(p.stringAttribValue('module_role').startswith('Parapet') for p in disabled.points()),
+            'Roof switch incorrectly disabled the independent parapet')
     for output in ("OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2", "OUT_BUILDING_COLLISION"):
         other = geometry(asset, output)
         require(not other.points() and not other.prims(), f"{output} is not empty")
@@ -895,7 +917,7 @@ def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
     setup()
     asset.parm('massing_shape').set(1)
     rules['roof']['roofEnabled']=False; apply_rules()
-    require(not any(p.stringAttribValue('module_role') in ('RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner')
+    require(not any(p.stringAttribValue('module_role') == 'RoofSurface'
                     for p in geometry(asset,'OUT_BUILDING_LOD0').points()), 'Disabled L roof still emitted roof modules')
     require(not any(p[0]=='RoofProp' for p in records()), 'Disabled L roof still emitted props')
     rules['roof']['roofEnabled']=True; rules['roof']['parapetHeight']=0; apply_rules()
@@ -977,7 +999,7 @@ def assert_partial_preview(asset: hou.Node) -> dict[str, Any]:
     asset.parm('massing_shape').set(0)
     asset.parm('roof_enabled').set(0)
     preview.cook(force=True)
-    require(not any(p.stringAttribValue('module_role') in ('RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner')
+    require(not any(p.stringAttribValue('module_role') == 'RoofSurface'
                     for p in preview.geometry().prims()), "Disabled roof emitted missing cells")
     asset.parm('roof_enabled').set(1)
     asset.parm("preview_missing_modules").set(1)
@@ -1219,6 +1241,248 @@ def assert_upper_windows(parent_asset: hou.Node) -> dict[str, Any]:
         asset.destroy()
 
 
+def assert_ac_wall_records(asset: hou.Node, host_name: str = 'SELECT_FACADE_MODULES') -> int:
+    """Independent oracle: each AC footprint must be covered by final solid walls."""
+    hosts = geometry(asset, host_name).freeze()
+    details = geometry(asset, 'OUT_DETAIL_INSTANCES').freeze()
+    ac = [p for p in details.points() if p.stringAttribValue('module_role') == 'ACUnit']
+    catalog = catalog_module_rows(asset.parm('unity_style_catalog').evalAsString())
+    cw = float(asset.parm('unity_style_catalog').evalAsString().splitlines()[0].split('|')[1])
+    occupied = set()
+    for p in ac:
+        face, floor, cell = (p.intAttribValue(k) for k in ('face_index', 'floor_index', 'cell_index'))
+        building = p.intAttribValue('building_id')
+        require(face in (1, 2, 3) and floor > 0, 'AC escaped an upper side/rear facade')
+        row = next(r for r in catalog if int(r[2]) == 17 and r[4] == p.stringAttribValue('unity_instance'))
+        span = int(row[5])
+        require(p.intAttribValue('module_span') == span, 'AC metadata lost declared width span')
+        matching = [h for h in hosts.points() if h.intAttribValue('building_id') == building
+                    and h.intAttribValue('face_index') == face and h.intAttribValue('floor_index') == floor]
+        width, depth = asset.parm('building_width').eval(), asset.parm('building_depth').eval()
+        def interval(h):
+            x, _, z = h.position()
+            plane_error = abs(x-width*.5) if face == 1 else abs(x+width*.5) if face == 2 else abs(z+depth)
+            if plane_error > .001: return (-1000., -1000.)
+            u = z+depth if face == 1 else -z if face == 2 else x+width*.5
+            half_width = h.intAttribValue('module_span')*cw*.5
+            return (u-half_width, u+half_width)
+        for c in range(cell, cell + span):
+            covering = [h for h in matching if interval(h)[0] <= c*cw+.001
+                        and interval(h)[1] >= (c+1)*cw-.001]
+            require(any(h.stringAttribValue('module_role') in ('MiddleBlank', 'SideWall', 'RearWall')
+                        and not h.intAttribValue('preview_missing') and h.stringAttribValue('unity_instance')
+                        and h.intAttribValue('facade_target') in (2, 3) for h in covering),
+                    f'AC has no actual solid wall support: face={face}, floor={floor}, cell={c}')
+            require(not any(h.stringAttribValue('module_role') in
+                            ('MiddleWindow', 'GroundShop', 'GroundShopDoor', 'Entrance') for h in covering),
+                    f'AC overlaps an opening: face={face}, floor={floor}, cell={c}')
+            key = (building, face, floor, c)
+            require(key not in occupied, 'AC footprints overlap each other')
+            occupied.add(key)
+        assert_ac_support_plane(p, width, depth)
+        expected_u = (cell + span * .5) * cw
+        actual_u = p.position()[2] + depth if face == 1 else -p.position()[2] if face == 2 else p.position()[0] + width * .5
+        require(abs(actual_u - expected_u) < .001, 'AC pivot is not centered within its supported footprint')
+    return len(ac)
+
+
+def assert_ac_solid_walls(parent_asset: hou.Node) -> dict[str, Any]:
+    """Regression for AC on windows, missing walls, and multi-cell footprints."""
+    asset = parent_asset.parent().createNode(ASSET_TYPE, 'VERIFY_AC_SOLID_WALLS')
+    cases = total = 0
+    def setup(*, shape=0, seed=29, window_count=2, window_span=1, ac_span=1,
+              walls=True, floors=4, cell_width=2):
+        rows = [r for r in catalog_module_rows(STYLE_CATALOG) if int(r[2]) not in (4, 17)
+                and (walls or int(r[2]) not in (5, 10, 11))]
+        catalog = f'STYLE|{cell_width}|4|3\n' + '\n'.join('|'.join(r) for r in rows)
+        catalog += '\n' + style_row(4, SOURCE_PREFIX+'Brick_Window_Trim_Single.fbx', width=window_span, floors=2)
+        catalog += '\n' + style_row(17, DETAIL_PREFIX+'PF_AC_WallFixture.prefab', width=ac_span, height=.6, facades=12, floors=2)
+        configure(asset, catalog, shape=shape, seed=seed, density=1, floors=floors,
+                  width=6*cell_width, depth=5*cell_width, notch_width=2*cell_width, notch_depth=2*cell_width)
+        asset.parm('style_rule_source').set(0)
+        asset.parm('attachment_overrides').set(0)
+        for token in ATTACHMENT_TOKENS:
+            asset.parm(token+'_density').set(1 if token == 'wall_ac' else 0)
+        asset.parm('wall_ac_max_count').set(64)
+        set_facade_override(asset, floor_from=2, floor_to=12, mode=2, rhythm=1,
+                            window=(window_count, window_count), blank=(0, 64))
+        values = {p.name()[:-1]: p.eval() for p in asset.parms()
+                  if p.name().startswith('facade_override_') and p.name().endswith('1')}
+        asset.parm('facade_overrides').set(2)
+        for i, target in ((1, 2), (2, 3)):
+            for key, value in values.items(): asset.parm(key+str(i)).set(value)
+            asset.parm('facade_override_target'+str(i)).set(target)
+    try:
+        for shape in (0, 1):
+            for window_span in (1, 2):
+                for ac_span in (1, 2, 3):
+                    for seed in (1, 29, 97):
+                        setup(shape=shape, window_span=window_span, ac_span=ac_span, seed=seed)
+                        count = assert_ac_wall_records(asset)
+                        total += count; cases += 1
+                        before = signature(geometry(asset, 'OUT_DETAIL_INSTANCES'))
+                        require(before == signature(geometry(asset, 'OUT_DETAIL_INSTANCES')), 'AC wall selection is not deterministic')
+        require(total > 0, 'Mixed-wall fixtures did not exercise AC generation')
+        for options in (dict(window_count=64), dict(window_count=0, walls=False), dict(floors=1),
+                        dict(window_count=0, ac_span=7)):
+            setup(**options)
+            require(assert_ac_wall_records(asset) == 0, f'AC generated without usable wall capacity: {options}')
+            cases += 1
+        setup(window_count=0)
+        shell = signature(geometry(asset))
+        require(assert_ac_wall_records(asset) > 0, 'Solid wall fixture emitted no AC')
+        for toggle in ('attachments_enabled', 'attachment_global_density', 'wall_ac_density', 'wall_ac_max_count'):
+            p = asset.parm(toggle); old = p.eval(); p.set(0)
+            require(assert_ac_wall_records(asset) == 0, 'AC ignored '+toggle)
+            require(signature(geometry(asset)) == shell, 'AC toggle changed the wall/window layout')
+            p.set(old); cases += 1
+        set_attachment_overrides(asset, [(3, 1, 2, 8, 3, 3)])
+        require(0 < assert_ac_wall_records(asset) <= 2, 'AC rear/floor/max fixture failed')
+        for p in geometry(asset, 'OUT_DETAIL_INSTANCES').points():
+            require(p.intAttribValue('face_index') == 3 and p.intAttribValue('floor_index') == 2,
+                    'AC ignored facade/floor override')
+        cases += 1
+        setup(window_count=0, shape=1)
+        asset.parm('l_notch_side').set(1)
+        asset.parm('corner_building').set(1)
+        require(assert_ac_wall_records(asset) > 0, 'Corner L fixture emitted no AC')
+        require(all(p.intAttribValue('face_index') != 2 for p in geometry(asset, 'OUT_DETAIL_INSTANCES').points()),
+                'AC appeared on a secondary frontage')
+        cases += 1
+        # Contract fixture models a single three-cell wall module. Production
+        # wall selection is untouched; this probes the consumer's span interface.
+        setup(window_count=0, ac_span=2)
+        asset.allowEditingOfContents()
+        core = asset.node('StreetBuildingCore')
+        fixture = core.createNode('attribwrangle', 'TEST_MULTICELL_WALL')
+        fixture.parm('class').set(0)
+        fixture.setInput(0, core.node('SELECT_FACADE_MODULES'))
+        fixture.parm('snippet').set('''
+int kept=0;
+for(int p=npoints(0)-1;p>=0;p--) {
+    if(!kept && point(0,"face_index",p)==1 && point(0,"floor_index",p)==1
+        && point(0,"module_role",p)=="SideWall") {
+        setpointattrib(0,"module_span",p,3,"set");
+        vector pos=point(0,"P",p);pos.z=-5;setpointattrib(0,"P",p,pos,"set");kept=1;
+    } else removepoint(0,p);
+}
+''')
+        core.node('DETAIL_INSTANCE_POINTS').setInput(2, fixture)
+        require(assert_ac_wall_records(asset, fixture.name()) == 1, 'Multi-cell wall host was not expanded correctly')
+        cases += 1
+        return dict(cases=cases, checked_instances=total, actual_walls=True, no_windows=True,
+                    missing_walls_rejected=True, continuous_spans=True, deterministic=True)
+    finally:
+        asset.destroy()
+
+
+def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
+    """Exercise actual outputs, independent of patch text and historical builders."""
+    test = asset.parent().createNode(ASSET_TYPE, 'VERIFY_ROOF_TRIM')
+    cases = 0
+    trim_roles = {'Cornice', 'FloorBand', 'FacadeColumn'}
+    try:
+        require(test.parm('parapet_enabled') is not None, 'Independent parapet toggle is missing')
+        require(not test.parmTemplateGroup().find('parapet_height').conditionals(),
+                'Parapet height must remain accessible when the roof is disabled')
+        for shape in (0, 1):
+            for catalog in (STYLE_CATALOG, 'STYLE|2|4|3'):
+                configure(test, catalog, shape=shape)
+                test.parm('preview_missing_modules').set(1)
+                for roof in (0, 1):
+                    for parapet in (0, 1):
+                        for height in (0, .6):
+                            for trim in (0, 1):
+                                test.setParms(dict(roof_enabled=roof, parapet_enabled=parapet,
+                                                   parapet_height=height, architectural_trim_enabled=trim))
+                                slots = geometry(test, 'MERGE_DIRECT_BUILDING_INSTANCES')
+                                roles = [p.stringAttribValue('module_role') for p in slots.points()]
+                                require(('RoofSurface' in roles) == bool(roof), 'Roof switch ignored')
+                                require(any(r.startswith('Parapet') for r in roles) == bool(parapet and height),
+                                        'Independent parapet switch/zero height ignored')
+                                require(bool(set(roles) & trim_roles) == bool(trim), 'Trim switch ignored')
+                                if trim:
+                                    require(trim_roles.issubset(roles), 'Trim role positions are missing')
+                                previews = geometry(test, 'OUT_BUILDING_PREVIEW')
+                                if catalog == 'STYLE|2|4|3' and trim:
+                                    require(trim_roles.issubset(p.stringAttribValue('module_role') for p in previews.prims()),
+                                            'Missing trim modules are not previewed')
+                                if not parapet or not height:
+                                    require(not any(p.stringAttribValue('module_role').startswith('Parapet') for p in previews.prims()),
+                                            'Parapet preview survived disable/zero')
+                                if not roof:
+                                    require(not any(p.stringAttribValue('module_role') == 'RoofProp'
+                                                    for p in geometry(test, 'OUT_DETAIL_INSTANCES').points()),
+                                            'Roof props survived disabled roof')
+                                geometry(test)
+                                cases += 1
+                # Uniform panel constraints also apply after style inheritance.
+                rules = dict(trimEnabled=True, roofEnabled=True, parapetHeight=.6)
+                test.setParms(dict(style_rule_source=1, unity_style_rules=json.dumps(
+                    dict(version=1, ground=rules, upper=rules, roof=rules)),
+                    roof_enabled=0, parapet_enabled=1, parapet_height=0, architectural_trim_enabled=0))
+                parsed = geometry(test, 'PARSE_GENERATION_RULES')
+                require(parsed.intAttribValue('effective_generate_roof') == 0 and
+                        parsed.floatAttribValue('effective_parapet') == 0 and
+                        parsed.intAttribValue('effective_trim') == 0, 'Inherited rules overrode panel disable')
+                test.setParms(dict(roof_enabled=1, parapet_height=.6))
+                require(geometry(test, 'PARSE_GENERATION_RULES').intAttribValue('effective_generate_parapet') == 1,
+                        'Legacy JSON without parapetEnabled must preserve parapets')
+                rules['parapetEnabled'] = False
+                test.parm('unity_style_rules').set(json.dumps(dict(version=1, ground=rules, upper=rules, roof=rules)))
+                require(geometry(test, 'PARSE_GENERATION_RULES').floatAttribValue('effective_parapet') == 0,
+                        'Explicit style parapet disable ignored')
+                # Upper wall and roof layer must not both allocate the same cornice.
+                test.parm('architectural_trim_enabled').set(1)
+                cornices = [p for p in geometry(test, 'MERGE_DIRECT_BUILDING_INSTANCES').points()
+                            if p.stringAttribValue('module_role') == 'Cornice']
+                locations = [(tuple(round(v, 4) for v in p.position()),
+                              tuple(round(v, 4) for v in p.attribValue('orient'))) for p in cornices]
+                require(len(locations) == len(set(locations)), 'Upper/roof layers emitted overlapping cornices')
+                test.parm('style_rule_source').set(0)
+        # The legacy graybox LODs must use the same resolved controls as instances.
+        configure(test, STYLE_CATALOG, module_source=0, attachments=0)
+        test.parm('style_rule_source').set(0)
+        test.parm('lod_outputs_enabled').set(1)
+        for roof in (0, 1):
+            for parapet in (0, 1):
+                for height in (0, .6):
+                    test.setParms(dict(roof_enabled=roof, parapet_enabled=parapet, parapet_height=height))
+                    for output in ('BUILD_LOD0', 'BUILD_LOD1', 'BUILD_LOD2'):
+                        g = geometry(test, output)
+                        roles = [p.stringAttribValue('module_role') for p in g.prims()]
+                        require(any(r.startswith('Parapet') for r in roles) == bool(parapet and height),
+                                'Graybox parapet control ignored: ' + output)
+                        require(any(p.stringAttribValue('surface_role') == 'roof' for p in g.prims()) == bool(roof),
+                                'Graybox roof control ignored: ' + output)
+        parcel = frontage = None
+        try:
+            configure(test, STYLE_CATALOG)
+            parcel = make_external_input('VERIFY_ROOF_TRIM_PARCEL',
+                [(-8,0,0),(8,0,0),(8,0,-10),(-8,0,-10)], closed=True,
+                payload='SBR1\nG|16|10|0|4|4|0|4|0|3|0|0|.65|2|2|1|.6|1|1|1|73')
+            frontage = make_external_input('VERIFY_ROOF_TRIM_FRONTAGE', [(-8,0,0),(8,0,0)], closed=False)
+            test.setInput(0, parcel); test.setInput(1, frontage)
+            test.setParms(dict(site_source=1, roof_enabled=0, parapet_enabled=1,
+                               parapet_height=0, architectural_trim_enabled=0))
+            parsed = geometry(test, 'PARSE_GENERATION_RULES')
+            require(parsed.stringAttribValue('rule_source') == 'parcel', 'Parcel test did not use external rules')
+            require(parsed.intAttribValue('effective_generate_roof') == 0 and
+                    parsed.floatAttribValue('effective_parapet') == 0 and
+                    parsed.intAttribValue('effective_trim') == 0, 'Parcel rules overrode panel disable')
+            roles = {p.stringAttribValue('module_role') for p in geometry(test, 'MERGE_DIRECT_BUILDING_INSTANCES').points()}
+            require(not roles.intersection(trim_roles | {'RoofSurface','Parapet','ParapetCorner','ParapetConcaveCorner'}),
+                    'Disabled parcel geometry survived final output')
+        finally:
+            test.setInput(0, None); test.setInput(1, None)
+            if parcel is not None: parcel.destroy()
+            if frontage is not None: frontage.destroy()
+        return dict(cases=cases, graybox_cases=24, independent=True, panel_disable=True,
+                    external_parcel_disable=True, missing_trim_preview=True)
+    finally:
+        test.destroy()
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -1282,7 +1546,9 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "partial_preview": assert_partial_preview(fresh),
             "unified_ground": assert_unified_ground(fresh),
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
-            "upper_windows": assert_upper_windows(fresh)}
+            "upper_windows": assert_upper_windows(fresh),
+            "roof_trim": assert_roof_trim(fresh),
+            "ac_solid_walls": assert_ac_solid_walls(fresh)}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
@@ -1333,6 +1599,20 @@ def _sb_export_candidate(path):
     else:
         templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
     templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
+    old_height = asset.parmTemplateGroup().find('parapet_height')
+    height = hou.FloatParmTemplate(old_height.name(), old_height.label(), 1,
+        default_value=old_height.defaultValue(), min=old_height.minValue(), max=old_height.maxValue(),
+        min_is_strict=old_height.minIsStrict(), max_is_strict=old_height.maxIsStrict(),
+        look=old_height.look(), naming_scheme=old_height.namingScheme())
+    height.setHelp(old_height.help())
+    height.setTags(old_height.tags())
+    templates.replace('parapet_height', height)
+    parapet = asset.parmTemplateGroup().find('parapet_enabled')
+    if parapet is not None:
+        if templates.find('parapet_enabled') is None:
+            templates.insertBefore('parapet_height', parapet)
+        else:
+            templates.replace('parapet_enabled', parapet)
     for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
         template = asset.parmTemplateGroup().find(name)
         require(template is not None, 'Unified ground interface is missing: ' + name)

@@ -145,7 +145,8 @@
     "proxy_trim_material": "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Trim.mat",
     "proxy_window_material": "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Window.mat",
     "unity_style_catalog": "",
-    "unity_bridge_end_marker": "END"
+    "unity_bridge_end_marker": "END",
+    "parapet_enabled": true
   },
   "menus": {
     "site_source": [
@@ -276,7 +277,13 @@
     "StreetBuilding.UpperWall.SideRearFallback",
     "StreetBuilding.UpperWindows.FacadeMask",
     "StreetBuilding.UpperWindows.ContinuousSpan",
-    "StreetBuilding.UpperWindows.FallbackDeterminism"
+    "StreetBuilding.UpperWindows.FallbackDeterminism",
+    "StreetBuilding.RoofTrim.IndependentToggles",
+    "StreetBuilding.RoofTrim.PanelDisableWins",
+    "StreetBuilding.RoofTrim.MissingModulePreview",
+    "StreetBuilding.AC.ActualSolidWallSupport",
+    "StreetBuilding.AC.ContinuousSpanSupport",
+    "StreetBuilding.AC.NoWallNoInstances"
   ],
   "three_layer_rules": {
     "version": 1,

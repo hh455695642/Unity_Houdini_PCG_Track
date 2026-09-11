@@ -1063,6 +1063,23 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
                 promoted_templates.replace('preview_missing_modules', asset.parmTemplateGroup().find('preview_missing_modules'))
             promoted_templates.replace('site_source', asset.parmTemplateGroup().find('site_source'))
     if expected_type == 'pcgbike::StreetBuilding::1.0':
+        # Keep canonical folder identities while promoting the verified independent control.
+        if asset.parm('parapet_enabled') is not None:
+            parapet = asset.parmTemplateGroup().find('parapet_enabled')
+            if promoted_templates.find('parapet_enabled') is None:
+                promoted_templates.insertBefore('parapet_height', parapet)
+            else:
+                promoted_templates.replace('parapet_enabled', parapet)
+            # Node-level setParmTemplateGroup retains inherited HDA conditionals.
+            # Construct the verified definition template without the roof HideWhen.
+            old_height = asset.parmTemplateGroup().find('parapet_height')
+            height = hou.FloatParmTemplate(old_height.name(), old_height.label(), 1,
+                default_value=old_height.defaultValue(), min=old_height.minValue(), max=old_height.maxValue(),
+                min_is_strict=old_height.minIsStrict(), max_is_strict=old_height.maxIsStrict(),
+                look=old_height.look(), naming_scheme=old_height.namingScheme())
+            height.setHelp(old_height.help())
+            height.setTags(old_height.tags())
+            promoted_templates.replace('parapet_height', height)
         for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
             template = asset.parmTemplateGroup().find(name)
             if template is not None:

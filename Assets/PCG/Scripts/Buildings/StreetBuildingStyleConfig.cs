@@ -239,6 +239,8 @@ namespace PCGBike.Buildings
         public int windowMin = 2, windowMax = 8;
         public int blankMin, blankMax = 4;
         public bool trimEnabled = true, attachmentsEnabled = true, roofEnabled = true;
+        // Independent from the roof surface; initializer preserves existing serialized styles.
+        public bool parapetEnabled = true;
         [Min(0)] public float parapetHeight = .6f;
         [Range(0, 1)] public float density = .6f;
         public StreetBuildingAttachmentRule awning = new(1f, 8);

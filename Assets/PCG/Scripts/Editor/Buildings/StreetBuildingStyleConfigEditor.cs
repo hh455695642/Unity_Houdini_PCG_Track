@@ -234,7 +234,7 @@ namespace PCGBike.Editor.Buildings
                     Field(pair.Item1 + "Max", pair.Item2 + "最多数量");
                 }
             }
-            else { Field("roofEnabled", "生成屋顶"); Field("parapetHeight", "女儿墙高度 (m)"); }
+            else { Field("roofEnabled", "生成屋顶"); Field("parapetEnabled", "生成女儿墙"); Field("parapetHeight", "女儿墙高度 (m)"); }
             Field("trimEnabled", "启用柱 / 腰线 / 檐口");
             Field("attachmentsEnabled", "启用本层配件"); Field("density", "本层配件密度");
             foreach (var pair in new[] { ("awning", "雨棚"), ("sign", "招牌"), ("fireEscape", "消防梯"),
