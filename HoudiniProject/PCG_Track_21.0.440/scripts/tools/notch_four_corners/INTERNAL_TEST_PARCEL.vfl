@@ -1,0 +1,49 @@
+// STREETBUILDING_V7_INTERNAL_RECTANGLE_OR_L
+float width = max(4.0, ch("../../building_width"));
+float depth = max(4.0, ch("../../building_depth"));
+int shape = chi("../../massing_shape");
+float notch_w = ch("../../l_notch_width");
+float notch_d = ch("../../l_notch_depth");
+int notch_side = chi("../../l_notch_side");
+// STREETBUILDING_NOTCH_GRID_20260912：统一模块尺度；旧米制数据不强制取整。
+float notch_cw=2;
+string notch_rows[]=split(chs("../../unity_style_catalog"),"\n");
+if(len(notch_rows)>0) {
+    string h[]=split(notch_rows[0],"|");
+    if(len(h)==4 && h[0]=="STYLE" && atof(h[1])>0) notch_cw=atof(h[1]);
+}
+if(chi("../../l_notch_units")==1) {
+    notch_w=clamp(chi("../../l_notch_width_cells"),1,max(1,int(rint(width/notch_cw))-1))*notch_cw;
+    notch_d=clamp(chi("../../l_notch_depth_cells"),1,max(1,int(rint(depth/notch_cw))-1))*notch_cw;
+}
+if (shape < 0 || shape > 1 || notch_side<0 || notch_side>3) error("StreetBuilding invalid massing shape or notch corner");
+if (shape==1 && (notch_w<=0 || notch_d<=0 || width-notch_w<notch_cw-.001 || depth-notch_d<notch_cw-.001))
+    error("StreetBuilding L notch must preserve one-cell wings");
+vector positions[];
+if (shape == 0)
+    positions = array(set(-width*.5,0,-depth*.5), set(width*.5,0,-depth*.5),
+        set(width*.5,0,depth*.5), set(-width*.5,0,depth*.5));
+else if (notch_side == 0)
+    positions = array(set(-width*.5,0,depth*.5), set(width*.5,0,depth*.5),
+        set(width*.5,0,-depth*.5), set(-width*.5+notch_w,0,-depth*.5),
+        set(-width*.5+notch_w,0,-depth*.5+notch_d),
+        set(-width*.5,0,-depth*.5+notch_d));
+else if(notch_side==1)
+    positions = array(set(-width*.5,0,depth*.5), set(width*.5,0,depth*.5),
+        set(width*.5,0,-depth*.5+notch_d),
+        set(width*.5-notch_w,0,-depth*.5+notch_d),
+        set(width*.5-notch_w,0,-depth*.5), set(-width*.5,0,-depth*.5));
+else if(notch_side==2)
+    positions=array(set(-width*.5+notch_w,0,depth*.5),set(width*.5,0,depth*.5),
+        set(width*.5,0,-depth*.5),set(-width*.5,0,-depth*.5),
+        set(-width*.5,0,depth*.5-notch_d),set(-width*.5+notch_w,0,depth*.5-notch_d));
+else
+    positions=array(set(-width*.5,0,depth*.5),set(width*.5-notch_w,0,depth*.5),
+        set(width*.5-notch_w,0,depth*.5-notch_d),set(width*.5,0,depth*.5-notch_d),
+        set(width*.5,0,-depth*.5),set(-width*.5,0,-depth*.5));
+int prim = addprim(0, "poly");
+foreach (vector position; positions) addvertex(0, prim, addpoint(0, position));
+setprimattrib(0, "building_id", prim, 0, "set");
+setprimattrib(0, "massing_shape", prim, shape == 0 ? "rectangle" : "l_shape", "set");
+setprimattrib(0, "notch_side", prim, notch_side==0?"rear_left":notch_side==1?"rear_right":notch_side==2?"front_left":"front_right", "set");
+setdetailattrib(0, "streetbuilding_internal_source", 1, "set");

@@ -1,0 +1,332 @@
+float sb_notch_cw() { return max(.001,float(detail("op:../PARSE_GENERATION_RULES","effective_cell_width",0))); }
+// 按目标楼层与立面筛选；保留目录顺序，避免改变固定种子的权重抽样。
+string sb_layer_catalog(string raw; int band; int facade)
+{
+    string result=""; float cw=2;
+    string names[]=array("GroundShop","GroundShopDoor","GroundWall","Entrance","MiddleWindow","MiddleBlank","CornerConvex","CornerConcave","Cornice","Parapet","SideWall","RearWall","FacadeColumn","FloorBand","Awning","Sign","FireEscape","ACUnit","RoofProp","RoofSurface","ParapetCorner","ParapetConcaveCorner");
+    foreach(string row;split(raw,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)==4 && f[0]=="STYLE") {cw=atof(f[1]); result=row;}
+        if(len(f)!=18 || f[0]!="M") continue;
+        if(!(atoi(f[11])&band) || !(atoi(f[10])&facade)) continue;
+        int role=atoi(f[2]); if(role<0 || role>=len(names)) continue;
+        float height=atof(f[8])>0?atof(f[8]):max(.001,atof(f[13]));
+        result+=sprintf("\nM|%s|%s|0|%s|0|0|0|0|0|0|%g|%g|%g",names[role],f[3],f[4],max(1,atoi(f[5]))*cw,height,atof(f[9]));
+    }
+    return result;
+}
+// STREETBUILDING_V10_VERSIONLESS_CATALOG_HELPERS
+int sb_has_variant(string catalog; string role; string variant)
+{
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant)
+            return 1;
+    }
+    return 0;
+}
+
+int sb_has_role(string catalog; string role)
+{
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role) return 1;
+    }
+    return 0;
+}
+
+string sb_choose_variant(string catalog; string role; int selection_seed; int max_span;
+    export int selected_span)
+{
+    float total = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 14 || f[0] != "M" || f[1] != role || atoi(f[3]) != 0) continue;
+        int span = int(rint(atof(f[11]) / sb_notch_cw()));
+        if (span < 1 || span > max_span) continue;
+        total += max(0.0, atof(f[13]));
+    }
+    if (total <= 0.0) return "";
+    float target = rand(float(selection_seed) * 0.731 + 19.17) * total;
+    float cursor = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 14 || f[0] != "M" || f[1] != role || atoi(f[3]) != 0) continue;
+        int span = int(rint(atof(f[11]) / sb_notch_cw()));
+        if (span < 1 || span > max_span) continue;
+        cursor += max(0.0, atof(f[13]));
+        if (target <= cursor)
+        {
+            selected_span = span;
+            return f[2];
+        }
+    }
+    return "";
+}
+
+int sb_part_count(string catalog; string role; string variant)
+{
+    int result = 0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant)
+            result = max(result, atoi(f[3]) + 1);
+    }
+    return result;
+}
+
+string sb_catalog_part(string catalog; string role; string variant; int part;
+    export vector offset; export vector rotation; export int span)
+{
+    offset = 0; rotation = 0; span = 1;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role
+            && f[2] == variant && atoi(f[3]) == part)
+        {
+            offset = set(atof(f[5]), atof(f[6]), atof(f[7]));
+            rotation = set(atof(f[8]), atof(f[9]), atof(f[10]));
+            span = int(rint(atof(f[11]) / sb_notch_cw()));
+            return f[4];
+        }
+    }
+    return "";
+}
+
+int sb_add_instance(string catalog; string role; string variant; int part;
+    vector origin; vector face_right; vector outward; float local_u; float base_y;
+    float houdini_yaw; int face_index; string surface; int floor_index; int cell_index;
+    int selection_seed; int building_entrance; int shop_entrance)
+{
+    vector offset, rotation; int span;
+    string path = sb_catalog_part(catalog, role, variant, part, offset, rotation, span);
+    // Missing candidates become preview markers, never foreign-role Prefabs.
+    int missing = len(path)==0;
+    if(missing) { offset=0; rotation=0; span=1; }
+    if (length2(rotation) > 1e-10)
+        error("StreetBuilding catalog rotations must be authored inside a Prefab");
+    vector unity_position = origin + face_right * (local_u + offset.x)
+        + set(0, base_y + offset.y, 0) + outward * offset.z;
+    vector houdini_position = set(-unity_position.x, unity_position.y, unity_position.z);
+    int pt = addpoint(0, houdini_position);
+    vector4 orient = quaternion(radians(houdini_yaw), set(0, 1, 0));
+    setpointattrib(0, "orient", pt, orient, "set");
+    setpointattrib(0,"preview_missing",pt,missing,"set");
+    float mh=floor_index==0?ch("../../floor_height_ground"):ch("../../floor_height_typical");
+    vector sz=set(sb_notch_cw(),mh,.16);
+    if(role=="RoofSurface") sz=set(sb_notch_cw(),.12,sb_notch_cw());
+    if(role=="Parapet" || role=="ParapetCorner" || role=="ParapetConcaveCorner") sz=set(2,float(detail("op:../PARSE_GENERATION_RULES","effective_parapet",0)),.16);
+    if(role=="Cornice") sz=set(2,.18,.22);
+    if(role=="FloorBand") sz=set(2,.20,.12);
+    if(role=="FacadeColumn") sz=set(.16,mh,.16);
+    setpointattrib(0,"preview_size",pt,sz,"set");
+    setpointattrib(0, "scale", pt, set(1, 1, 1), "set");
+    setpointattrib(0, "unity_instance", pt, path, "set");
+    string face_token = face_index == 0 ? "FR" : face_index == 1 ? "LT" :
+        face_index == 2 ? "RT" : face_index == 3 ? "BK" : "RF";
+    string prefix = sprintf("SB_B0000_%s_F%02d_C%02d_%s_%s_P%d",
+        face_token, floor_index, cell_index, role, variant, part);
+    setpointattrib(0, "instance_prefix", pt, prefix, "set");
+    setpointattrib(0, "name", pt, prefix, "set");
+    setpointattrib(0, "building_id", pt, 0, "set");
+    setpointattrib(0, "face_index", pt, face_index, "set");
+    setpointattrib(0, "floor_index", pt, floor_index, "set");
+    setpointattrib(0, "cell_index", pt, cell_index, "set");
+    setpointattrib(0, "module_span", pt, span, "set");
+    setpointattrib(0, "selection_seed", pt, selection_seed, "set");
+    setpointattrib(0, "module_role", pt, role, "set");
+    setpointattrib(0, "module_variant", pt, variant, "set");
+    setpointattrib(0, "surface_role", pt, surface, "set");
+    setpointattrib(0, "facade_band", pt, floor_index == 0 ? "ground" : surface == "roof" ? "roof" : "middle", "set");
+    setpointattrib(0, "is_building_entrance", pt, building_entrance, "set");
+    setpointattrib(0, "is_shop_entrance", pt, shop_entrance, "set");
+    setpointattrib(0, "lod", pt, 0, "set");
+    setpointattrib(0, "chunk_id", pt, 0, "set");
+    setpointattrib(0, "pcg_kind", pt, "streetbuilding_module_instance", "set");
+    setpointattrib(0, "pcg_variant", pt, variant, "set");
+    return pt;
+}
+
+void sb_emit(string catalog; string role; string variant; vector origin; vector right;
+    vector outward; float local_u; float y; float h_yaw; int face; string surface;
+    int floor; int cell; int selection_seed; int entrance)
+{
+    int parts = sb_part_count(catalog, role, variant);
+    parts=max(1,parts);
+    for (int part = 0; part < parts; part++)
+        sb_add_instance(catalog, role, variant, part, origin, right, outward, local_u, y,
+            h_yaw, face, surface, floor, cell, selection_seed, entrance && part == 0, 0);
+}
+
+void sbv7_emit_parapet_run(string catalog; vector origin; vector right; vector outward;
+    int cells; float yaw; int face; string surface; int floors; int seed; int serial_base)
+{
+    float roof_y=ch("../../floor_height_ground")+(floors-1)*ch("../../floor_height_typical");
+    // 屋顶大组中的檐口只沿顶部边缘生成；不复制到各建筑楼层。
+    if(detail("op:../PARSE_GENERATION_RULES","layer_trim_2",0))
+    {
+        for(int cell=0;cell<cells;cell++) {
+            int key=seed*1009+7001+serial_base+cell*37; int span;
+            string variant=sb_choose_variant(catalog,"Cornice",key,1,span);
+            sb_emit(catalog,"Cornice",variant,origin,right,outward,(cell+.5)*sb_notch_cw(),
+                roof_y-1,yaw,4,"roof_edge",floors,serial_base+cell,key,0);
+        }
+    }
+    if(float(detail("op:../PARSE_GENERATION_RULES","effective_parapet",0))<=0) return;
+    for(int cell=1;cell<cells-1;cell++)
+    {
+        int key=seed*1009+(face+5)*503+(serial_base+cell)*37;
+        int span; string variant=sb_choose_variant(catalog,"Parapet",key,1,span);
+        sb_emit(catalog,"Parapet",variant,origin,right,outward,(cell+.5)*sb_notch_cw(),
+            roof_y,yaw,face,surface,floors,serial_base+cell,key,0);
+    }
+}
+void sbv7_emit_corner(string catalog; string role; vector position; float yaw;
+    int floors; int seed; int corner)
+{
+    if(float(detail("op:../PARSE_GENERATION_RULES","effective_parapet",0))<=0) return;
+    int key=seed*1009+9001+corner*37; int span;
+    string variant=sb_choose_variant(catalog,role,key,1,span);
+    sb_emit(catalog,role,variant,position,set(1,0,0),set(0,0,1),0,0,yaw,4,
+        "roof_edge",floors,corner,key,0);
+}
+
+
+// STREETBUILDING_V8_ROOF_EDGE_TOPOLOGY
+string catalog=sb_layer_catalog(detail(0,"catalog_raw",0),4,15);
+if (len(strip(catalog))==0) 
+{
+// 空分支也提供完整实例属性，避免 Merge 在开关切换后警告。
+string schema_strings[]=array("unity_instance","instance_prefix","name","module_role","module_variant","surface_role","facade_band","pcg_kind","pcg_variant"); foreach(string n;schema_strings) addpointattrib(0,n,"");
+string schema_ints[]=array("building_id","face_index","floor_index","cell_index","module_span","selection_seed","is_building_entrance","is_shop_entrance","lod","chunk_id","preview_missing"); foreach(string n;schema_ints) addpointattrib(0,n,0);
+addpointattrib(0,"orient",vector4(set(0.0,0.0,0.0,1.0)));
+addpointattrib(0,"scale",vector(set(1.0,1.0,1.0)));
+addpointattrib(0,"preview_size",vector(set(0.0,0.0,0.0)));
+// STREETBUILDING_V9_CLEAN_DIRECT_INSTANCE_ATTRS
+for (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);
+string keep[]=array("P","orient","scale","unity_instance","instance_prefix","name","building_id",
+    "face_index","floor_index","cell_index","module_span","selection_seed",
+    "module_role","module_variant","surface_role","facade_band",
+    "is_building_entrance","is_shop_entrance","lod","chunk_id","pcg_kind","pcg_variant","preview_missing","preview_size");
+string attributes[]=detailintrinsic(0,"pointattributes");
+foreach (string name;attributes) if (find(keep,name)<0) removeattrib(0,"point",name);
+string primitive_attributes[]=detailintrinsic(0,"primitiveattributes");
+string vertex_attributes[]=detailintrinsic(0,"vertexattributes");
+foreach (string name;primitive_attributes) removeattrib(0,"prim",name);
+foreach (string name;vertex_attributes) removeattrib(0,"vertex",name);
+return;
+}
+float parapet_h=float(detail("op:../PARSE_GENERATION_RULES","effective_parapet",0)); if (parapet_h<=0 && !int(detail("op:../PARSE_GENERATION_RULES","layer_trim_2",0)))
+{
+// 空分支也提供完整实例属性，避免 Merge 在开关切换后警告。
+string schema_strings[]=array("unity_instance","instance_prefix","name","module_role","module_variant","surface_role","facade_band","pcg_kind","pcg_variant"); foreach(string n;schema_strings) addpointattrib(0,n,"");
+string schema_ints[]=array("building_id","face_index","floor_index","cell_index","module_span","selection_seed","is_building_entrance","is_shop_entrance","lod","chunk_id","preview_missing"); foreach(string n;schema_ints) addpointattrib(0,n,0);
+addpointattrib(0,"orient",vector4(set(0.0,0.0,0.0,1.0)));
+addpointattrib(0,"scale",vector(set(1.0,1.0,1.0)));
+addpointattrib(0,"preview_size",vector(set(0.0,0.0,0.0)));
+// STREETBUILDING_V9_CLEAN_DIRECT_INSTANCE_ATTRS
+for (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);
+string keep[]=array("P","orient","scale","unity_instance","instance_prefix","name","building_id",
+    "face_index","floor_index","cell_index","module_span","selection_seed",
+    "module_role","module_variant","surface_role","facade_band",
+    "is_building_entrance","is_shop_entrance","lod","chunk_id","pcg_kind","pcg_variant","preview_missing","preview_size");
+string attributes[]=detailintrinsic(0,"pointattributes");
+foreach (string name;attributes) if (find(keep,name)<0) removeattrib(0,"point",name);
+string primitive_attributes[]=detailintrinsic(0,"primitiveattributes");
+string vertex_attributes[]=detailintrinsic(0,"vertexattributes");
+foreach (string name;primitive_attributes) removeattrib(0,"prim",name);
+foreach (string name;vertex_attributes) removeattrib(0,"vertex",name);
+return;
+}
+int shape=int(detail("op:../PARSE_GENERATION_RULES","effective_shape",0));
+// Incomplete parapet roles are previewed independently.
+float width=float(detail("op:../PARSE_GENERATION_RULES","effective_width",0)); float depth=float(detail("op:../PARSE_GENERATION_RULES","effective_depth",0));
+float nw=float(detail("op:../PARSE_GENERATION_RULES","effective_notch_width",0)); float nd=float(detail("op:../PARSE_GENERATION_RULES","effective_notch_depth",0));
+int ns=int(detail("op:../PARSE_GENERATION_RULES","effective_notch_side",0));
+int wc=int(rint(width/sb_notch_cw())); int dc=int(rint(depth/sb_notch_cw()));
+int nwc=int(rint(nw/sb_notch_cw())); int ndc=int(rint(nd/sb_notch_cw()));
+int floors=max(1,int(detail("op:../PARSE_GENERATION_RULES","effective_floor_count",0)));
+float roof_y=ch("../../floor_height_ground")+(floors-1)*ch("../../floor_height_typical");
+int seed=int(detail("op:../PARSE_GENERATION_RULES","effective_seed",0));
+if (shape==0)
+{
+    for (int face=0;face<4;face++)
+    {
+        int cells=face<2?wc:dc;
+        vector origin=face==0?set(-width*.5,0,0):face==1?set(width*.5,0,-depth):face==2?set(-width*.5,0,-depth):set(width*.5,0,0);
+        vector right=face==0?set(1,0,0):face==1?set(-1,0,0):face==2?set(0,0,1):set(0,0,-1);
+        vector outward=face==0?set(0,0,1):face==1?set(0,0,-1):face==2?set(-1,0,0):set(1,0,0);
+        float yaw=face==0?0:face==1?-180:face==2?90:-90;
+        string surface=face==0?"front":face==1?"rear":face==2?"left":"right";
+        sbv7_emit_parapet_run(catalog,origin,right,outward,cells,yaw,face,surface,floors,seed,face*100);
+    }
+    vector cp[]=array(set(-width*.5,roof_y,0),set(width*.5,roof_y,0),set(width*.5,roof_y,-depth),set(-width*.5,roof_y,-depth));
+    float cy[]=array(0.0,-90.0,-180.0,90.0);
+    for(int c=0;c<4;c++) sbv7_emit_corner(catalog,"ParapetCorner",cp[c],cy[c],floors,seed,c);
+}
+else
+{
+    vector origins[]; vector rights[]; vector outs[]; int cells[]; float yaws[];
+    vector corners[]; float corner_yaws[]; int concave=ns==0?4:ns==1?3:ns==2?5:2;
+    if(ns==0)
+    {
+        origins=array(set(-width*.5,0,0),set(width*.5,0,0),set(width*.5,0,-depth),set(-width*.5+nw,0,-depth),set(-width*.5+nw,0,-depth+nd),set(-width*.5,0,-depth+nd));
+        rights=array(set(1,0,0),set(0,0,-1),set(-1,0,0),set(0,0,1),set(-1,0,0),set(0,0,1));
+        outs=array(set(0,0,1),set(1,0,0),set(0,0,-1),set(-1,0,0),set(0,0,-1),set(-1,0,0));
+        cells=array(wc,dc,wc-nwc,ndc,nwc,dc-ndc);
+        yaws=array(0.0,-90.0,-180.0,90.0,-180.0,90.0);
+        corners=array(set(-width*.5,roof_y,0),set(width*.5,roof_y,0),set(width*.5,roof_y,-depth),set(-width*.5+nw,roof_y,-depth),set(-width*.5+nw,roof_y,-depth+nd),set(-width*.5,roof_y,-depth+nd));
+        corner_yaws=array(0.0,-90.0,-180.0,90.0,-180.0,90.0);
+    }
+    else if(ns==1)
+    {
+        origins=array(set(-width*.5,0,0),set(width*.5,0,0),set(width*.5,0,-depth+nd),set(width*.5-nw,0,-depth+nd),set(width*.5-nw,0,-depth),set(-width*.5,0,-depth));
+        rights=array(set(1,0,0),set(0,0,-1),set(-1,0,0),set(0,0,-1),set(-1,0,0),set(0,0,1));
+        outs=array(set(0,0,1),set(1,0,0),set(0,0,-1),set(1,0,0),set(0,0,-1),set(-1,0,0));
+        cells=array(wc,dc-ndc,nwc,ndc,wc-nwc,dc);
+        yaws=array(0.0,-90.0,-180.0,-90.0,-180.0,90.0);
+        corners=array(set(-width*.5,roof_y,0),set(width*.5,roof_y,0),set(width*.5,roof_y,-depth+nd),set(width*.5-nw,roof_y,-depth+nd),set(width*.5-nw,roof_y,-depth),set(-width*.5,roof_y,-depth));
+        corner_yaws=array(0.0,-90.0,-180.0,-90.0,-180.0,90.0);
+    }
+    else
+    {
+        if(ns==2) corners=array(set(-width*.5+nw,roof_y,0),set(width*.5,roof_y,0),set(width*.5,roof_y,-depth),set(-width*.5,roof_y,-depth),set(-width*.5,roof_y,-nd),set(-width*.5+nw,roof_y,-nd));
+        else corners=array(set(-width*.5,roof_y,0),set(width*.5-nw,roof_y,0),set(width*.5-nw,roof_y,-nd),set(width*.5,roof_y,-nd),set(width*.5,roof_y,-depth),set(-width*.5,roof_y,-depth));
+        for(int e=0;e<6;e++) {
+            vector a=corners[e], b=corners[(e+1)%6], r=normalize(b-a);
+            vector o=set(-r.z,0,r.x); float yaw=degrees(atan2(-o.x,o.z));
+            a.y=0; append(origins,a); append(rights,r);append(outs,o);
+            append(cells,int(rint(distance(a,set(b.x,0,b.z))/sb_notch_cw())));append(yaws,yaw);
+            append(corner_yaws,yaw);
+        }
+    }
+    for(int e=0;e<6;e++) sbv7_emit_parapet_run(catalog,origins[e],rights[e],outs[e],cells[e],yaws[e],4,"roof_edge",floors,seed,e*100);
+    for(int c=0;c<6;c++) sbv7_emit_corner(catalog,c==concave?"ParapetConcaveCorner":"ParapetCorner",corners[c],corner_yaws[c],floors,seed,c);
+}
+removeattrib(0,"point","N");
+
+// 空分支也提供完整实例属性，避免 Merge 在开关切换后警告。
+string schema_strings[]=array("unity_instance","instance_prefix","name","module_role","module_variant","surface_role","facade_band","pcg_kind","pcg_variant"); foreach(string n;schema_strings) addpointattrib(0,n,"");
+string schema_ints[]=array("building_id","face_index","floor_index","cell_index","module_span","selection_seed","is_building_entrance","is_shop_entrance","lod","chunk_id","preview_missing"); foreach(string n;schema_ints) addpointattrib(0,n,0);
+addpointattrib(0,"orient",vector4(set(0.0,0.0,0.0,1.0)));
+addpointattrib(0,"scale",vector(set(1.0,1.0,1.0)));
+addpointattrib(0,"preview_size",vector(set(0.0,0.0,0.0)));
+// STREETBUILDING_V9_CLEAN_DIRECT_INSTANCE_ATTRS
+for (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);
+string keep[]=array("P","orient","scale","unity_instance","instance_prefix","name","building_id",
+    "face_index","floor_index","cell_index","module_span","selection_seed",
+    "module_role","module_variant","surface_role","facade_band",
+    "is_building_entrance","is_shop_entrance","lod","chunk_id","pcg_kind","pcg_variant","preview_missing","preview_size");
+string attributes[]=detailintrinsic(0,"pointattributes");
+foreach (string name;attributes) if (find(keep,name)<0) removeattrib(0,"point",name);
+string primitive_attributes[]=detailintrinsic(0,"primitiveattributes");
+string vertex_attributes[]=detailintrinsic(0,"vertexattributes");
+foreach (string name;primitive_attributes) removeattrib(0,"prim",name);
+foreach (string name;vertex_attributes) removeattrib(0,"vertex",name);

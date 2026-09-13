@@ -1,0 +1,426 @@
+// 按目标楼层与立面筛选；保留目录顺序，避免改变固定种子的权重抽样。
+string sb_layer_catalog(string raw; int band; int facade)
+{
+    string result=""; float cw=2;
+    string names[]=array("GroundShop","GroundShopDoor","GroundWall","Entrance","MiddleWindow","MiddleBlank","CornerConvex","CornerConcave","Cornice","Parapet","SideWall","RearWall","FacadeColumn","FloorBand","Awning","Sign","FireEscape","ACUnit","RoofProp","RoofSurface","ParapetCorner","ParapetConcaveCorner");
+    foreach(string row;split(raw,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)==4 && f[0]=="STYLE") {cw=atof(f[1]); result=row;}
+        if(len(f)!=18 || f[0]!="M") continue;
+        if(!(atoi(f[11])&band) || !(atoi(f[10])&facade)) continue;
+        int role=atoi(f[2]); if(role<0 || role>=len(names)) continue;
+        float height=atof(f[8])>0?atof(f[8]):max(.001,atof(f[13]));
+        result+=sprintf("\nM|%s|%s|0|%s|0|0|0|0|0|0|%g|%g|%g",names[role],f[3],f[4],max(1,atoi(f[5]))*cw,height,atof(f[9]));
+    }
+    return result;
+}
+// STREETBUILDING_V8_DETAIL_WALL_ATTACHMENT
+int sbv6_has_role(string catalog; string role)
+{
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role) return 1;
+    }
+    return 0;
+}
+
+string sbv6_choose(string catalog; string role; int selection_seed)
+{
+    float total = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && atoi(f[3]) == 0)
+            total += max(0.0, atof(f[13]));
+    }
+    if (total <= 0.0) return "";
+    float target = rand(float(selection_seed) * .731 + 19.17) * total;
+    float cursor = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 14 || f[0] != "M" || f[1] != role || atoi(f[3]) != 0) continue;
+        cursor += max(0.0, atof(f[13]));
+        if (target <= cursor) return f[2];
+    }
+    return "";
+}
+
+int sbv6_parts(string catalog; string role; string variant)
+{
+    int count = 0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant)
+            count = max(count, atoi(f[3]) + 1);
+    }
+    return count;
+}
+
+string sbv6_part(string catalog; string role; string variant; int part;
+    export vector offset; export int span)
+{
+    offset = 0; span = 1;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant
+            && atoi(f[3]) == part)
+        {
+            offset = set(atof(f[5]), atof(f[6]), atof(f[7]));
+            if (length2(set(atof(f[8]), atof(f[9]), atof(f[10]))) > 1e-10)
+                error("StreetBuilding V6 detail rotations belong inside Prefabs");
+            span = int(rint(atof(f[11]) / (role=="ACUnit"?max(.001,float(detail(0,"style_cell_width",0))):2.0)));
+            return f[4];
+        }
+    }
+    return "";
+}
+
+int sbv6_emit(string catalog; string role; int selection_seed; vector origin;
+    vector right; vector outward; float local_u; float base_y; float yaw;
+    int face; string surface; int floor; int cell)
+{
+    string variant = sbv6_choose(catalog, role, selection_seed);
+    if (len(variant) == 0) return 0;
+    int parts = sbv6_parts(catalog, role, variant);
+    for (int part = 0; part < parts; part++)
+    {
+        vector offset; int span;
+        string path = sbv6_part(catalog, role, variant, part, offset, span);
+        if (len(path) == 0) error("StreetBuilding V6 missing %s/%s part %d", role, variant, part);
+        vector unity_p = origin + right * (local_u + offset.x)
+            + set(0, base_y + offset.y, 0) + outward * offset.z;
+        int pt = addpoint(0, set(-unity_p.x, unity_p.y, unity_p.z));
+        vector4 orient = quaternion(radians(yaw), set(0, 1, 0));
+        string token = face == 0 ? "FR" : face == 1 ? "LT" :
+            face == 2 ? "RT" : face == 3 ? "BK" : "RF";
+        string prefix = sprintf("SB_D0000_%s_F%02d_C%02d_%s_%s_P%d",
+            token, floor, cell, role, variant, part);
+        setpointattrib(0, "orient", pt, orient, "set");
+        setpointattrib(0, "scale", pt, set(1, 1, 1), "set");
+        setpointattrib(0, "unity_instance", pt, path, "set");
+        setpointattrib(0, "instance_prefix", pt, prefix, "set");
+        setpointattrib(0, "name", pt, prefix, "set");
+        setpointattrib(0, "building_id", pt, 0, "set");
+        setpointattrib(0, "face_index", pt, face, "set");
+        setpointattrib(0, "floor_index", pt, floor, "set");
+        setpointattrib(0, "cell_index", pt, cell, "set");
+        setpointattrib(0, "module_span", pt, span, "set");
+        setpointattrib(0, "selection_seed", pt, selection_seed, "set");
+        setpointattrib(0, "module_role", pt, role, "set");
+        setpointattrib(0, "module_variant", pt, variant, "set");
+        setpointattrib(0, "surface_role", pt, surface, "set");
+        setpointattrib(0, "facade_band", pt, face == 4 ? "roof" : floor == 0 ? "ground" : "middle", "set");
+        setpointattrib(0, "is_building_entrance", pt, 0, "set");
+        setpointattrib(0, "is_shop_entrance", pt, 0, "set");
+        setpointattrib(0, "lod", pt, 0, "set");
+        setpointattrib(0, "chunk_id", pt, 0, "set");
+        setpointattrib(0, "pcg_kind", pt, "streetbuilding_detail_instance", "set");
+        setpointattrib(0, "pcg_variant", pt, variant, "set");
+    }
+    return parts;
+}
+
+// STREETBUILDING_V9_ATTACHMENT_INSTANCE_POINTS
+int sbv9_emit_limited(string catalog; string role; int selection_seed; vector origin;
+    vector right; vector outward; float local_u; float base_y; float yaw;
+    int face; string surface; int floor; int cell; int remaining)
+{
+    int fm=face==4?15:surface=="secondary_front"?2:face==0?1:face==3?8:4;
+    string filtered=sb_layer_catalog(detail(0,"catalog_raw",0),face==4?4:floor==0?1:2,fm);
+    string variant=sbv6_choose(filtered,role,selection_seed);
+    int parts=len(variant)>0?sbv6_parts(filtered,role,variant):0;
+    if (parts<=0 || parts>remaining) return 0;
+    return sbv6_emit(filtered,role,selection_seed,origin,right,outward,local_u,
+        base_y,yaw,face,surface,floor,cell);
+}
+
+
+// STREETBUILDING_AC_SOLID_WALL_20260911
+// 第三路输入是已经选定的墙窗实例；只认真实墙模块，不根据布局意图猜测。
+// 性能：每栋楼一次建立格位表，后续查询仅访问字典；无运行时 CPU 工作。
+// 扩展点：新增可承载配件的墙角色时，在此白名单与累计合约同步登记。
+string sb_ac_cell_key(int building; int face; int floor; int cell)
+{
+    return sprintf("%d/%d/%d/%d",building,face,floor,cell);
+}
+int sb_ac_wall_run(dict solid; dict blocked; int face; int floor; int cell; int cells)
+{
+    int run=0;
+    for(int c=cell;c<cells;c++)
+    {
+        string key=sb_ac_cell_key(0,face,floor,c);
+        if(!isvalidindex(solid,key) || isvalidindex(blocked,key)) break;
+        run++;
+    }
+    return run;
+}
+int sb_ac_emit(string raw; int key; int run; float cw; vector origin; vector right;
+    vector outward; float base_y; float yaw; int face; string surface; int floor;
+    int cell; int remaining; export int selected_span)
+{
+    selected_span=0;
+    string catalog=sb_layer_catalog(raw,2,face==3?8:4), fitting="";
+    foreach(string row;split(catalog,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)!=14 || f[0]!="M" || f[1]!="ACUnit") continue;
+        int span=max(1,int(rint(atof(f[11])/cw)));
+        if(span<=run) fitting+=row+"\n";
+    }
+    string variant=sbv6_choose(fitting,"ACUnit",key);
+    int parts=len(variant)>0?sbv6_parts(fitting,"ACUnit",variant):0;
+    if(parts<=0 || parts>remaining) return 0;
+    foreach(string row;split(fitting,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)==14 && f[2]==variant)
+        { selected_span=max(1,int(rint(atof(f[11])/cw))); break; }
+    }
+    // 多格配件的 Pivot 放在整个占格范围中心；单格位置保持原样。
+    return sbv6_emit(fitting,"ACUnit",key,origin,right,outward,
+        (cell+selected_span*.5)*cw,base_y,yaw,face,surface,floor,cell);
+}
+
+float sb_density(int band; int kind) {return detail(1,sprintf("layer_attachment_%d_%d_density",band,kind),0);}
+int sb_maximum(int band; int kind) {return detail(1,sprintf("layer_attachment_%d_%d_max",band,kind),0);}
+int sb_mask(int band; int kind) {return detail(1,sprintf("layer_attachment_%d_%d_mask",band,kind),0);}
+int sb_allowed(int band; int kind; int floor_one)
+{
+    return floor_one>=int(detail(1,sprintf("layer_attachment_%d_%d_from",band,kind),0))
+        && floor_one<=int(detail(1,sprintf("layer_attachment_%d_%d_to",band,kind),0));
+}
+string catalog=detail(0,"catalog_payload",0);
+if (chi("../../module_source")!=1 || len(strip(catalog))==0
+    || !detail(1,"effective_attachments",0) || !chi("../../attachments_enabled")) return;
+
+// Input 0 can carry the external Parcel.  Detail output must contain only
+// instance points, while detail attributes remain available after removal.
+for (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);
+for (int point=npoints(0)-1;point>=0;point--) removepoint(0,point);
+
+float master=clamp(float(detail(1,"effective_detail_density",0)),0,1);
+float density[]=array(
+    float(detail(1,"attachment_density_0",0)),float(detail(1,"attachment_density_1",0)),
+    float(detail(1,"attachment_density_2",0)),float(detail(1,"attachment_density_3",0)),
+    float(detail(1,"attachment_density_4",0)));
+int maximum[]=array(
+    int(detail(1,"attachment_max_0",0)),int(detail(1,"attachment_max_1",0)),
+    int(detail(1,"attachment_max_2",0)),int(detail(1,"attachment_max_3",0)),
+    int(detail(1,"attachment_max_4",0)));
+int mask[]=array(
+    int(detail(1,"attachment_mask_0",0)),int(detail(1,"attachment_mask_1",0)),
+    int(detail(1,"attachment_mask_2",0)),int(detail(1,"attachment_mask_3",0)),
+    int(detail(1,"attachment_mask_4",0)));
+int count[]=array(0,0,0,0,0);
+if (master<=0 && chi("../../style_rule_source")==0) return;
+int layer_counts[];resize(layer_counts,15);
+
+float cw=max(.001,float(detail(0,"style_cell_width",0)));
+float width=float(detail(1,"effective_width",0));
+float depth=float(detail(1,"effective_depth",0));
+int wcells=int(rint(width/cw)); int dcells=int(rint(depth/cw));
+int shape=int(detail(1,"effective_shape",0));
+int nwc=int(rint(float(detail(1,"effective_notch_width",0))/cw));
+int ndc=int(rint(float(detail(1,"effective_notch_depth",0))/cw));
+int ns=int(detail(1,"effective_notch_side",0));
+int floors=max(1,int(detail(1,"effective_floor_count",0)));
+int seed=int(detail(1,"effective_seed",0));
+int corner=int(detail(1,"effective_corner",0));
+float ground_h=chf("../../floor_height_ground");
+float typical_h=chf("../../floor_height_typical");
+int emitted=0; int entrance=wcells/2;
+
+// Awning and sign slots: primary frontage and, for corner buildings, the
+// secondary frontage.  Mask bits are Front=1, Secondary=2, Side=4, Rear=8.
+// 实例规则保留历史首层放置；风格规则按所属组生成各层配件。
+// 前侧缺口：从最终墙模块取支撑面和入口标记，不再假定完整矩形正面。
+if(shape==1 && ns>=2) {
+    for(int host=0;host<npoints(2) && emitted<64;host++) {
+        int target=point(2,"facade_target",host), f=point(2,"floor_index",host);
+        if(target>1 || f<0 || (chi("../../style_rule_source")==0 && f!=0) || point(2,"is_building_entrance",host)) continue;
+        string role=point(2,"module_role",host);
+        if(role!="GroundWall" && role!="GroundShop" && role!="GroundShopDoor" && role!="MiddleBlank" && role!="MiddleWindow") continue;
+        if(point(2,"preview_missing",host)) continue;
+        int face=point(2,"face_index",host), band=f==0?0:1, cell=point(2,"cell_index",host);
+        string surface=point(2,"surface_role",host);
+        vector pos=point(2,"P",host); pos.x=-pos.x; pos.y=0;
+        vector right=face==0?set(1,0,0):set(0,0,-1), outward=face==0?set(0,0,1):set(1,0,0);
+        vector origin=pos+outward*.22; float yaw=face==0?0:-90;
+        float top=f==0?ground_h:ground_h+f*typical_h;
+        int key=seed*1009+target*503+cell*37+f*101;
+        for(int kind=0;kind<2 && emitted<64;kind++) {
+            if(!(sb_mask(band,kind)&(target==0?1:2)) || !sb_allowed(band,kind,f+1)
+                || layer_counts[band*5+kind]>=sb_maximum(band,kind)) continue;
+            if(rand(float(key)*(kind==0?.197:.263)+(kind==0?1:7))>=sb_density(band,kind)) continue;
+            int added=sbv9_emit_limited(catalog,kind==0?"Awning":"Sign",key+(kind==0?3101:3203),origin,right,outward,
+                0,top-(kind==0?.95:1.55),yaw,face,surface,f,cell,
+                min(64-emitted,sb_maximum(band,kind)-layer_counts[band*5+kind]));
+            emitted+=added;layer_counts[band*5+kind]+=added;count[kind]+=added;
+        }
+    }
+} else {
+int wall_limit=chi("../../style_rule_source")==1?floors:1;
+for(int wall_floor=0;wall_floor<wall_limit && emitted<64;wall_floor++)
+for (int target=0;target<2 && emitted<64;target++)
+{
+    int band=wall_floor==0?0:1;
+    if ((target==0 && !(sb_mask(band,0)&1) && !(sb_mask(band,1)&1))
+        || (target==1 && (!corner || (!(sb_mask(band,0)&2) && !(sb_mask(band,1)&2))))) continue;
+    int cells=target==0?wcells:dcells;
+    vector origin=target==0?set(-width*.5,0,.22):set(width*.5+.22,0,0);
+    vector right=target==0?set(1,0,0):set(0,0,-1);
+    vector outward=target==0?set(0,0,1):set(1,0,0);
+    float yaw=target==0?0:-90; int face=target==0?0:2;
+    string surface=target==0?"front":"secondary_front";
+    for (int cell=0;cell<cells && emitted<64;cell++)
+    {
+        if (wall_floor==0 && target==0 && cell==entrance) continue;
+        int key=seed*1009+target*503+cell*37+wall_floor*101;
+        float wall_top=wall_floor==0?ground_h:ground_h+wall_floor*typical_h;
+        if ((sb_mask(band,0)&(target==0?1:2)) && layer_counts[band*5+0]<sb_maximum(band,0)
+            && sb_allowed(band,0,wall_floor+1) && rand(float(key)*.197+1)<sb_density(band,0))
+        {
+            int added=sbv9_emit_limited(catalog,"Awning",key+3101,origin,right,outward,
+                (cell+.5)*cw,wall_top-.95,yaw,face,surface,wall_floor,cell,
+                min(64-emitted,sb_maximum(band,0)-layer_counts[band*5+0]));
+            emitted+=added; layer_counts[band*5+0]+=added; count[0]+=added;
+        }
+        if ((sb_mask(band,1)&(target==0?1:2)) && layer_counts[band*5+1]<sb_maximum(band,1) && emitted<64
+            && sb_allowed(band,1,wall_floor+1) && rand(float(key)*.263+7)<sb_density(band,1))
+        {
+            int added=sbv9_emit_limited(catalog,"Sign",key+3203,origin,right,outward,
+                (cell+.5)*cw,wall_top-1.55,yaw,face,surface,wall_floor,cell,
+                min(64-emitted,sb_maximum(band,1)-layer_counts[band*5+1]));
+            emitted+=added; layer_counts[band*5+1]+=added; count[1]+=added;
+        }
+    }
+}
+
+}
+
+int rear_mode=int(detail(1,"effective_rear_mode",0));
+if ((sb_mask(1,2)&8) && count[2]<sb_maximum(1,2) && emitted<64 && rear_mode==2
+    && floors>=3 && sb_allowed(1,2,2)
+    && rand(float(seed)*.311+9)<sb_density(1,2))
+{
+    int added=sbv9_emit_limited(catalog,"FireEscape",seed*1009+3307,
+        set(width*.5,0,-depth-.24),set(-1,0,0),set(0,0,-1),width*.5,
+        ground_h,-180,3,"rear",1,max(0,wcells/2-1),
+        min(64-emitted,sb_maximum(1,2)-count[2]));
+    emitted+=added; count[2]+=added;
+}
+
+
+// 以 building/face/floor/cell 区分墙位；窗洞优先阻挡，即使输入有重叠也不放行。
+dict ac_solid, ac_blocked;
+for(int host=0;host<npoints(2);host++)
+{
+    int building=point(2,"building_id",host), face=point(2,"face_index",host);
+    int floor=point(2,"floor_index",host), target=point(2,"facade_target",host);
+    if(building!=0 || floor<1 || floor>=floors || face<1 || face>3 || target<2) continue;
+    string role=point(2,"module_role",host), semantic=point(2,"semantic_role",host);
+    int wall=role=="MiddleBlank" || role=="SideWall" || role=="RearWall";
+    int hole=role=="MiddleWindow" || role=="GroundShop"
+        || role=="GroundShopDoor" || role=="Entrance";
+    int valid=wall && !int(point(2,"preview_missing",host))
+        && len(string(point(2,"unity_instance",host)))>0;
+    if(!valid && !hole) continue;
+    int span=max(1,int(point(2,"module_span",host)));
+    // 墙窗 cell_index 为整栋连续编号，配件为单面局部编号。按最终位置投影，
+    // 同时核对支撑平面，避免 L 形内凹墙被当作外侧墙。
+    vector pos=point(2,"P",host);
+    float plane=face==1?abs(pos.x-width*.5):face==2?abs(pos.x+width*.5):abs(pos.z+depth);
+    if(plane>.001) continue;
+    float u=face==1?pos.z+depth:face==2?-pos.z:pos.x+width*.5;
+    float start=u/cw-span*.5;
+    int first=int(rint(start));
+    if(abs(start-first)>.001) continue;
+    int cells=face==3?wcells:dcells;
+    for(int c=max(0,first);c<min(cells,first+span);c++)
+    {
+        string k=sb_ac_cell_key(building,face,floor,c);
+        if(valid) ac_solid[k]=1;
+        if(hole) ac_blocked[k]=1;
+    }
+}
+
+// Wall AC uses independent per-kind density/max, facade mask and floor range.
+for (int face=1;face<=3 && emitted<64 && count[3]<sb_maximum(1,3);face++)
+{
+    if (face==3 && rear_mode==0) continue;
+    if (face<3 && int(detail(1,"effective_side_mode",0))==1) continue;
+    if (!(sb_mask(1,3)&(face==3?8:4))) continue;
+    int cells=face==3?wcells:dcells;
+    vector origin=face==1?set(-width*.5,0,-depth):face==2?set(width*.5,0,0):set(width*.5,0,-depth);
+    vector right=face==1?set(0,0,1):face==2?set(0,0,-1):set(-1,0,0);
+    vector outward=face==1?set(-1,0,0):face==2?set(1,0,0):set(0,0,-1);
+    float yaw=face==1?90:face==2?-90:-180;
+    string surface=face==1?"left":face==2?"right":"rear";
+    for (int floor_one=2;floor_one<=floors && emitted<64 && count[3]<sb_maximum(1,3);floor_one++)
+    {
+        if (!sb_allowed(1,3,floor_one)) continue;
+        int floor_index=floor_one-1;
+        for (int cell=0;cell<cells && emitted<64 && count[3]<sb_maximum(1,3);cell++)
+        {
+            int removed=shape==1 && face<3
+                && ((ns==0 && face==1 && cell<ndc) || (ns==1 && face==2 && cell>=dcells-ndc));
+            removed=max(removed,shape==1 && ns<2 && face==3
+                && (ns==0?cell>=wcells-nwc:cell<nwc));
+            if (removed || (corner && face==2)) continue;
+            int run=sb_ac_wall_run(ac_solid,ac_blocked,face,floor_index,cell,cells);
+            if(run<=0) continue;
+            int key=seed*1009+face*503+floor_index*101+cell*37;
+            if (rand(float(key)*.149+11)>=sb_density(1,3)) continue;
+            int span;
+            int added=sb_ac_emit(detail(0,"catalog_raw",0),key+3509,run,cw,origin,right,outward,
+                ground_h+.65+(floor_one-2)*typical_h,yaw,face,surface,
+                floor_index,cell,min(64-emitted,sb_maximum(1,3)-count[3]),span);
+            emitted+=added; count[3]+=added;
+            if(added>0) cell+=span-1; // 已占用格位不重复放置外机。
+        }
+    }
+}
+
+// Roof props stay one cell away from the edge and outside either L-notch.
+if (count[4]<sb_maximum(2,4) && emitted<64 && detail(1,"effective_generate_roof",0)
+    && wcells>=3 && dcells>=3 && sb_allowed(2,4,floors)
+    && rand(float(seed)*.887+31)<sb_density(2,4))
+{
+    int valid[];
+    for (int z=1;z<dcells-1;z++) for (int x=1;x<wcells-1;x++)
+    {
+        int removed=shape==1 && (ns<2?z>=dcells-ndc:z<ndc) && (ns%2==0?x<nwc:x>=wcells-nwc);
+        if (!removed) append(valid,z*wcells+x);
+    }
+    if (len(valid)>0)
+    {
+        int pick=clamp(int(floor(rand(float(seed)*.417+3)*len(valid))),0,len(valid)-1);
+        int cell=valid[pick]; int xcell=cell%wcells; int zcell=cell/wcells;
+        float roof_y=ground_h+(floors-1)*typical_h;
+        int added=sbv9_emit_limited(catalog,"RoofProp",seed*1009+4*503+cell*37,
+            set(-width*.5,0,-(zcell+.5)*cw),set(1,0,0),set(0,0,-1),
+            (xcell+.5)*cw,roof_y,0,4,"roof",floors,cell,
+            min(64-emitted,sb_maximum(2,4)-count[4]));
+        emitted+=added; count[4]+=added;
+    }
+}
+
+setdetailattrib(0,"attachment_awning_count",count[0],"set");
+setdetailattrib(0,"attachment_sign_count",count[1],"set");
+setdetailattrib(0,"attachment_fire_escape_count",count[2],"set");
+setdetailattrib(0,"attachment_wall_ac_count",count[3],"set");
+setdetailattrib(0,"attachment_roof_prop_count",count[4],"set");
+setdetailattrib(0,"streetbuilding_effective_width",width,"set");
+setdetailattrib(0,"streetbuilding_effective_depth",depth,"set");
+setdetailattrib(0,"streetbuilding_effective_floor_count",floors,"set");
+setdetailattrib(0,"streetbuilding_effective_shape",shape,"set");
+setdetailattrib(0,"output_role","detail_instances","set");
+setdetailattrib(0,"streetbuilding_contract","StreetBuilding.VersionlessStyle.10.0","set");
+setdetailattrib(0,"streetbuilding_revision","STREETBUILDING_V10_VERSIONLESS_STYLE_PAYLOAD","set");
+setdetailattrib(0,"streetbuilding_detail_count",npoints(0),"set");
+removeattrib(0,"point","N");

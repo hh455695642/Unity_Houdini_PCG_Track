@@ -1,0 +1,86 @@
+// STREETBUILDING_V9_BUILD_FACADE_CELLS
+void sbv9_cell(int target; int face; string surface; vector origin; vector right;
+    vector outward; float yaw; int local_cell; int run_count; int serial; int floor;
+    float cell_width)
+{
+    int pt=addpoint(0,origin+right*((local_cell+.5)*cell_width));
+    setpointattrib(0,"facade_target",pt,target,"set"); setpointattrib(0,"face_index",pt,face,"set");
+    setpointattrib(0,"surface_role",pt,surface,"set"); setpointattrib(0,"cell_index",pt,serial,"set");
+    setpointattrib(0,"run_local_cell",pt,local_cell,"set"); setpointattrib(0,"run_cell_count",pt,run_count,"set");
+    setpointattrib(0,"floor_index",pt,floor,"set"); setpointattrib(0,"floor_1based",pt,floor+1,"set");
+    setpointattrib(0,"placement_origin",pt,origin,"set"); setpointattrib(0,"placement_right",pt,right,"set");
+    setpointattrib(0,"placement_outward",pt,outward,"set"); setpointattrib(0,"placement_yaw",pt,yaw,"set");
+    setpointattrib(0,"local_u",pt,(local_cell+.5)*cell_width,"set");
+}
+void sbv9_run(int target; int face; string surface; vector origin; vector right;
+    vector outward; float yaw; int count; export int serial; int floors; float cw)
+{
+    for (int floor=0;floor<floors;floor++) for (int c=0;c<count;c++)
+        sbv9_cell(target,face,surface,origin,right,outward,yaw,c,count,serial+c,floor,cw);
+    serial+=count;
+}
+
+float cw=detail(1,"style_cell_width",0); if (cw<=0) cw=2;
+float width=detail(0,"effective_width",0); float depth=detail(0,"effective_depth",0);
+int wc=int(rint(width/cw)); int dc=int(rint(depth/cw)); int floors=max(1,detail(0,"effective_floor_count",0));
+int shape=detail(0,"effective_shape",0); int side_mode=detail(0,"effective_side_mode",0);
+int rear_mode=detail(0,"effective_rear_mode",0); int corner=detail(0,"effective_corner",0);
+float nw=detail(0,"effective_notch_width",0); float nd=detail(0,"effective_notch_depth",0);
+int nwc=int(rint(nw/cw)); int ndc=int(rint(nd/cw)); int ns=detail(0,"effective_notch_side",0);
+if (wc<2 || dc<2 || abs(width-wc*cw)>.01 || abs(depth-dc*cw)>.01)
+    error("StreetBuilding parcel dimensions must follow the Style Cell grid");
+if (shape==1 && (nwc<1 || ndc<1 || wc-nwc<1 || dc-ndc<1))
+    error("StreetBuilding L notch must preserve one-cell wings");
+for (int p=nprimitives(0)-1;p>=0;p--) removeprim(0,p,1);
+int serial=0;
+sbv9_run(0,0,"front",set(-width*.5+(shape==1 && ns==2?nw:0),0,0),set(1,0,0),set(0,0,1),0,shape==1 && ns>=2?wc-nwc:wc,serial,floors,cw);
+if (shape==0)
+{
+    if (side_mode!=1)
+    {
+        sbv9_run(2,1,"left",set(-width*.5,0,-depth),set(0,0,1),set(-1,0,0),90,dc,serial,floors,cw);
+        sbv9_run(corner?1:2,2,corner?"secondary_front":"right",set(width*.5,0,0),set(0,0,-1),set(1,0,0),-90,dc,serial,floors,cw);
+    }
+    if (rear_mode!=0) sbv9_run(3,3,"rear",set(width*.5,0,-depth),set(-1,0,0),set(0,0,-1),-180,wc,serial,floors,cw);
+}
+else if (ns==0)
+{
+    if (side_mode!=1)
+    {
+        sbv9_run(corner?1:2,2,corner?"secondary_front":"right",set(width*.5,0,0),set(0,0,-1),set(1,0,0),-90,dc,serial,floors,cw);
+        sbv9_run(2,1,"notch_inner",set(-width*.5+nw,0,-depth),set(0,0,1),set(-1,0,0),90,ndc,serial,floors,cw);
+        sbv9_run(2,1,"left",set(-width*.5,0,-depth+nd),set(0,0,1),set(-1,0,0),90,dc-ndc,serial,floors,cw);
+    }
+    if (rear_mode!=0)
+    {
+        sbv9_run(3,3,"rear",set(width*.5,0,-depth),set(-1,0,0),set(0,0,-1),-180,wc-nwc,serial,floors,cw);
+        sbv9_run(3,3,"notch_rear",set(-width*.5+nw,0,-depth+nd),set(-1,0,0),set(0,0,-1),-180,nwc,serial,floors,cw);
+    }
+}
+else if(ns==1)
+{
+    if (side_mode!=1)
+    {
+        sbv9_run(2,1,"left",set(-width*.5,0,-depth),set(0,0,1),set(-1,0,0),90,dc,serial,floors,cw);
+        sbv9_run(2,2,"notch_inner",set(width*.5-nw,0,-depth),set(0,0,1),set(1,0,0),-90,ndc,serial,floors,cw);
+        sbv9_run(corner?1:2,2,corner?"secondary_front":"right",set(width*.5,0,0),set(0,0,-1),set(1,0,0),-90,dc-ndc,serial,floors,cw);
+    }
+    if (rear_mode!=0)
+    {
+        sbv9_run(3,3,"rear",set(width*.5-nw,0,-depth),set(-1,0,0),set(0,0,-1),-180,wc-nwc,serial,floors,cw);
+        sbv9_run(3,3,"notch_rear",set(width*.5,0,-depth+nd),set(-1,0,0),set(0,0,-1),-180,nwc,serial,floors,cw);
+    }
+}
+else
+{
+    // 朝前的凹入墙段是次正立面；入口仍仅属于外侧主正立面。
+    sbv9_run(1,0,"secondary_front",set(ns==2?-width*.5:width*.5-nw,0,-nd),set(1,0,0),set(0,0,1),0,nwc,serial,floors,cw);
+    if(side_mode!=1) {
+        sbv9_run(2,1,"left",set(-width*.5,0,-depth),set(0,0,1),set(-1,0,0),90,ns==2?dc-ndc:dc,serial,floors,cw);
+        sbv9_run(corner?1:2,2,corner?"secondary_front":"right",set(width*.5,0,ns==3?-nd:0),set(0,0,-1),set(1,0,0),-90,ns==3?dc-ndc:dc,serial,floors,cw);
+        sbv9_run(2,ns==2?1:2,"notch_inner",set(ns==2?-width*.5+nw:width*.5-nw,0,ns==2?-nd:0),
+            set(0,0,ns==2?1:-1),set(ns==2?-1:1,0,0),ns==2?90:-90,ndc,serial,floors,cw);
+    }
+    if(rear_mode!=0) sbv9_run(3,3,"rear",set(width*.5,0,-depth),set(-1,0,0),set(0,0,-1),-180,wc,serial,floors,cw);
+}
+setdetailattrib(0,"streetbuilding_cell_count",npoints(0),"set");

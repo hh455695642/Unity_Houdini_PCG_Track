@@ -1,0 +1,89 @@
+// STREETBUILDING_V1_METADATA
+for (int primitive = 0; primitive < nprimitives(1); primitive++)
+{
+    int polygon_points[] = primpoints(1, primitive);
+    vector center = 0;
+    foreach (int polygon_point; polygon_points)
+        center += point(1, "P", polygon_point);
+    center /= max(1, len(polygon_points));
+    center.y = float(prim(1, "building_height", primitive)) * 0.5;
+    int point_number = addpoint(0, center);
+    int marker_x = addpoint(0, center + set(0.01, 0.0, 0.0));
+    int marker_y = addpoint(0, center + set(0.0, 0.01, 0.0));
+    int marker_primitive = addprim(0, "poly",
+        array(point_number, marker_x, marker_y));
+    int building_id = int(prim(1, "building_id", primitive));
+    setpointattrib(0, "building_id", point_number, building_id, "set");
+    setpointattrib(0, "floor_count", point_number,
+        int(prim(1, "floor_count", primitive)), "set");
+    setpointattrib(0, "seed", point_number,
+        int(prim(1, "seed", primitive)), "set");
+    setpointattrib(0, "front_edge", point_number,
+        int(prim(1, "front_edge", primitive)), "set");
+    setpointattrib(0, "secondary_front_edge", point_number,
+        int(prim(1, "secondary_front_edge", primitive)), "set");
+    setpointattrib(0, "rear_mode", point_number,
+        int(prim(1, "rear_mode", primitive)), "set");
+    setpointattrib(0, "side_mode", point_number,
+        int(prim(1, "side_mode", primitive)), "set");
+    setpointattrib(0, "building_height", point_number,
+        float(prim(1, "building_height", primitive)), "set");
+    setpointattrib(0, "bay_count", point_number,
+        int(prim(1, "bay_count", primitive)), "set");
+    setpointattrib(0, "ground_use", point_number,
+        string(prim(1, "ground_use", primitive)), "set");
+    setpointattrib(0, "facade_rhythm", point_number,
+        string(prim(1, "facade_rhythm", primitive)), "set");
+    setpointattrib(0, "wall_surface_id", point_number,
+        int(prim(1, "wall_surface_id", primitive)), "set");
+    setpointattrib(0, "window_family", point_number,
+        int(prim(1, "window_family", primitive)), "set");
+    setpointattrib(0, "retail_cluster_id", point_number,
+        int(prim(1, "retail_cluster_id", primitive)), "set");
+    setpointattrib(0, "detail_density", point_number,
+        float(prim(1, "detail_density", primitive)), "set");
+    setpointattrib(0, "shopfront_ratio", point_number,
+        float(prim(1, "shopfront_ratio", primitive)), "set");
+    setpointattrib(0, "chunk_id", point_number, building_id, "set");
+    setpointattrib(0, "name", point_number,
+        sprintf("Building_%04d_Metadata", building_id), "set");
+    setprimattrib(0, "building_id", marker_primitive, building_id, "set");
+    setprimattrib(0, "surface_role", marker_primitive, "metadata", "set");
+    setprimattrib(0, "module_role", marker_primitive, "Metadata", "set");
+    setprimattrib(0, "name", marker_primitive,
+        sprintf("Building_%04d_Metadata", building_id), "set");
+    setprimattrib(0, "pcg_kind", marker_primitive, "building_metadata", "set");
+}
+setdetailattrib(0, "output_role", "building_metadata", "set");
+setdetailattrib(0, "streetbuilding_contract", "StreetBuilding.Facade.2", "set");
+
+setdetailattrib(0, "streetbuilding_massing_shape", chi("../../massing_shape") == 0 ? "rectangle" : "l_shape", "set");
+
+// STREETBUILDING_V9_RULE_DIAGNOSTICS
+setdetailattrib(0,"streetbuilding_rule_source",string(detail(2,"streetbuilding_rule_source",0)),"set");
+setdetailattrib(0,"streetbuilding_rule_report",string(detail(2,"streetbuilding_rule_report",0)),"set");
+setdetailattrib(0,"streetbuilding_rule_compressed",int(detail(2,"streetbuilding_rule_compressed",0)),"set");
+setdetailattrib(0,"streetbuilding_contract","StreetBuilding.VersionlessStyle.10.0","set");
+setdetailattrib(0,"streetbuilding_revision","STREETBUILDING_V10_VERSIONLESS_STYLE_PAYLOAD","set");
+
+// STREETBUILDING_AUTO_MISSING_DIAGNOSTICS_1: survives zero real instance output.
+int missing=0; string keys[]; int counts[];
+if(chi("../../module_source")==1) for(int p=0;p<npoints(3);p++) {
+    if(!point(3,"preview_missing",p)) continue;
+    missing++;
+    string key=sprintf("%d|%s",int(point(3,"floor_index",p)),string(point(3,"module_role",p)));
+    int index=find(keys,key);
+    if(index<0){append(keys,key);append(counts,1);}else counts[index]++;
+}
+string summary="";
+for(int i=0;i<len(keys);i++) summary+=sprintf("%s|%d\n",keys[i],counts[i]);
+setdetailattrib(0,"preview_missing_count",missing,"set");
+setdetailattrib(0,"preview_missing_summary",summary,"set");
+setdetailattrib(0,"preview_diagnostics_version",1,"set");
+
+// 格数/米制兼容状态用于编辑器诊断，不新增 Cook warning。
+setdetailattrib(0,"notch_units",chi("../../l_notch_units"),"set");
+setdetailattrib(0,"notch_migration_report",chi("../../l_notch_units")==1?"grid":"legacy metres retained","set");
+setdetailattrib(0,"notch_corner",chi("../../l_notch_side"),"set");
+setdetailattrib(0,"notch_width_m",float(detail("op:../PARSE_GENERATION_RULES","effective_notch_width",0)),"set");
+setdetailattrib(0,"notch_depth_m",float(detail("op:../PARSE_GENERATION_RULES","effective_notch_depth",0)),"set");

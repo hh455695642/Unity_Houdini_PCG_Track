@@ -118,7 +118,7 @@ def captured_manifest_hash(manifest: dict[str, Any]) -> str:
     if amendment:
         if not amendment.get("reason") or not amendment.get("capture_manifest_sha256"):
             raise GateFailure("Scope amendment requires an auditable reason and Capture hash")
-        for field in ("allowed_nodes", "required_contracts", "allowed_files", "allowed_public_parameters"):
+        for field in ("allowed_nodes", "required_contracts", "allowed_files", "allowed_public_parameters", "allowed_parameters"):
             for value in amendment.get("added_" + field, []):
                 if any(char in value for char in "*?[]") or original[field].count(value) != 1:
                     raise GateFailure("Scope amendments must append unique exact names")
@@ -1087,6 +1087,13 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
                     promoted_templates.append(template)
                 else:
                     promoted_templates.replace(name, template)
+    if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('l_notch_width_cells') is not None:
+        import sys
+        from pathlib import Path
+        notch_tools = str(Path(expected_hip).parent / 'scripts' / 'tools')
+        if notch_tools not in sys.path: sys.path.insert(0, notch_tools)
+        from streetbuilding_notch_interface import promote
+        promoted_templates = promote(hou, promoted_templates, asset)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only
@@ -1098,6 +1105,9 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         # Only a manifest with an explicit public-parameter allowlist may
         # promote the verified Live template group into the definition.
         definition.setParmTemplateGroup(promoted_templates)
+        if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('l_notch_width_cells') is not None:
+            from streetbuilding_notch_interface import install_events
+            install_events(definition)
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),

@@ -1,0 +1,74 @@
+// 按目标楼层与立面筛选；保留目录顺序，避免改变固定种子的权重抽样。
+string sb_layer_catalog(string raw; int band; int facade)
+{
+    string result=""; float cw=2;
+    string names[]=array("GroundShop","GroundShopDoor","GroundWall","Entrance","MiddleWindow","MiddleBlank","CornerConvex","CornerConcave","Cornice","Parapet","SideWall","RearWall","FacadeColumn","FloorBand","Awning","Sign","FireEscape","ACUnit","RoofProp","RoofSurface","ParapetCorner","ParapetConcaveCorner");
+    foreach(string row;split(raw,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)==4 && f[0]=="STYLE") {cw=atof(f[1]); result=row;}
+        if(len(f)!=18 || f[0]!="M") continue;
+        if(!(atoi(f[11])&band) || !(atoi(f[10])&facade)) continue;
+        int role=atoi(f[2]); if(role<0 || role>=len(names)) continue;
+        float height=atof(f[8])>0?atof(f[8]):max(.001,atof(f[13]));
+        result+=sprintf("\nM|%s|%s|0|%s|0|0|0|0|0|0|%g|%g|%g",names[role],f[3],f[4],max(1,atoi(f[5]))*cw,height,atof(f[9]));
+    }
+    return result;
+}
+// STREETBUILDING_V6_1_VALIDATE_DETAILS
+int points = npoints(0);
+if (points > 64) error("StreetBuilding V6.1 detail budget exceeded: %d", points);
+for (int point = 0; point < points; point++)
+{
+    string path = point(0, "unity_instance", point);
+    string role = point(0, "module_role", point);
+    int face = point(0, "face_index", point);
+    int floor = point(0, "floor_index", point);
+    vector scale = point(0, "scale", point);
+    vector4 orient = point(0, "orient", point);
+    // 对每个最终实例验证素材所属层与立面，覆盖不能放宽目录限制。
+    string surface=point(0,"surface_role",point);
+    int facade=face==4?15:surface=="secondary_front"?2:face==0?1:face==3?8:4;
+    string allowed=sb_layer_catalog(chs("../../unity_style_catalog"),face==4?4:floor==0?1:2,facade);
+    int permitted=0;
+    foreach(string row;split(allowed,"\n")) {
+        string f[]=split(row,"|");
+        if(len(f)==14 && f[1]==role && f[4]==path) permitted=1;
+    }
+    if(!permitted) error("StreetBuilding detail violates layer/facade catalog: %s floor %d",role,floor);
+    if (len(path) == 0) error("StreetBuilding V6.1 emitted an empty detail asset path");
+    if (distance(scale, set(1, 1, 1)) > .0001) error("StreetBuilding V6.1 requires unit detail scale");
+    if (abs(length(orient) - 1.0) > .001) error("StreetBuilding V6.1 emitted a non-unit detail orient");
+    if ((role == "Awning" || role == "Sign") && ((face != 0 && face != 2) || floor < 0 || (chi("../../style_rule_source")==0 && floor != 0)))
+        error("StreetBuilding V6.1 front detail placement failed for %s", role);
+    if (role == "FireEscape" && face != 3)
+        error("StreetBuilding V6.1 FireEscape must be on the rear face");
+    if (role == "ACUnit" && (face < 1 || face > 3 || floor < 1))
+        error("StreetBuilding V6.1 ACUnit must be on an upper side/rear face");
+    if (role == "ACUnit")
+    {
+        vector p = point(0, "P", point);
+        float width = detail(0,"streetbuilding_effective_width",0); float depth = detail(0,"streetbuilding_effective_depth",0);
+        float plane_error = face == 1 ? abs(p.x - width * .5)
+            : face == 2 ? abs(p.x + width * .5) : abs(p.z + depth);
+        if (plane_error > .001)
+            error("StreetBuilding V8 ACUnit pivot escaped its wall support plane");
+    }
+    if (role == "RoofProp" && face != 4)
+        error("StreetBuilding V6.1 RoofProp must be on the roof");
+    if (role == "RoofProp")
+    {
+        string variant = point(0, "module_variant", point);
+        vector p = point(0, "P", point);
+        float roof_y = ch("../../floor_height_ground")
+            + (max(1, int(detail(0,"streetbuilding_effective_floor_count",0))) - 1) * ch("../../floor_height_typical");
+        if (variant == "ac_unit") error("StreetBuilding V6.1 forbids roof AC units");
+        if (abs(p.y - roof_y) > .01) error("StreetBuilding V6.1 roof prop is floating");
+    }
+}
+setdetailattrib(0, "output_role", "detail_instances", "set");
+setdetailattrib(0, "streetbuilding_contract", "StreetBuilding.VersionlessStyle.10.0", "set");
+setdetailattrib(0, "streetbuilding_revision", "STREETBUILDING_V10_VERSIONLESS_STYLE_PAYLOAD", "set");
+setdetailattrib(0, "streetbuilding_detail_count", points, "set");
+
+setdetailattrib(0, "streetbuilding_massing_shape", detail(0,"streetbuilding_effective_shape",0) == 0 ? "rectangle" : "l_shape", "set");

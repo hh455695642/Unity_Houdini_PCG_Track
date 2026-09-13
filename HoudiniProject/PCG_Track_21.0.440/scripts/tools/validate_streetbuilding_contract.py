@@ -216,7 +216,7 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
         "side_facade_mode": side, "roof_enabled": roof, "lod_outputs_enabled": 0,
         "variation_seed": seed, "massing_shape": shape, "l_notch_width": notch_width,
         "l_notch_depth": notch_depth, "l_notch_side": notch_side,
-        "site_source": 0, "site_source_auto": 0, "corner_building": 0,
+        "site_source": 0, "site_source_auto": 0, "corner_building": 0, "l_notch_units": 0,
     }
     for name, value in values.items():
         asset.parm(name).set(value)
@@ -590,7 +590,7 @@ def assert_l_shape(asset: hou.Node) -> dict[str, Any]:
                           "concave_corners": 1, "ac_units": len(ac_points),
                           "corner_assets_distinct": True, "sha256": first}
 
-    configure(asset, STYLE_CATALOG, shape=1, notch_width=10, notch_depth=4)
+    configure(asset, STYLE_CATALOG, shape=1, notch_width=12, notch_depth=4)
     rejected = False
     try:
         target = node(asset, "OUT_BUILDING_LOD0")
@@ -598,7 +598,7 @@ def assert_l_shape(asset: hou.Node) -> dict[str, Any]:
         rejected = bool(target.errors())
     except hou.OperationFailed:
         rejected = True
-    require(rejected, "L shape accepted a notch that leaves only one module cell")
+    require(rejected, "L shape accepted a notch that leaves no module cell")
     results["invalid_notch"] = "rejected"
     return results
 
@@ -1534,7 +1534,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
-    return {"status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_notches import validate_notches
+    return {"notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -1620,6 +1621,8 @@ def _sb_export_candidate(path):
             templates.append(template)
         else:
             templates.replace(name, template)
+    from streetbuilding_notch_interface import promote, install_events
+    templates = promote(hou, templates, asset)
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))
@@ -1627,6 +1630,7 @@ def _sb_export_candidate(path):
     candidate_definition = hou.hda.definitionsInFile(str(candidate_hda))[0]
     candidate_definition.updateFromNode(asset)
     candidate_definition.setParmTemplateGroup(templates)
+    install_events(candidate_definition)
     candidate_definition.setIsPreferred(True)
     hou.hipFile.save(str(candidate_hip))
     result = validate(candidate_hda, candidate_hip, contract)

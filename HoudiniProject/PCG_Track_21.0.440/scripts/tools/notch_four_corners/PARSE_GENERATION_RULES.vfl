@@ -1,0 +1,140 @@
+// STREETBUILDING_V12_HDA_PANEL_RULES
+void sbv12_apply_global(string payload; export float width; export float depth;
+    export int shape; export float notch_w; export float notch_d; export int notch_side;
+    export int floors; export int corner; export int ground_use; export int mode;
+    export int rhythm; export float shop_ratio; export int side_mode; export int rear_mode;
+    export int roof; export float parapet; export int trim; export int attachments;
+    export float detail_density; export int seed)
+{
+    foreach (string row; split(payload, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 21 || f[0] != "G") continue;
+        if (atof(f[1]) > 0) width = atof(f[1]);
+        if (atof(f[2]) > 0) depth = atof(f[2]);
+        shape=atoi(f[3]); notch_w=atof(f[4]); notch_d=atof(f[5]); notch_side=atoi(f[6]);
+        if (atoi(f[7]) > 0) floors=atoi(f[7]);
+        corner=atoi(f[8]); ground_use=atoi(f[9]); mode=atoi(f[10]); rhythm=atoi(f[11]);
+        shop_ratio=atof(f[12]); side_mode=atoi(f[13]); rear_mode=atoi(f[14]);
+        roof=atoi(f[15]); parapet=atof(f[16]); trim=atoi(f[17]); attachments=atoi(f[18]);
+        detail_density=atof(f[19]); seed=atoi(f[20]);
+    }
+}
+
+float width=ch("../../building_width"); float depth=ch("../../building_depth");
+int shape=chi("../../massing_shape"); float notch_w=ch("../../l_notch_width");
+float notch_d=ch("../../l_notch_depth"); int notch_side=chi("../../l_notch_side");
+// STREETBUILDING_NOTCH_GRID_20260912：统一模块尺度；旧米制数据不强制取整。
+float notch_cw=2;
+string notch_rows[]=split(chs("../../unity_style_catalog"),"\n");
+if(len(notch_rows)>0) {
+    string h[]=split(notch_rows[0],"|");
+    if(len(h)==4 && h[0]=="STYLE" && atof(h[1])>0) notch_cw=atof(h[1]);
+}
+if(chi("../../l_notch_units")==1) {
+    notch_w=clamp(chi("../../l_notch_width_cells"),1,max(1,int(rint(width/notch_cw))-1))*notch_cw;
+    notch_d=clamp(chi("../../l_notch_depth_cells"),1,max(1,int(rint(depth/notch_cw))-1))*notch_cw;
+}
+int floors=clamp(chi("../../floor_count"),1,12); int corner=chi("../../corner_building");
+int ground_use=chi("../../ground_floor_use"); int mode=chi("../../facade_layout_mode");
+int rhythm=chi("../../facade_rhythm"); float shop_ratio=ch("../../shopfront_ratio");
+int side_mode=chi("../../side_facade_mode"); int rear_mode=chi("../../rear_facade_mode");
+int roof=chi("../../roof_enabled"); float parapet=ch("../../parapet_height");
+int trim=chi("../../architectural_trim_enabled"); int attachments=chi("../../attachments_enabled");
+float detail_density=ch("../../attachment_global_density"); int seed=chi("../../variation_seed");
+
+// 三层风格默认值只在显式选择“风格默认”时启用；旧实例仍走原参数。
+int use_style=chi("../../style_rule_source")==1;
+dict layers;
+if(use_style)
+{
+    layers=json_loads(chs("../../unity_style_rules"),2);
+    if(int(layers["version"])!=1) error("StreetBuilding style rules version must be 1");
+}
+string layer_names[]=array("ground","upper","roof");
+for(int band=0;band<3;band++)
+{
+    dict rules=layers[layer_names[band]];
+    int inherited=use_style && !chi(sprintf("../../style_override_%s",layer_names[band]));
+    setdetailattrib(0,sprintf("layer_inherited_%d",band),inherited,"set");
+    setdetailattrib(0,sprintf("layer_rules_%d",band),rules,"set");
+    setdetailattrib(0,sprintf("layer_trim_%d",band),inherited?int(rules["trimEnabled"]):trim,"set");
+    if(inherited && band==0) {ground_use=int(rules["groundUse"]);shop_ratio=float(rules["shopfrontRatio"]);}
+    if(inherited && band==2) {roof=int(rules["roofEnabled"]);parapet=float(rules["parapetHeight"]);}
+}
+
+string hda_payload="SBR1";
+int count=chi("../../facade_overrides");
+for (int i=1;i<=count;i++)
+    hda_payload+=sprintf("\nO|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d",
+        chi(sprintf("../../facade_override_target%d",i)),chi(sprintf("../../facade_override_floor_start%d",i)),
+        chi(sprintf("../../facade_override_floor_end%d",i)),chi(sprintf("../../facade_override_layout_mode%d",i)),
+        chi(sprintf("../../facade_override_rhythm%d",i)),chi(sprintf("../../facade_override_entrance_min%d",i)),
+        chi(sprintf("../../facade_override_entrance_max%d",i)),chi(sprintf("../../facade_override_shop_door_min%d",i)),
+        chi(sprintf("../../facade_override_shop_door_max%d",i)),chi(sprintf("../../facade_override_shopfront_min%d",i)),
+        chi(sprintf("../../facade_override_shopfront_max%d",i)),chi(sprintf("../../facade_override_window_min%d",i)),
+        chi(sprintf("../../facade_override_window_max%d",i)),chi(sprintf("../../facade_override_blank_min%d",i)),
+        chi(sprintf("../../facade_override_blank_max%d",i)));
+int acount=chi("../../attachment_overrides");
+for (int i=1;i<=acount;i++)
+{
+    int mask=chi(sprintf("../../attachment_override_front%d",i))
+        +2*chi(sprintf("../../attachment_override_secondary_front%d",i))
+        +4*chi(sprintf("../../attachment_override_side%d",i))
+        +8*chi(sprintf("../../attachment_override_rear%d",i));
+    hda_payload+=sprintf("\nA|%d|%g|%d|%d|%d|%d",
+        chi(sprintf("../../attachment_override_kind%d",i)),chf(sprintf("../../attachment_override_density%d",i)),
+        chi(sprintf("../../attachment_override_max_count%d",i)),mask,
+        chi(sprintf("../../attachment_override_floor_start%d",i)),chi(sprintf("../../attachment_override_floor_end%d",i)));
+}
+
+string parcel_payload="";
+if (chi("../SELECT_SITE_SOURCE/input")==1 && nprimitives(0)>0 && hasprimattrib(0,"streetbuilding_rule_payload"))
+    parcel_payload=string(prim(0,"streetbuilding_rule_payload",0));
+if (len(strip(parcel_payload)))
+    sbv12_apply_global(parcel_payload,width,depth,shape,notch_w,notch_d,notch_side,floors,
+        corner,ground_use,mode,rhythm,shop_ratio,side_mode,rear_mode,roof,parapet,trim,
+        attachments,detail_density,seed);
+
+// STREETBUILDING_ROOF_TRIM_20260911
+// 面板是最终禁用约束；风格/地块只提供默认值，不能重新开启。
+roof = roof && chi("../../roof_enabled");
+int parapet_on=chi("../../parapet_enabled");
+if(use_style && !chi("../../style_override_roof")) {
+    dict roof_rules=layers["roof"];
+    // 旧 JSON 无字段时兼容为开启。
+    if(isvalidindex(roof_rules,"parapetEnabled")) parapet_on &= int(roof_rules["parapetEnabled"]);
+}
+parapet_on = parapet_on && ch("../../parapet_height")>0 && parapet>0;
+parapet = parapet_on ? max(0,parapet) : 0;
+trim = trim && chi("../../architectural_trim_enabled");
+for(int band=0;band<3;band++) {
+    string name=sprintf("layer_trim_%d",band);
+    int layer_trim=detail(0,name,0);
+    // setdetailattrib 的写入不作为同一次 wrangle 的读取源。
+    dict rules=layers[layer_names[band]];
+    int inherited=use_style && !chi(sprintf("../../style_override_%s",layer_names[band]));
+    layer_trim=inherited?int(rules["trimEnabled"]):1;
+    setdetailattrib(0,name,trim && layer_trim,"set");
+}
+setdetailattrib(0,"effective_generate_parapet",parapet_on,"set");
+for (int p=0;p<nprimitives(0);p++)
+{
+    setprimattrib(0,"floor_count",p,floors,"set"); setprimattrib(0,"seed",p,seed,"set");
+    setprimattrib(0,"rear_mode",p,rear_mode,"set"); setprimattrib(0,"side_mode",p,side_mode,"set");
+}
+setdetailattrib(0,"rule_payload_hda",hda_payload,"set");
+setdetailattrib(0,"rule_payload_parcel",parcel_payload,"set");
+setdetailattrib(0,"rule_source",len(strip(parcel_payload))?"parcel":use_style?"style":"hda","set");
+setdetailattrib(0,"effective_width",width,"set"); setdetailattrib(0,"effective_depth",depth,"set");
+setdetailattrib(0,"effective_shape",shape,"set"); setdetailattrib(0,"effective_notch_width",notch_w,"set");
+setdetailattrib(0,"effective_notch_depth",notch_d,"set"); setdetailattrib(0,"effective_notch_side",notch_side,"set");
+setdetailattrib(0,"effective_floor_count",floors,"set"); setdetailattrib(0,"effective_corner",corner,"set");
+setdetailattrib(0,"effective_ground_use",ground_use,"set"); setdetailattrib(0,"effective_facade_mode",mode,"set");
+setdetailattrib(0,"effective_rhythm",rhythm,"set"); setdetailattrib(0,"effective_shopfront_ratio",clamp(shop_ratio,0,1),"set");
+setdetailattrib(0,"effective_side_mode",side_mode,"set"); setdetailattrib(0,"effective_rear_mode",rear_mode,"set");
+setdetailattrib(0,"effective_generate_roof",roof,"set"); setdetailattrib(0,"effective_parapet",max(0,parapet),"set");
+setdetailattrib(0,"effective_trim",trim,"set"); setdetailattrib(0,"effective_attachments",attachments,"set");
+setdetailattrib(0,"effective_detail_density",clamp(detail_density,0,1),"set"); setdetailattrib(0,"effective_seed",seed,"set");
+setdetailattrib(0,"effective_cell_width",notch_cw,"set");
+setdetailattrib(0,"notch_units",chi("../../l_notch_units"),"set");

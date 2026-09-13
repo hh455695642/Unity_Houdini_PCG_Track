@@ -1,0 +1,463 @@
+float sb_notch_cw() { return max(.001,float(detail("op:../PARSE_GENERATION_RULES","effective_cell_width",0))); }
+// 按目标楼层与立面筛选；保留目录顺序，避免改变固定种子的权重抽样。
+string sb_layer_catalog(string raw; int band; int facade)
+{
+    string result=""; float cw=2;
+    string names[]=array("GroundShop","GroundShopDoor","GroundWall","Entrance","MiddleWindow","MiddleBlank","CornerConvex","CornerConcave","Cornice","Parapet","SideWall","RearWall","FacadeColumn","FloorBand","Awning","Sign","FireEscape","ACUnit","RoofProp","RoofSurface","ParapetCorner","ParapetConcaveCorner");
+    foreach(string row;split(raw,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)==4 && f[0]=="STYLE") {cw=atof(f[1]); result=row;}
+        if(len(f)!=18 || f[0]!="M") continue;
+        if(!(atoi(f[11])&band) || !(atoi(f[10])&facade)) continue;
+        int role=atoi(f[2]); if(role<0 || role>=len(names)) continue;
+        float height=atof(f[8])>0?atof(f[8]):max(.001,atof(f[13]));
+        result+=sprintf("\nM|%s|%s|0|%s|0|0|0|0|0|0|%g|%g|%g",names[role],f[3],f[4],max(1,atoi(f[5]))*cw,height,atof(f[9]));
+    }
+    return result;
+}
+// STREETBUILDING_V10_VERSIONLESS_CATALOG_HELPERS
+int sb_has_variant(string catalog; string role; string variant)
+{
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant)
+            return 1;
+    }
+    return 0;
+}
+
+int sb_has_role(string catalog; string role)
+{
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role) return 1;
+    }
+    return 0;
+}
+
+string sb_choose_variant(string catalog; string role; int selection_seed; int max_span;
+    export int selected_span)
+{
+    float total = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 14 || f[0] != "M" || f[1] != role || atoi(f[3]) != 0) continue;
+        int span = int(rint(atof(f[11]) / sb_notch_cw()));
+        if (span < 1 || span > max_span) continue;
+        total += max(0.0, atof(f[13]));
+    }
+    if (total <= 0.0) return "";
+    float target = rand(float(selection_seed) * 0.731 + 19.17) * total;
+    float cursor = 0.0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) != 14 || f[0] != "M" || f[1] != role || atoi(f[3]) != 0) continue;
+        int span = int(rint(atof(f[11]) / sb_notch_cw()));
+        if (span < 1 || span > max_span) continue;
+        cursor += max(0.0, atof(f[13]));
+        if (target <= cursor)
+        {
+            selected_span = span;
+            return f[2];
+        }
+    }
+    return "";
+}
+
+int sb_part_count(string catalog; string role; string variant)
+{
+    int result = 0;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role && f[2] == variant)
+            result = max(result, atoi(f[3]) + 1);
+    }
+    return result;
+}
+
+string sb_catalog_part(string catalog; string role; string variant; int part;
+    export vector offset; export vector rotation; export int span)
+{
+    offset = 0; rotation = 0; span = 1;
+    foreach (string row; split(catalog, "\n"))
+    {
+        string f[] = split(strip(row), "|");
+        if (len(f) == 14 && f[0] == "M" && f[1] == role
+            && f[2] == variant && atoi(f[3]) == part)
+        {
+            offset = set(atof(f[5]), atof(f[6]), atof(f[7]));
+            rotation = set(atof(f[8]), atof(f[9]), atof(f[10]));
+            span = int(rint(atof(f[11]) / sb_notch_cw()));
+            return f[4];
+        }
+    }
+    return "";
+}
+
+int sb_add_instance(string catalog; string role; string variant; int part;
+    vector origin; vector face_right; vector outward; float local_u; float base_y;
+    float houdini_yaw; int face_index; string surface; int floor_index; int cell_index;
+    int selection_seed; int building_entrance; int shop_entrance)
+{
+    vector offset, rotation; int span;
+    string path = sb_catalog_part(catalog, role, variant, part, offset, rotation, span);
+    // Missing candidates become preview markers, never foreign-role Prefabs.
+    int missing = len(path)==0;
+    if(missing) { offset=0; rotation=0; span=1; }
+    if (length2(rotation) > 1e-10)
+        error("StreetBuilding catalog rotations must be authored inside a Prefab");
+    vector unity_position = origin + face_right * (local_u + offset.x)
+        + set(0, base_y + offset.y, 0) + outward * offset.z;
+    vector houdini_position = set(-unity_position.x, unity_position.y, unity_position.z);
+    int pt = addpoint(0, houdini_position);
+    vector4 orient = quaternion(radians(houdini_yaw), set(0, 1, 0));
+    setpointattrib(0, "orient", pt, orient, "set");
+    setpointattrib(0,"preview_missing",pt,missing,"set");
+    float mh=floor_index==0?ch("../../floor_height_ground"):ch("../../floor_height_typical");
+    vector sz=set(2,mh,.16);
+    if(role=="RoofSurface") sz=set(2,.12,2);
+    if(role=="Parapet" || role=="ParapetCorner" || role=="ParapetConcaveCorner") sz=set(2,float(detail("op:../PARSE_GENERATION_RULES","effective_parapet",0)),.16);
+    if(role=="Cornice") sz=set(2,.18,.22);
+    if(role=="FloorBand") sz=set(2,.20,.12);
+    if(role=="FacadeColumn") sz=set(.16,mh,.16);
+    setpointattrib(0,"preview_size",pt,sz,"set");
+    setpointattrib(0, "scale", pt, set(1, 1, 1), "set");
+    setpointattrib(0, "unity_instance", pt, path, "set");
+    string face_token = face_index == 0 ? "FR" : face_index == 1 ? "LT" :
+        face_index == 2 ? "RT" : face_index == 3 ? "BK" : "RF";
+    string prefix = sprintf("SB_B0000_%s_F%02d_C%02d_%s_%s_P%d",
+        face_token, floor_index, cell_index, role, variant, part);
+    setpointattrib(0, "instance_prefix", pt, prefix, "set");
+    setpointattrib(0, "name", pt, prefix, "set");
+    setpointattrib(0, "building_id", pt, 0, "set");
+    setpointattrib(0, "face_index", pt, face_index, "set");
+    setpointattrib(0, "floor_index", pt, floor_index, "set");
+    setpointattrib(0, "cell_index", pt, cell_index, "set");
+    setpointattrib(0, "module_span", pt, span, "set");
+    setpointattrib(0, "selection_seed", pt, selection_seed, "set");
+    setpointattrib(0, "module_role", pt, role, "set");
+    setpointattrib(0, "module_variant", pt, variant, "set");
+    setpointattrib(0, "surface_role", pt, surface, "set");
+    setpointattrib(0, "facade_band", pt, floor_index == 0 ? "ground" : surface == "roof" ? "roof" : "middle", "set");
+    setpointattrib(0, "is_building_entrance", pt, building_entrance, "set");
+    setpointattrib(0, "is_shop_entrance", pt, shop_entrance, "set");
+    setpointattrib(0, "lod", pt, 0, "set");
+    setpointattrib(0, "chunk_id", pt, 0, "set");
+    setpointattrib(0, "pcg_kind", pt, "streetbuilding_module_instance", "set");
+    setpointattrib(0, "pcg_variant", pt, variant, "set");
+    return pt;
+}
+
+void sb_emit(string catalog; string role; string variant; vector origin; vector right;
+    vector outward; float local_u; float y; float h_yaw; int face; string surface;
+    int floor; int cell; int selection_seed; int entrance)
+{
+    int parts = sb_part_count(catalog, role, variant);
+    parts=max(1,parts);
+    for (int part = 0; part < parts; part++)
+        sb_add_instance(catalog, role, variant, part, origin, right, outward, local_u, y,
+            h_yaw, face, surface, floor, cell, selection_seed, entrance && part == 0, 0);
+}
+
+
+// STREETBUILDING_V9_SELECT_FACADE_MODULES
+string sbv9_choose_height(string catalog; string role; int selection_seed; float target_height)
+{
+    float total=0;
+    foreach (string row;split(catalog,"\n")) { string f[]=split(strip(row),"|");
+        if (len(f)==14 && f[0]=="M" && f[1]==role && atoi(f[3])==0 && abs(atof(f[12])-target_height)<.01)
+            total+=max(0,atof(f[13])); }
+    if (total<=0) return "";
+    float pick=rand(float(selection_seed)*.731+19.17)*total; float cursor=0;
+    foreach (string row;split(catalog,"\n")) { string f[]=split(strip(row),"|");
+        if (len(f)!=14 || f[0]!="M" || f[1]!=role || atoi(f[3])!=0 || abs(atof(f[12])-target_height)>=.01) continue;
+        cursor+=max(0,atof(f[13])); if (pick<=cursor) return f[2]; }
+    return "";
+}
+
+void sbv9_emit_selected(string catalog; string role; string variant; vector origin; vector right;
+    vector outward; float u; float y; float yaw; int face; string surface; int floor; int cell;
+    int key; int entrance; int shop_door; int target; string semantic; int rule_mode; int compressed)
+{
+    int parts=sb_part_count(catalog,role,variant);
+    parts=max(1,parts);
+    for (int part=0;part<parts;part++)
+    {
+        int pt=sb_add_instance(catalog,role,variant,part,origin,right,outward,u,y,yaw,face,
+            surface,floor,cell,key,entrance && part==0,shop_door && part==0);
+        if(target>=2 && floor>0 && role=="MiddleWindow" && len(variant)>0)
+        {
+            float cw=detail(1,"style_cell_width",0);
+            foreach(string row;split(catalog,"\n"))
+            {
+                string f[]=split(strip(row),"|");
+                if(len(f)==14 && f[1]==role && f[2]==variant)
+                {setpointattrib(0,"module_span",pt,int(rint(atof(f[11])/cw)),"set");break;}
+            }
+        }
+        setpointattrib(0,"facade_target",pt,target,"set");
+        setpointattrib(0,"semantic_role",pt,semantic,"set");
+        setpointattrib(0,"rule_mode",pt,rule_mode,"set");
+        setpointattrib(0,"rule_compressed",pt,compressed,"set");
+    }
+}
+
+// 首层统一墙面：后缀可达表先检查完整占格，再按权重选模块。
+// 扩展点：flags 的位用于首层必须出现的功能，不修改标准层算法。
+function int[] sb_wall_dp(int count; int spans[]; int flags[]; int door; int door_span)
+{
+    int dp[]; resize(dp,(count+1)*4); dp[count*4]=1;
+    for(int c=count-1;c>=0;c--) for(int need=0;need<4;need++)
+    {
+        if(c==door) {dp[c*4+need]=dp[(c+door_span)*4+need];continue;}
+        if(door>=0 && c>door && c<door+door_span) continue;
+        for(int i=0;i<len(spans);i++)
+        {
+            int end=c+spans[i];
+            if(end>count || (door>=0 && c<door && end>door)) continue;
+            int remaining=need & (3^flags[i]);
+            if(dp[end*4+remaining]) {dp[c*4+need]=1;break;}
+        }
+    }
+    return dp;
+}
+void sb_unified_run(string catalog; int pts[]; int seed; float cw; float height; int previous)
+{
+    int count=len(pts); if(count==0) return;
+    int target=point(0,"facade_target",pts[0]);
+    string variants[],roles[],doors[]; int spans[],flags[],door_spans[]; float weights[],door_weights[];
+    foreach(string row;split(catalog,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)!=14 || f[0]!="M" || atoi(f[3])!=0 || abs(atof(f[12])-height)>.01 || atof(f[13])<=0) continue;
+        int span=int(rint(atof(f[11])/cw));
+        if(span<1 || span>count || abs(span*cw-atof(f[11]))>.01) continue;
+        if(f[1]=="Entrance" && target==0)
+        {append(doors,f[2]);append(door_spans,span);append(door_weights,atof(f[13]));}
+        if(f[1]=="GroundWall" || (target<=1 && (f[1]=="GroundShop" || f[1]=="GroundShopDoor")))
+        {
+            append(variants,f[2]);append(roles,f[1]);append(spans,span);append(weights,atof(f[13]));
+            append(flags,f[1]=="GroundWall"?2:f[1]=="GroundShop"?1:0);
+        }
+    }
+    // 非入口模块缺失仍可预览；绝不把其他角色的 Prefab 当墙填入。
+    if(len(variants)==0)
+    {append(variants,"");append(roles,"GroundWall");append(spans,1);append(weights,1);append(flags,0);}
+    int door=-1,door_span=0; string door_variant=""; int need=0;
+    if(target==0)
+    {
+        int choices_variant[],choices_cell[],choices_need[]; int best=-1;
+        for(int v=0;v<len(doors);v++) for(int c=0;c+door_spans[v]<=count;c++)
+        {
+            int dp[]=sb_wall_dp(count,spans,flags,c,door_spans[v]);
+            int wanted=dp[3]?3:dp[1]?1:dp[0]?0:-1;
+            if(wanted<0) continue;
+            if(wanted>best) {resize(choices_variant,0);resize(choices_cell,0);resize(choices_need,0);best=wanted;}
+            if(wanted==best) {append(choices_variant,v);append(choices_cell,c);append(choices_need,wanted);}
+        }
+        if(len(choices_cell)==0) {error("StreetBuilding: exactly one compatible ground entrance is required; no complete placement exists");return;}
+        int alternatives=0; foreach(int c;choices_cell) if(point(0,"cell_index",pts[c])!=previous) alternatives++;
+        int counts[];resize(counts,len(doors));
+        for(int i=0;i<len(choices_cell);i++) if(alternatives==0 || point(0,"cell_index",pts[choices_cell[i]])!=previous) counts[choices_variant[i]]++;
+        float total=0;for(int v=0;v<len(doors);v++) if(counts[v]>0) total+=door_weights[v];
+        float pick=rand(set(seed,13.17,29.1))*total;int chosen=-1;
+        for(int i=0;i<len(choices_cell);i++)
+        {
+            int v=choices_variant[i];
+            if(alternatives>0 && point(0,"cell_index",pts[choices_cell[i]])==previous) continue;
+            pick-=door_weights[v]/counts[v];chosen=i;if(pick<=0)break;
+        }
+        door=choices_cell[chosen];int v=choices_variant[chosen];door_span=door_spans[v];door_variant=doors[v];need=choices_need[chosen];
+        setdetailattrib(0,"layout_entrance_cell",int(point(0,"cell_index",pts[door])),"set");
+        setdetailattrib(0,"layout_front_coverage",need,"set");
+    }
+    int dp[]=sb_wall_dp(count,spans,flags,door,door_span);
+    if(!dp[need]) {error("StreetBuilding: wall module spans cannot tile facade run");return;}
+    for(int c=0;c<count;)
+    {
+        string role,variant,semantic;int span;
+        if(c==door) {role="Entrance";variant=door_variant;semantic="entrance";span=door_span;}
+        else
+        {
+            float total=0; int candidates[];
+            for(int i=0;i<len(spans);i++)
+            {
+                int end=c+spans[i];if(end>count || (door>=0 && c<door && end>door))continue;
+                if(dp[end*4+(need & (3^flags[i]))]) {append(candidates,i);total+=weights[i];}
+            }
+            float pick=rand(set(seed,c+37,target+101))*total;int chosen=candidates[len(candidates)-1];
+            foreach(int i;candidates) {pick-=weights[i];if(pick<=0){chosen=i;break;}}
+            role=roles[chosen];variant=variants[chosen];span=spans[chosen];need=need & (3^flags[chosen]);
+            semantic=role=="GroundWall"?"blank":role=="GroundShopDoor"?"shop_door":"shopfront";
+        }
+        int source=pts[c];int face=point(0,"face_index",source);int cell=point(0,"cell_index",source);
+        vector origin=point(0,"placement_origin",source),right=point(0,"placement_right",source),outward=point(0,"placement_outward",source);
+        int before=npoints(0);
+        sbv9_emit_selected(catalog,role,variant,origin,right,outward,(c+span*.5)*cw,0,
+            float(point(0,"placement_yaw",source)),face,string(point(0,"surface_role",source)),0,cell,
+            seed,role=="Entrance",role=="GroundShopDoor",target,semantic,0,0);
+        for(int p=before;p<npoints(0);p++)setpointattrib(0,"module_span",p,span,"set");
+        c+=span;
+    }
+}
+
+// STREETBUILDING_UPPER_SIDE_REAR_WINDOWS_20260910
+
+// 侧背面窗户：目录已按楼层/立面过滤，再检查高度和连续可用格数。
+// 性能关键点：仅编辑期 Cook；保持目录顺序和原权重抽样，不增加运行时处理。
+string sb_upper_window(string catalog; int key; int capacity; float cw; float height;
+    export int span)
+{
+    string variants[]; int spans[]; float weights[]; float total=0;
+    foreach(string row;split(catalog,"\n"))
+    {
+        string f[]=split(strip(row),"|");
+        if(len(f)!=14 || f[0]!="M" || f[1]!="MiddleWindow" || atoi(f[3])!=0) continue;
+        int cells=int(rint(atof(f[11])/cw)); float weight=atof(f[13]);
+        if(cells<1 || cells>capacity || abs(cells*cw-atof(f[11]))>.01
+            || abs(atof(f[12])-height)>.01 || weight<=0) continue;
+        append(variants,f[2]);append(spans,cells);append(weights,weight);total+=weight;
+    }
+    if(total<=0) return "";
+    float pick=rand(float(key)*.731+19.17)*total; float cursor=0;
+    for(int i=0;i<len(variants);i++)
+    {
+        cursor+=weights[i];
+        if(pick<=cursor) {span=spans[i];return variants[i];}
+    }
+    return "";
+}
+
+string raw=detail(1,"catalog_raw",0); if (len(strip(raw))==0) return;
+int original=npoints(0); int seed=detail(0,"effective_seed",0); int building_id=0;
+int unified=chi("../../unified_ground_walls");
+if(unified && chi("../../layout_seed")>=0) seed=chi("../../layout_seed");
+float ground_h=detail(1,"style_ground_height",0); float typical_h=detail(1,"style_typical_height",0);
+float cell_width=detail(1,"style_cell_width",0); int consumed_sources[];
+if(unified)
+{
+    for(int first=0;first<original;first++)
+    {
+        if(point(0,"floor_index",first)!=0 || point(0,"run_local_cell",first)!=0 || point(0,"rule_mode",first)!=0)continue;
+        int pts[];int count=point(0,"run_cell_count",first);
+        for(int i=0;i<count;i++)append(pts,first+i);
+        int target=point(0,"facade_target",first);
+        string catalog=sb_layer_catalog(raw,1,int(pow(2,target)));
+        sb_unified_run(catalog,pts,seed,cell_width,ground_h,chi("../../previous_entrance_cell"));
+    }
+}
+for (int source=0;source<original;source++)
+{
+    if (find(consumed_sources,source)>=0) continue;
+    int target=point(0,"facade_target",source); int face=point(0,"face_index",source);
+    int floor=point(0,"floor_index",source); int cell=point(0,"cell_index",source);
+    string catalog=sb_layer_catalog(raw,floor==0?1:2,int(pow(2,target)));
+    string semantic=point(0,"semantic_role",source); string surface=point(0,"surface_role",source);
+    vector origin=point(0,"placement_origin",source); vector right=point(0,"placement_right",source);
+    vector outward=point(0,"placement_outward",source); float yaw=point(0,"placement_yaw",source);
+    float u=point(0,"local_u",source); int key=seed*1009+building_id*8191+target*503+floor*101+cell*37;
+    string role=""; string variant=""; int span=1; int available_span=1; int neighbors[];
+    int upper_window=target>=2 && floor>0 && semantic=="window";
+    if (target<=1 || upper_window)
+    {
+        int run_cell=point(0,"run_local_cell",source);
+        int remaining=point(0,"run_cell_count",source)-run_cell-1;
+        for (int offset=1;offset<=(upper_window?remaining:min(8,remaining));offset++)
+        {
+            int neighbor=-1;
+            for (int candidate=0;candidate<original;candidate++)
+                if (find(consumed_sources,candidate)<0
+                    && point(0,"facade_target",candidate)==target
+                    && point(0,"floor_index",candidate)==floor
+                    // 连续墙段身份：同面、同起点、同方向，禁止跨 L 形转角。
+                    && point(0,"face_index",candidate)==face
+                    && distance(vector(point(0,"placement_origin",candidate)),origin)<.0001
+                    && distance(vector(point(0,"placement_right",candidate)),right)<.0001
+                    && distance(vector(point(0,"placement_origin",candidate)),vector(point(0,"placement_origin",source)))<.001
+                    && point(0,"run_local_cell",candidate)==run_cell+offset
+                    && point(0,"semantic_role",candidate)==semantic)
+                { neighbor=candidate; break; }
+            if (neighbor<0) break;
+            append(neighbors,neighbor); available_span++;
+        }
+    }
+    if (target<=1)
+    {
+        if (floor==0) role=semantic=="entrance"?"Entrance":semantic=="shop_door" && sb_has_role(catalog,"GroundShopDoor")?"GroundShopDoor":
+            semantic=="shop_door" || semantic=="shopfront"?"GroundShop":"GroundWall";
+        else role=semantic=="window"?"MiddleWindow":"MiddleBlank";
+    }
+    else role=unified && floor==0?"GroundWall":target==3?"RearWall":"SideWall";
+    // 扩展点：先满足窗户语义；无兼容窗户才使用既有墙体回退。
+    if(upper_window) variant=sb_upper_window(catalog,key,available_span,cell_width,typical_h,span);
+    if(len(variant)>0) role="MiddleWindow";
+    else variant=(target>=2)?sbv9_choose_height(catalog,role,key,floor==0?ground_h:typical_h):sb_choose_variant(catalog,role,key,available_span,span);
+    // Standard walls may serve side/rear faces after layer/direction filtering.
+    // Dedicated SideWall/RearWall variants retain priority; never use ground walls.
+    if (len(variant)==0 && target>=2 && floor>0)
+    {
+        string walls="";
+        foreach(string row;split(catalog,"\n"))
+        {
+            string f[]=split(strip(row),"|");
+            if(len(f)==14 && f[0]=="M" && f[1]=="MiddleBlank"
+                && abs(atof(f[11])-cell_width)<.01) walls+=row+"\n";
+        }
+        string fallback=sbv9_choose_height(walls,"MiddleBlank",key,typical_h);
+        if(len(fallback)>0) { role="MiddleBlank"; variant=fallback; }
+    }
+    // Missing role is emitted as a preview marker.
+    if ((target<=1 || (upper_window && role=="MiddleWindow")) && span>1)
+    {
+        for (int index=0;index<span-1 && index<len(neighbors);index++)
+            append(consumed_sources,neighbors[index]);
+        u+=(span-1)*cell_width*.5;
+    }
+    if(!(unified && floor==0 && point(0,"rule_mode",source)==0))
+    sbv9_emit_selected(catalog,role,variant,origin,right,outward,u,
+        floor==0?0:ground_h+(floor-1)*typical_h,yaw,face,surface,floor,cell,key,
+        semantic=="entrance",semantic=="shop_door",target,semantic,
+        int(point(0,"rule_mode",source)),int(point(0,"rule_compressed",source)));
+    if (floor==0 && detail(0,sprintf("layer_trim_%d",floor==0?0:1),0))
+    {
+        int cs; string cornice=sb_choose_variant(catalog,"Cornice",key+7,1,cs);
+        sbv9_emit_selected(catalog,"Cornice",cornice,origin,right,outward,u,(floor==0?ground_h:ground_h+floor*typical_h)-1,yaw,
+            face,surface,floor,cell,key+7,0,0,target,"cornice",0,0);
+    }
+    if (detail(0,sprintf("layer_trim_%d",floor==0?0:1),0) && target==0 && point(0,"run_local_cell",source)==0)
+    {
+        string column=sbv9_choose_height(catalog,"FacadeColumn",key+17,
+            floor==0?ground_h:typical_h);
+        if (len(column)==0) { int cs; column=sb_choose_variant(catalog,"FacadeColumn",key+17,1,cs); }
+        sbv9_emit_selected(catalog,"FacadeColumn",column,origin,right,outward,0,
+            floor==0?0:ground_h+(floor-1)*typical_h,yaw,face,surface,floor,-1,key+17,
+            0,0,target,"column",0,0);
+    }
+}
+// 腰线单独按原始格分配，不随跨格窗户吞格；缺资源仍可预览。
+// 扩展点：保持 semantic_role 与模块角色，便于后续美术替换和局部 Bake。
+for(int source=0;source<original;source++) {
+    int floor=point(0,"floor_index",source);
+    if(floor!=0 || !int(detail(0,"layer_trim_0",0))) continue;
+    int target=point(0,"facade_target",source), face=point(0,"face_index",source);
+    string catalog=sb_layer_catalog(raw,1,int(pow(2,target)));
+    int cell=point(0,"cell_index",source), span;
+    int key=seed*1009+target*503+cell*37+23;
+    string variant=sb_choose_variant(catalog,"FloorBand",key,1,span);
+    sbv9_emit_selected(catalog,"FloorBand",variant,
+        vector(point(0,"placement_origin",source)),vector(point(0,"placement_right",source)),
+        vector(point(0,"placement_outward",source)),float(point(0,"local_u",source)),
+        ground_h-.10,float(point(0,"placement_yaw",source)),face,string(point(0,"surface_role",source)),
+        floor,cell,key,0,0,target,"floor_band",0,0);
+}
+for (int p=original-1;p>=0;p--) removepoint(0,p);
+for (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);
+setdetailattrib(0,"streetbuilding_contract","StreetBuilding.VersionlessStyle.10.0","set");
+setdetailattrib(0,"streetbuilding_revision","STREETBUILDING_V10_VERSIONLESS_STYLE_PAYLOAD","set");
+removeattrib(0,"point","N");

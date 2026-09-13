@@ -146,7 +146,10 @@
     "proxy_window_material": "Assets/PCG/Materials/Buildings/M_StreetBuilding_Graybox_Window.mat",
     "unity_style_catalog": "",
     "unity_bridge_end_marker": "END",
-    "parapet_enabled": true
+    "parapet_enabled": true,
+    "l_notch_width_cells": 2,
+    "l_notch_depth_cells": 2,
+    "l_notch_units": 1
   },
   "menus": {
     "site_source": [
@@ -163,7 +166,9 @@
     ],
     "l_notch_side": [
       "rear_left",
-      "rear_right"
+      "rear_right",
+      "front_left",
+      "front_right"
     ],
     "ground_floor_use": [
       "auto",
@@ -283,7 +288,11 @@
     "StreetBuilding.RoofTrim.MissingModulePreview",
     "StreetBuilding.AC.ActualSolidWallSupport",
     "StreetBuilding.AC.ContinuousSpanSupport",
-    "StreetBuilding.AC.NoWallNoInstances"
+    "StreetBuilding.AC.NoWallNoInstances",
+    "StreetBuilding.Notch.FourCorners",
+    "StreetBuilding.Notch.GridUnits",
+    "StreetBuilding.Notch.LegacyMigration",
+    "StreetBuilding.Notch.FrontAttachments"
   ],
   "three_layer_rules": {
     "version": 1,
