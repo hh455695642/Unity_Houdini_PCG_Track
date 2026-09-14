@@ -30,7 +30,6 @@
     "RESOLVE_FACADE_GRAMMAR": "attribwrangle",
     "GRAYBOX_MODULE_LIBRARY": "null",
     "VALIDATE_MODULE_LIBRARY": "attribwrangle",
-    "VISIBLE_SHELL_POLICY": "attribwrangle",
     "BUILD_LOD0": "attribwrangle",
     "BUILD_LOD1": "attribwrangle",
     "BUILD_LOD2": "attribwrangle",
@@ -133,7 +132,6 @@
     "roof_props_max_count": 8,
     "attachment_overrides": 0,
     "rear_facade_mode": 0,
-    "side_facade_mode": 0,
     "roof_enabled": 1,
     "lod_outputs_enabled": 1,
     "variation_seed": 1,
@@ -186,14 +184,8 @@
       "manual"
     ],
     "rear_facade_mode": [
-      "off",
-      "simple_cap",
-      "full_facade"
-    ],
-    "side_facade_mode": [
-      "auto",
-      "off",
-      "force"
+      "0",
+      "2"
     ]
   },
   "budgets": {
@@ -293,7 +285,8 @@
     "StreetBuilding.Parameters.StyleHeightSingleSource",
     "StreetBuilding.Parameters.TotalFloorCount",
     "StreetBuilding.Parameters.NaturalFrontages",
-    "StreetBuilding.Parameters.LegacyParcelSlotIgnored"
+    "StreetBuilding.Parameters.LegacyParcelSlotIgnored",
+    "StreetBuilding.Interface.FacadeModeRemoval"
   ],
   "three_layer_rules": {
     "version": 1,

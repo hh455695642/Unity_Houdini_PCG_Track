@@ -203,7 +203,7 @@ def assert_ac_support_plane(point: hou.Point, width: float, depth: float) -> Non
 
 def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float = 10,
               floors: int = 4, seed: int = 29, rhythm: int = 3, rear: int = 2,
-              side: int = 2, roof: int = 1, density: float = .6,
+              roof: int = 1, density: float = .6,
               attachments: int = 1, module_source: int = 1, shape: int = 0,
               notch_width: float = 4, notch_depth: float = 4, notch_side: int = 0) -> None:
     values = {
@@ -212,7 +212,7 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
         "building_depth": depth, "floor_count": floors, "parapet_height": .6,
         "facade_rhythm": rhythm, "attachment_global_density": density,
         "attachments_enabled": attachments, "rear_facade_mode": rear,
-        "side_facade_mode": side, "roof_enabled": roof, "lod_outputs_enabled": 0,
+        "roof_enabled": roof, "lod_outputs_enabled": 0,
         "variation_seed": seed, "massing_shape": shape, "l_notch_width": notch_width,
         "l_notch_depth": notch_depth, "l_notch_side": notch_side,
         "site_source": 0, "site_source_auto": 0, "l_notch_units": 0,
@@ -392,12 +392,12 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
     configure(asset, STYLE_CATALOG, seed=47)
     second = signature(geometry(asset))
     require(second != first, "Different seeds did not change variant distribution")
-    configure(asset, STYLE_CATALOG, rear=0, side=1, roof=0)
+    configure(asset, STYLE_CATALOG, rear=0, roof=0)
     disabled = geometry(asset)
     require({point.intAttribValue("face_index") for point in disabled.points()
              if not point.stringAttribValue('module_role').startswith('Parapet')
-             and point.stringAttribValue('module_role') != 'Cornice'} == {0},
-            "Side/rear/roof switches did not disable their faces")
+             and point.stringAttribValue('module_role') != 'Cornice'} == {0, 1, 2},
+            "Rear/roof switches must retain the automatic side facades")
     require(any(p.stringAttribValue('module_role').startswith('Parapet') for p in disabled.points()),
             'Roof switch incorrectly disabled the independent parapet')
     for output in ("OUT_BUILDING_LOD1", "OUT_BUILDING_LOD2", "OUT_BUILDING_COLLISION"):
@@ -1533,7 +1533,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     assert_network(fresh, contract)
     from validate_streetbuilding_notches import validate_notches
     from validate_streetbuilding_parameters import validate_parameters
-    return {"parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_facade_modes import validate_facade_modes
+    return {"facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -1623,6 +1624,8 @@ def _sb_export_candidate(path):
     templates = promote(hou, templates, asset)
     for name in ('corner_building', 'floor_height_ground', 'floor_height_typical'):
         if templates.find(name) is not None: templates.remove(name)
+    from streetbuilding_facade_interface import promote as promote_facades, install_events as install_facade_events
+    templates = promote_facades(templates, asset)
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))
@@ -1631,6 +1634,7 @@ def _sb_export_candidate(path):
     candidate_definition.updateFromNode(asset)
     candidate_definition.setParmTemplateGroup(templates)
     install_events(candidate_definition)
+    install_facade_events(candidate_definition)
     candidate_definition.setIsPreferred(True)
     hou.hipFile.save(str(candidate_hip))
     result = validate(candidate_hda, candidate_hip, contract)

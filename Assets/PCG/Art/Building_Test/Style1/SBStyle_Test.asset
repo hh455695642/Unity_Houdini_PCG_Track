@@ -50,7 +50,7 @@ MonoBehaviour:
       _absoluteHeight: 0
       _weight: 1
       _enabled: 1
-      _allowedFacades: 1
+      _allowedFacades: 3
       _allowedFloors: 0
     _sideRear: []
     _corners: []
@@ -75,6 +75,7 @@ MonoBehaviour:
       trimEnabled: 1
       attachmentsEnabled: 1
       roofEnabled: 1
+      parapetEnabled: 1
       parapetHeight: 0.6
       density: 0.6
       awning:
@@ -183,6 +184,7 @@ MonoBehaviour:
       trimEnabled: 1
       attachmentsEnabled: 1
       roofEnabled: 1
+      parapetEnabled: 1
       parapetHeight: 0.6
       density: 0.6
       awning:
@@ -247,6 +249,7 @@ MonoBehaviour:
       trimEnabled: 1
       attachmentsEnabled: 1
       roofEnabled: 1
+      parapetEnabled: 1
       parapetHeight: 0.6
       density: 0.6
       awning:
