@@ -109,10 +109,11 @@ class CompareSnapshotsTests(unittest.TestCase):
         self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
         self.assertIn("reflection-method-call", entrypoint)
 
-    def test_streetbuilding_persistence_uses_v12_builder(self):
-        gate_source = (TOOLS_DIR / "pcg_regression_gate.py").read_text(encoding="utf-8")
-        self.assertIn("patch_streetbuilding_hda_panel_generation_v12.py", gate_source)
-        self.assertNotIn('"builder": "HoudiniProject/PCG_Track_21.0.440/scripts/tools/patch_streetbuilding_versionless_style_payload_v10.py"', gate_source)
+    def test_streetbuilding_persistence_requires_current_live(self):
+        config = gate.MODULES['StreetBuilding']
+        self.assertFalse(config.get('isolated'))
+        self.assertNotIn('builder', config)
+        self.assertEqual('/obj/StreetBuilding_DEV', config['asset_path'])
 
     def test_unchanged_snapshot_passes(self):
         before = snapshot()

@@ -209,14 +209,13 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
     values = {
         "module_source": module_source, "unity_style_catalog": catalog,
         "building_width": width,
-        "building_depth": depth, "floor_height_ground": 4.0,
-        "floor_height_typical": 3.0, "floor_count": floors, "parapet_height": .6,
+        "building_depth": depth, "floor_count": floors, "parapet_height": .6,
         "facade_rhythm": rhythm, "attachment_global_density": density,
         "attachments_enabled": attachments, "rear_facade_mode": rear,
         "side_facade_mode": side, "roof_enabled": roof, "lod_outputs_enabled": 0,
         "variation_seed": seed, "massing_shape": shape, "l_notch_width": notch_width,
         "l_notch_depth": notch_depth, "l_notch_side": notch_side,
-        "site_source": 0, "site_source_auto": 0, "corner_building": 0, "l_notch_units": 0,
+        "site_source": 0, "site_source_auto": 0, "l_notch_units": 0,
     }
     for name, value in values.items():
         asset.parm(name).set(value)
@@ -688,7 +687,6 @@ def make_external_input(name: str, points: list[tuple[float, float, float]], *,
 
 def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
     configure(asset, STYLE_CATALOG, density=1)
-    asset.parm("corner_building").set(1)
     for token in ("awning", "sign", "fire_escape", "wall_ac", "roof_props"):
         asset.parm(f"{token}_density").set(1)
 
@@ -713,8 +711,8 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
     require(selected.findPointAttrib("catalog_schema") is None
             and selected.findPointAttrib("module_family") is None,
             "Removed schema/family metadata reached module selection")
-    require({point.intAttribValue("facade_target") for point in selected.points()} >= {0, 1, 2, 3},
-            "Corner building did not expose all semantic facade targets")
+    require({point.intAttribValue("facade_target") for point in selected.points()} == {0, 2, 3},
+            "Rectangle must expose front, side and rear targets without artificial frontage")
 
     for name, value in {
         "entrance_count_min": 2, "shop_door_count_min": 2,
@@ -1344,10 +1342,9 @@ def assert_ac_solid_walls(parent_asset: hou.Node) -> dict[str, Any]:
         cases += 1
         setup(window_count=0, shape=1)
         asset.parm('l_notch_side').set(1)
-        asset.parm('corner_building').set(1)
         require(assert_ac_wall_records(asset) > 0, 'Corner L fixture emitted no AC')
-        require(all(p.intAttribValue('face_index') != 2 for p in geometry(asset, 'OUT_DETAIL_INSTANCES').points()),
-                'AC appeared on a secondary frontage')
+        require(all(p.stringAttribValue('surface_role') != 'secondary_front' for p in geometry(asset, 'OUT_DETAIL_INSTANCES').points() if p.stringAttribValue('module_role') == 'ACUnit'),
+                'AC appeared on a natural secondary frontage')
         cases += 1
         # Contract fixture models a single three-cell wall module. Production
         # wall selection is untouched; this probes the consumer's span interface.
@@ -1535,7 +1532,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
     from validate_streetbuilding_notches import validate_notches
-    return {"notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_parameters import validate_parameters
+    return {"parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -1559,7 +1557,7 @@ def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, po
     This hython process owns only its disposable HIP and definition.
     """
     import uuid
-    from pcg_regression_gate import connect_live
+    from pcg_regression_gate import connect_live, eval_live
     candidate = root / '.codex_tmp' / 'regression' / ('streetbuilding-candidate-' + uuid.uuid4().hex)
     candidate.mkdir(parents=True)
     items = candidate / 'live.cpio'
@@ -1574,7 +1572,7 @@ def _sb_export_candidate(path):
     a.parent().saveItemsToFile((a,),path)
     return a.type().definition().libraryFilePath()
 ''')
-        definition_path = str(connection.eval('_sb_export_candidate({!r})'.format(str(items))))
+        definition_path = str(eval_live(connection, '_sb_export_candidate({!r})'.format(str(items))))
         require(Path(definition_path).resolve() == hda, 'Candidate definition differs from expected production HDA')
     finally:
         connection.close()
@@ -1623,6 +1621,8 @@ def _sb_export_candidate(path):
             templates.replace(name, template)
     from streetbuilding_notch_interface import promote, install_events
     templates = promote(hou, templates, asset)
+    for name in ('corner_building', 'floor_height_ground', 'floor_height_typical'):
+        if templates.find(name) is not None: templates.remove(name)
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))

@@ -583,17 +583,24 @@ def connect_live(host: str, port: int):
     return connection
 
 
+def eval_live(connection, expression):
+    """HOM scene work on RPC worker threads can crash Houdini's parameter UI."""
+    connection.execute("import hdefereval")
+    return connection.eval(
+        "hdefereval.executeInMainThreadWithResult(lambda: " + expression + ")")
+
+
 def capture_live(module: str, config: dict[str, Any], host: str, port: int) -> dict[str, Any]:
     connection = connect_live(host, port)
     try:
         connection.execute(REMOTE_CAPTURE_CODE)
-        payload = connection.eval(
+        payload = eval_live(connection,
             "_pcg_capture_live({!r}, {!r})".format(module, canonical_json(config)))
         result = json.loads(str(payload))
         houdini_state = result.get("houdini", {})
         if (not houdini_state.get("hip_unsaved_changes")
                 and houdini_state.get("hip_unsaved_changes_after_capture")):
-            reload_result = dict(connection.eval("_pcg_reload_current_clean()"))
+            reload_result = dict(eval_live(connection, "_pcg_reload_current_clean()"))
             if reload_result.get("unsaved"):
                 raise GateFailure("Capture dirtied the Live Scene and automatic reload stayed dirty")
             houdini_state["capture_reloaded_clean"] = True
@@ -650,7 +657,7 @@ def _pcg_serialize_live_backup(backup_dir):
     return backup_path
 """
         )
-        backup_path = Path(str(connection.eval(
+        backup_path = Path(str(eval_live(connection,
             "_pcg_serialize_live_backup({!r})".format(normalize_path(backup_root)))))
     finally:
         connection.close()
@@ -1094,6 +1101,11 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         if notch_tools not in sys.path: sys.path.insert(0, notch_tools)
         from streetbuilding_notch_interface import promote
         promoted_templates = promote(hou, promoted_templates, asset)
+    removing_heights = (expected_type == 'pcgbike::StreetBuilding::1.0'
+        and 'STREETBUILDING_STYLE_HEIGHT_SINGLE_SOURCE_20260914' in asset.node('StreetBuildingCore/PARSE_UNITY_INSTANCE_CATALOG').evalParm('snippet'))
+    if removing_heights:
+        for name in ('corner_building','floor_height_ground','floor_height_typical'):
+            if promoted_templates.find(name) is not None: promoted_templates.remove(name)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only
@@ -1108,6 +1120,15 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('l_notch_width_cells') is not None:
             from streetbuilding_notch_interface import install_events
             install_events(definition)
+    if removing_heights:
+        # Strip residual spare controls using the Live group only; do not promote
+        # synthesized folders back into the public definition.
+        live_templates = asset.parmTemplateGroup()
+        changed = False
+        for name in ('corner_building','floor_height_ground','floor_height_typical'):
+            if live_templates.find(name) is not None:
+                live_templates.remove(name); changed = True
+        if changed: asset.setParmTemplateGroup(live_templates)
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),
@@ -1117,7 +1138,7 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     }
 """
         )
-        payload = connection.eval(
+        payload = eval_live(connection,
             "_pcg_persist_live({!r}, {!r}, {!r}, {!r}, {!r})".format(
                 config["asset_path"], config["asset_type"], expected_hip,
                 expected_definition, preserve_public_interface))
@@ -1198,7 +1219,7 @@ def _pcg_reload_restored(hip_path, hda_path):
     }
 """
         )
-        live = dict(connection.eval(
+        live = dict(eval_live(connection,
             "_pcg_reload_restored({!r}, {!r})".format(hip_path, hda_path)))
     finally:
         connection.close()

@@ -80,6 +80,27 @@ function Invoke-Hython {
 
 function Invoke-UnityTool {
     param([string]$Tool, [hashtable]$InputObject)
+    if ($Tool -in @('editor-application-get-state', 'scene-list-opened', 'assets-find', 'console-get-logs')) {
+        $cliName = switch ($Tool) {
+            'editor-application-get-state' { 'editor_status' }
+            'scene-list-opened' { 'list_open_scenes' }
+            'assets-find' { 'find_assets' }
+            'console-get-logs' { 'get_console_logs' }
+        }
+        $cliArgs = @('command', $cliName, '--project-path', $projectRoot, '--json')
+        if ($Tool -eq 'assets-find') { $cliArgs += @('--name', $moduleConfig[$Module].Search, '--limit', '1000') }
+        if ($Tool -eq 'console-get-logs') { $cliArgs += @('--severity', ([string]$InputObject.logTypeFilter).ToLower(), '--limit', '1000') }
+        $reply = (& unity @cliArgs | Out-String | ConvertFrom-Json)
+        if ($LASTEXITCODE -ne 0 -or -not $reply.success) { throw "Pipeline command failed: $cliName" }
+        $data = $reply.data.result
+        $result = switch ($Tool) {
+            'editor-application-get-state' { @{ IsPlaying = ($data.playMode -ne 'stopped'); IsPlayingOrWillChangePlaymode = ($data.playMode -ne 'stopped'); IsCompiling = $data.compiling; IsUpdating = $data.domainReloadInProgress } }
+            'scene-list-opened' { @($data.scenes) }
+            'assets-find' { @($data.assets) }
+            'console-get-logs' { @($data.logs | ForEach-Object { @{ LogType=$_.type; Message=$_.message; Timestamp=$_.timestampUtc } }) }
+        }
+        return @{ structured = @{ result = $result } }
+    }
     $json = $InputObject | ConvertTo-Json -Depth 20 -Compress
     $inputPath = [System.IO.Path]::GetTempFileName()
     $previousErrorActionPreference = $ErrorActionPreference
@@ -390,6 +411,7 @@ try {
             throw 'Unified ground migration contracts failed.'
         }
     }
+    $persisted = $true
     Invoke-Hython -Arguments @(
         $gateScript, '--module', $Module, '--stage', 'persist',
         '--manifest', $manifestPath, '--project-root', $projectRoot,
@@ -421,6 +443,10 @@ try {
     Assert-UnityReady -Snapshot $unityCurrent
     if ($Module -eq 'StreetBuilding') {
         Assert-UnityAssetOnly -Snapshot $unityCurrent
+        $parameterResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingParameterSimplificationTests' -MethodName 'MigrateAndVerify'
+        if (-not ([string]$parameterResponse.structured.result.value).Contains('|VerifiedInstances|')) {
+            throw 'StreetBuilding retained parameter/Style/input/Bake migration failed.'
+        }
         Invoke-StreetBuildingContractTests
         $transactionResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingUnifiedTests' -MethodName 'RunTransactions'
         if ([string]$transactionResponse.structured.result.value -ne 'PASS') {

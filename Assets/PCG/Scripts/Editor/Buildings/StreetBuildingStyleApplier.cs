@@ -18,8 +18,6 @@ namespace PCGBike.Editor.Buildings
         internal static Func<UnityEngine.SceneManagement.Scene, bool> SaveScene = EditorSceneManager.SaveScene;
 
         private static readonly string[] IntParameters = { "module_source", "style_rule_source", "unified_ground_walls", "layout_seed", "previous_entrance_cell" };
-        private static readonly string[] FloatParameters =
-            { "floor_height_ground", "floor_height_typical" };
         private static readonly string[] StringParameters =
             { "unity_style_catalog", "unity_style_rules", "unity_bridge_end_marker" };
 
@@ -111,14 +109,10 @@ namespace PCGBike.Editor.Buildings
             SetInt(parameters, "module_source", 1);
             SetString(parameters, "unity_style_catalog", stylePayload);
             SetString(parameters, "unity_bridge_end_marker", "END");
-            SetFloat(parameters, "floor_height_ground", style.GroundFloorHeight);
-            SetFloat(parameters, "floor_height_typical", style.TypicalFloorHeight);
         }
 
         internal static void SetInt(HEU_Parameters p, string name, int value)
         { if (!p.SetIntParameterValue(name, value)) throw new InvalidOperationException(name + " rejected."); }
-        private static void SetFloat(HEU_Parameters p, string name, float value)
-        { if (!p.SetFloatParameterValue(name, value)) throw new InvalidOperationException(name + " rejected."); }
         internal static void SetString(HEU_Parameters p, string name, string value)
         {
             HEU_ParameterData data = p.GetParameter(name);
@@ -137,7 +131,6 @@ namespace PCGBike.Editor.Buildings
         internal sealed class ParameterSnapshot
         {
             private readonly Dictionary<string, int> _ints = new();
-            private readonly Dictionary<string, float> _floats = new();
             private readonly Dictionary<string, string> _strings = new();
 
             public static ParameterSnapshot Capture(HEU_Parameters p)
@@ -145,8 +138,6 @@ namespace PCGBike.Editor.Buildings
                 var result = new ParameterSnapshot();
                 foreach (string name in IntParameters)
                     if (p.GetParameter(name) != null && p.GetIntParameterValue(name, out int value)) result._ints[name] = value;
-                foreach (string name in FloatParameters)
-                    if (p.GetFloatParameterValue(name, out float value)) result._floats[name] = value;
                 foreach (string name in StringParameters)
                     if (p.GetStringParameterValue(name, out string value)) result._strings[name] = value;
                 return result;
@@ -155,7 +146,6 @@ namespace PCGBike.Editor.Buildings
             public void Restore(HEU_Parameters p)
             {
                 foreach (var pair in _ints) SetInt(p, pair.Key, pair.Value);
-                foreach (var pair in _floats) SetFloat(p, pair.Key, pair.Value);
                 foreach (var pair in _strings) SetString(p, pair.Key, pair.Value);
             }
         }

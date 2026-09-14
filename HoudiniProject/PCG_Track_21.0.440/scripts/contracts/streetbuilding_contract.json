@@ -97,14 +97,11 @@
     "proxy_bay_width_max": 3.6,
     "building_width": 12.0,
     "building_depth": 10.0,
-    "corner_building": 0,
     "massing_shape": 0,
     "l_notch_width": 4.0,
     "l_notch_depth": 4.0,
     "l_notch_side": 0,
     "floor_count": 4,
-    "floor_height_ground": 4.2,
-    "floor_height_typical": 3.2,
     "parapet_height": 0.6,
     "ground_floor_use": 0,
     "facade_rhythm": 0,
@@ -292,7 +289,11 @@
     "StreetBuilding.Notch.FourCorners",
     "StreetBuilding.Notch.GridUnits",
     "StreetBuilding.Notch.LegacyMigration",
-    "StreetBuilding.Notch.FrontAttachments"
+    "StreetBuilding.Notch.FrontAttachments",
+    "StreetBuilding.Parameters.StyleHeightSingleSource",
+    "StreetBuilding.Parameters.TotalFloorCount",
+    "StreetBuilding.Parameters.NaturalFrontages",
+    "StreetBuilding.Parameters.LegacyParcelSlotIgnored"
   ],
   "three_layer_rules": {
     "version": 1,
@@ -312,5 +313,10 @@
     "legacy_contract_interpretation": {
       "StreetBuilding.V12.HdaPanelSingleSource": "Retained ID applies only to instance-rule mode. The former universal HDA-only rule is replaced by StreetBuilding.Layers.StyleDefaultsAndOverrides."
     }
-  }
+  },
+  "removed_parameters": [
+    "corner_building",
+    "floor_height_ground",
+    "floor_height_typical"
+  ]
 }
