@@ -272,6 +272,9 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
     require(core.node("ALLOCATE_FACADE_CAPACITY").input(0) == core.node("BUILD_FACADE_CELLS"),
             "Facade allocator wiring failed")
     require(core.node("SELECT_FACADE_MODULES").inputs()[:2] == (
+        core.node("SELECT_FACADE_VARIANTS"), core.node("ALLOCATE_FACADE_CAPACITY")),
+        "Final arrangement wiring failed")
+    require(core.node("SELECT_FACADE_VARIANTS").inputs()[:2] == (
         core.node("ALLOCATE_FACADE_CAPACITY"), core.node("PARSE_UNITY_INSTANCE_CATALOG")),
         "Facade selector wiring failed")
     require(core.node("DIRECT_UNITY_INSTANCE_FACADE").input(0)
@@ -384,9 +387,15 @@ def assert_full_envelope(asset: hou.Node) -> dict[str, Any]:
     legacy_geometry.merge(geometry(asset))
     legacy_geometry.deletePoints([p for p in legacy_geometry.points()
         if p.stringAttribValue('module_role') in ('Cornice', 'FacadeColumn', 'FloorBand')])
-    # Captured from the pre-fix production definition; only intended trim changes excluded.
-    require(signature(legacy_geometry) == 'c2a7b52ba19a7313b6af7dc2e6796f11c90d5539e565eda30a11a8f6fe979ff0',
-            'Non-trim instance output differs from the captured production signature')
+    # Arrangement intentionally changes positions. Preserve the original trim-isolation
+    # behavior contract by comparing on/off output, rather than freezing old placement.
+    asset.parm('architectural_trim_enabled').set(0)
+    without_trim = geometry(asset).freeze()
+    without_trim.deletePoints([p for p in without_trim.points()
+        if p.stringAttribValue('module_role') in ('Cornice', 'FacadeColumn', 'FloorBand')])
+    require(signature(legacy_geometry) == signature(without_trim),
+            'Trim toggle changed non-trim instances')
+    asset.parm('architectural_trim_enabled').set(1)
     configure(asset, STYLE_CATALOG)
     require(signature(geometry(asset)) == first, "Weighted selection is not deterministic")
     configure(asset, STYLE_CATALOG, seed=47)
@@ -1534,6 +1543,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     from validate_streetbuilding_notches import validate_notches
     from validate_streetbuilding_parameters import validate_parameters
     from validate_streetbuilding_facade_modes import validate_facade_modes
+    from validate_streetbuilding_arrangement import validate_arrangement
+    arrangement = validate_arrangement(fresh)
     return {"facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
@@ -1548,7 +1559,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
             "upper_windows": assert_upper_windows(fresh),
             "roof_trim": assert_roof_trim(fresh),
-            "ac_solid_walls": assert_ac_solid_walls(fresh)}
+            "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
@@ -1626,6 +1637,8 @@ def _sb_export_candidate(path):
         if templates.find(name) is not None: templates.remove(name)
     from streetbuilding_facade_interface import promote as promote_facades, install_events as install_facade_events
     templates = promote_facades(templates, asset)
+    from streetbuilding_arrangement_interface import promote as promote_arrangement
+    templates = promote_arrangement(templates, asset)
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))

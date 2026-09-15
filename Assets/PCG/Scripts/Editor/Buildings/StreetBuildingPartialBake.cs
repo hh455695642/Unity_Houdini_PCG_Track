@@ -113,6 +113,15 @@ namespace PCGBike.Editor.Buildings
                         if (fields.Length == 3)
                             result += $"\n楼层索引 {fields[0]} · {fields[1]}：{fields[2]}";
                     }
+                    var arrangement = new HAPI_AttributeInfo();
+                    if (session.GetAttributeInfo(geo.GeoID, part.PartID, "arrangement_report",
+                        HAPI_AttributeOwner.HAPI_ATTROWNER_DETAIL, ref arrangement) && arrangement.exists)
+                    {
+                        var reportHandles = new int[arrangement.count * arrangement.tupleSize];
+                        if (reportHandles.Length > 0 && session.GetAttributeStringData(geo.GeoID, part.PartID,
+                            "arrangement_report", ref arrangement, reportHandles, 0, arrangement.count))
+                            result += "\n排列报告：\n" + HEU_SessionManager.GetString(reportHandles[0], session);
+                    }
                     return result;
                 }
             }

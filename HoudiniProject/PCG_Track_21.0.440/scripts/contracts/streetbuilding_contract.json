@@ -56,7 +56,8 @@
     "OUT_BUILDING_LOD2": "output",
     "OUT_DETAIL_INSTANCES": "output",
     "OUT_BUILDING_COLLISION": "output",
-    "OUT_BUILDING_METADATA": "output"
+    "OUT_BUILDING_METADATA": "output",
+    "SELECT_FACADE_VARIANTS": "attribwrangle"
   },
   "required_outputs": [
     "OUT_BUILDING_LOD0",
@@ -172,11 +173,10 @@
       "mixed"
     ],
     "facade_rhythm": [
-      "auto",
-      "uniform",
-      "alternating",
-      "center_accent",
-      "paired"
+      "0",
+      "1",
+      "3",
+      "4"
     ],
     "facade_layout_mode": [
       "auto",
@@ -286,7 +286,12 @@
     "StreetBuilding.Parameters.TotalFloorCount",
     "StreetBuilding.Parameters.NaturalFrontages",
     "StreetBuilding.Parameters.LegacyParcelSlotIgnored",
-    "StreetBuilding.Interface.FacadeModeRemoval"
+    "StreetBuilding.Interface.FacadeModeRemoval",
+    "StreetBuilding.Arrangement.Patterns",
+    "StreetBuilding.Arrangement.AlignedFloors",
+    "StreetBuilding.Arrangement.SymmetricVariants",
+    "StreetBuilding.Arrangement.FixedEntranceAndCounts",
+    "StreetBuilding.Arrangement.ContinuousCoverage"
   ],
   "three_layer_rules": {
     "version": 1,

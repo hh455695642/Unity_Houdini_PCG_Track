@@ -225,7 +225,13 @@ namespace PCGBike.Editor.Buildings
                 var mode = rules.FindPropertyRelative("layoutMode");
                 mode.intValue = EditorGUILayout.Popup("布局模式", mode.intValue, new[] { "自动", "随机范围", "手动数量" });
                 var rhythm = rules.FindPropertyRelative("rhythm");
-                rhythm.intValue = EditorGUILayout.Popup("立面节奏", rhythm.intValue, new[] { "自动", "均匀", "交替", "中央强调", "成对" });
+                // Keep wire values stable; legacy alternating (2) reads as uniform.
+                int current = rhythm.intValue == 2 ? 1 : rhythm.intValue;
+                EditorGUI.BeginChangeCheck();
+                int selected = EditorGUILayout.IntPopup("排列方式", current,
+                    new[] { "随机", "均匀分布", "左右对称", "成组" }, new[] { 0, 1, 3, 4 });
+                if (EditorGUI.EndChangeCheck()) rhythm.intValue = selected;
+                EditorGUILayout.HelpBox("每段墙面独立排列，入口位置保留。同配置标准层上下对齐；成组默认两个，左右对称使用同款同宽模块。实例选择风格默认后生效，局部覆盖优先。", MessageType.Info);
                 foreach (var pair in new[] { ("entrance", "入口"), ("shopDoor", "铺门"),
                              ("shopfront", "铺面"), ("window", "窗"), ("blank", "空白") })
                 {
