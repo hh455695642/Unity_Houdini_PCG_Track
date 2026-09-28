@@ -10,12 +10,12 @@
   "core_node": "StreetBuildingCore",
   "network_boxes": [
     "00_INPUT_VALIDATE",
-    "10_FRONTAGE_RESOLVE",
-    "20_MASSING",
-    "30_FACADE_GRAMMAR",
-    "40_GRAYBOX_MODULES",
-    "50_VISIBLE_SHELL",
-    "60_LOD_BUILD",
+    "10_RULES_AND_CATALOG",
+    "20_FACADE_CAPACITY",
+    "30_FACADE_SELECTION",
+    "40_BUILDING_INSTANCES",
+    "50_ATTACHMENT_INSTANCES",
+    "60_PROXY_MODEL",
     "70_UNITY_CONTRACT",
     "80_OUTPUT_VALIDATE"
   ],
@@ -28,11 +28,8 @@
     "RESOLVE_FRONTAGES": "attribwrangle",
     "RESOLVE_MASSING": "attribwrangle",
     "RESOLVE_FACADE_GRAMMAR": "attribwrangle",
-    "GRAYBOX_MODULE_LIBRARY": "null",
     "VALIDATE_MODULE_LIBRARY": "attribwrangle",
     "BUILD_LOD0": "attribwrangle",
-    "BUILD_LOD1": "attribwrangle",
-    "BUILD_LOD2": "attribwrangle",
     "DIRECT_UNITY_INSTANCE_FACADE": "attribwrangle",
     "PARSE_UNITY_INSTANCE_CATALOG": "attribwrangle",
     "PARSE_GENERATION_RULES": "attribwrangle",
@@ -49,7 +46,6 @@
     "DETAIL_INSTANCE_POINTS": "attribwrangle",
     "VALIDATE_DIRECT_DETAIL_INSTANCES": "attribwrangle",
     "DETAIL_MODULE_SOURCE_SWITCH": "switch",
-    "BUILD_COLLISION": "attribwrangle",
     "BUILD_METADATA": "attribwrangle",
     "OUT_BUILDING_LOD0": "output",
     "OUT_BUILDING_LOD1": "output",
@@ -57,7 +53,8 @@
     "OUT_DETAIL_INSTANCES": "output",
     "OUT_BUILDING_COLLISION": "output",
     "OUT_BUILDING_METADATA": "output",
-    "SELECT_FACADE_VARIANTS": "attribwrangle"
+    "SELECT_FACADE_VARIANTS": "attribwrangle",
+    "OUT_BUILDING_PREVIEW": "output"
   },
   "required_outputs": [
     "OUT_BUILDING_LOD0",
@@ -65,7 +62,8 @@
     "OUT_BUILDING_LOD2",
     "OUT_DETAIL_INSTANCES",
     "OUT_BUILDING_COLLISION",
-    "OUT_BUILDING_METADATA"
+    "OUT_BUILDING_METADATA",
+    "OUT_BUILDING_PREVIEW"
   ],
   "required_attributes": [
     "unity_instance",
@@ -310,7 +308,11 @@
     "StreetBuilding.Shopfront.ModuleCount",
     "StreetBuilding.Shopfront.IndependentFacades",
     "StreetBuilding.Shopfront.RatioOccupancy",
-    "StreetBuilding.Interface.TaskPanel"
+    "StreetBuilding.Interface.TaskPanel",
+    "StreetBuilding.Core.StageLayout",
+    "StreetBuilding.Core.RetiredBuildersAbsent",
+    "StreetBuilding.Core.OutputEquivalence",
+    "StreetBuilding.Core.HiddenLodCompatibility"
   ],
   "three_layer_rules": {
     "version": 1,
@@ -335,5 +337,76 @@
     "corner_building",
     "floor_height_ground",
     "floor_height_typical"
+  ],
+  "retired_nodes": [
+    "BUILD_LOD1",
+    "NORMAL_LOD1",
+    "BUILD_LOD2",
+    "NORMAL_LOD2",
+    "BUILD_COLLISION",
+    "GRAYBOX_MODULE_LIBRARY"
+  ],
+  "core_stage_nodes": {
+    "00_INPUT_VALIDATE": [
+      "EMPTY_GEOMETRY",
+      "IN_SITE_PARCELS",
+      "IN_FRONTAGE_GUIDES",
+      "IN_MODULE_LIBRARY",
+      "INTERNAL_TEST_PARCEL",
+      "SELECT_SITE_SOURCE",
+      "CANONICALIZE_PARCELS"
+    ],
+    "10_RULES_AND_CATALOG": [
+      "RESOLVE_FRONTAGES",
+      "PARSE_GENERATION_RULES",
+      "PARSE_UNITY_INSTANCE_CATALOG"
+    ],
+    "20_FACADE_CAPACITY": [
+      "BUILD_FACADE_CELLS",
+      "ALLOCATE_FACADE_CAPACITY"
+    ],
+    "30_FACADE_SELECTION": [
+      "SELECT_FACADE_VARIANTS",
+      "SELECT_FACADE_MODULES"
+    ],
+    "40_BUILDING_INSTANCES": [
+      "DIRECT_UNITY_INSTANCE_FACADE",
+      "BUILD_DIRECT_SIDE_REAR_INSTANCES",
+      "BUILD_DIRECT_ROOF_INSTANCES",
+      "BUILD_DIRECT_ROOF_EDGE_INSTANCES"
+    ],
+    "50_ATTACHMENT_INSTANCES": [
+      "SELECT_ATTACHMENT_MODULES",
+      "DETAIL_INSTANCE_POINTS"
+    ],
+    "60_PROXY_MODEL": [
+      "RESOLVE_MASSING",
+      "RESOLVE_FACADE_GRAMMAR",
+      "VALIDATE_MODULE_LIBRARY",
+      "BUILD_LOD0",
+      "NORMAL_LOD0"
+    ],
+    "70_UNITY_CONTRACT": [
+      "MERGE_DIRECT_BUILDING_INSTANCES",
+      "FILTER_REAL_INSTANCES",
+      "VALIDATE_DIRECT_BUILDING_INSTANCES",
+      "VALIDATE_DIRECT_DETAIL_INSTANCES",
+      "PREVIEW_MISSING_MODULES",
+      "BUILD_METADATA",
+      "LOD0_MODULE_SOURCE_SWITCH",
+      "DETAIL_MODULE_SOURCE_SWITCH"
+    ],
+    "80_OUTPUT_VALIDATE": [
+      "OUT_BUILDING_LOD0",
+      "OUT_BUILDING_LOD1",
+      "OUT_BUILDING_LOD2",
+      "OUT_DETAIL_INSTANCES",
+      "OUT_BUILDING_COLLISION",
+      "OUT_BUILDING_METADATA",
+      "OUT_BUILDING_PREVIEW"
+    ]
+  },
+  "hidden_compatibility_parameters": [
+    "lod_outputs_enabled"
   ]
 }

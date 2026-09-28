@@ -13,7 +13,7 @@ def validate_facade_modes(parent):
         for p in n.parms():
             require(not re.search(r'\b(side_facade_mode|side_mode|effective_side_mode|simple_cap|generate_sides|generate_rear_details)\b', p.rawValue()), 'Obsolete mode code: '+p.path())
     core=parent.node('StreetBuildingCore')
-    for name in ('BUILD_LOD0','BUILD_LOD1','BUILD_LOD2','BUILD_COLLISION','BUILD_METADATA'):
+    for name in ('BUILD_LOD0','BUILD_METADATA'):
         require(core.node(name).input(1)==core.node('RESOLVE_FACADE_GRAMMAR'), 'Policy bypass wiring: '+name)
     a=parent.parent().createNode(parent.type().name(),'VERIFY_FACADE_MODES')
     parcel=None

@@ -51,14 +51,13 @@ def validate_parameters(parent):
                 a.parm('roof_props_density').set(1)
                 props=[p for p in geometry(a,'OUT_DETAIL_INSTANCES').points() if p.stringAttribValue('module_role')=='RoofProp']
                 require(props and all(abs(p.position()[1]-roof_y)<.01 and tuple(p.attribValue('scale'))==(1,1,1) for p in props),'Roof accessory height/scale mismatch')
-                # Internal proxy also consumes the same Style, including each LOD.
+                # The retained graybox main model consumes the same Style heights.
                 a.parm('module_source').set(0);a.parm('lod_outputs_enabled').set(1);a.parm('parapet_height').set(0)
                 a.parm('attachments_enabled').set(0);a.parm('attachment_global_density').set(0)
                 mass=geometry(a,'RESOLVE_MASSING')
                 require(all(abs(p.attribValue('building_height')-roof_y)<.001 for p in mass.prims()),'Massing height mismatch')
-                # The current public LOD1/2 outputs intentionally connect to EMPTY.
-                # Exercise their retained builders without changing output wiring.
-                for lod in ('BUILD_LOD0','BUILD_LOD1','BUILD_LOD2'):
+                # LOD1/2 and collision builders are retired; public slots stay empty.
+                for lod in ('BUILD_LOD0',):
                     geo=geometry(a,lod)
                     roof_prims=[p for p in geo.prims() if p.stringAttribValue('module_role')=='Roof']
                     # A one-floor proxy's FloorBand extends 0.1m above the shell;

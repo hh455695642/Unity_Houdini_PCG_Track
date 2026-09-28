@@ -1114,6 +1114,9 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     if expected_type == 'pcgbike::StreetBuilding::1.0':
         from streetbuilding_arrangement_interface import promote as promote_arrangement
         promoted_templates = promote_arrangement(promoted_templates, asset)
+        # Core cleanup hides this compatibility field without changing its value
+        # or the canonical output-folder identity. Preserve the verified Live flag.
+        promoted_templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only

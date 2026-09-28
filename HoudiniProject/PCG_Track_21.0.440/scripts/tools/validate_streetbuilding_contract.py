@@ -1713,7 +1713,7 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
                               tuple(round(v, 4) for v in p.attribValue('orient'))) for p in cornices]
                 require(len(locations) == len(set(locations)), 'Upper/roof layers emitted overlapping cornices')
                 test.parm('style_rule_source').set(0)
-        # The legacy graybox LODs must use the same resolved controls as instances.
+        # The graybox main model must use the same resolved controls as instances.
         configure(test, STYLE_CATALOG, module_source=0, attachments=0)
         test.parm('style_rule_source').set(0)
         test.parm('lod_outputs_enabled').set(1)
@@ -1721,7 +1721,7 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
             for parapet in (0, 1):
                 for height in (0, .6):
                     test.setParms(dict(roof_enabled=roof, parapet_enabled=parapet, parapet_height=height))
-                    for output in ('BUILD_LOD0', 'BUILD_LOD1', 'BUILD_LOD2'):
+                    for output in ('BUILD_LOD0',):
                         g = geometry(test, output)
                         roles = [p.stringAttribValue('module_role') for p in g.prims()]
                         require(any(r.startswith('Parapet') for r in roles) == bool(parapet and height),
@@ -1808,6 +1808,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
+    from validate_streetbuilding_core_cleanup import validate_core_cleanup
+    core_cleanup = validate_core_cleanup(fresh)
     from validate_streetbuilding_notches import validate_notches
     from validate_streetbuilding_parameters import validate_parameters
     from validate_streetbuilding_facade_modes import validate_facade_modes
@@ -1817,7 +1819,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     window_counts = validate_window_counts(fresh)
     from validate_streetbuilding_instance_rules import validate_instance_rules
     instance_rules = validate_instance_rules(fresh)
-    return {"instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    return {"core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -1915,6 +1917,8 @@ def _sb_export_candidate(path):
     templates = promote_facades(templates, asset)
     from streetbuilding_arrangement_interface import promote as promote_arrangement
     templates = promote_arrangement(templates, asset)
+    # Promote only the approved field, preserving canonical definition folders.
+    templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
     candidate_hda = candidate / 'StreetBuilding.hda'
     candidate_hip = candidate / 'StreetBuilding.hip'
     definition.copyToHDAFile(str(candidate_hda))
