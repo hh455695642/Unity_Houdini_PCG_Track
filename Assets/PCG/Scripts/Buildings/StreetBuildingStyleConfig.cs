@@ -45,7 +45,7 @@ namespace PCGBike.Buildings
     }
 
     /// <summary>
-    /// 美术唯一可见的建筑风格事实源。每个条目只引用一个 Prefab；复合几何在 Prefab 内完成。
+    /// 素材目录与尺寸规格；数量、用途、排列和开关只属于建筑实例。每个条目只引用一个 Prefab；复合几何在 Prefab 内完成。
     /// </summary>
     [CreateAssetMenu(fileName = "SBStyle_New", menuName = "PCG/Street Building/Style Config")]
     public sealed class StreetBuildingStyleConfig : ScriptableObject
@@ -176,9 +176,7 @@ namespace PCGBike.Buildings
         [SerializeField] private List<StreetBuildingModuleDefinition> _trim = new();
         [SerializeField] private List<StreetBuildingModuleDefinition> _roofSurface = new();
         [SerializeField] private List<StreetBuildingModuleDefinition> _attachments = new();
-        [SerializeField] private StreetBuildingLayerRules _rules = new();
         public float Height => _height;
-        public StreetBuildingLayerRules Rules => _rules;
         public StreetBuildingLayerConfig(float height) { _height = height; }
         public IEnumerable<(StreetBuildingModuleGroup Group, StreetBuildingModuleDefinition Module)> Enumerate(StreetBuildingFloorMask floor)
         {
@@ -222,43 +220,6 @@ namespace PCGBike.Buildings
             list.Add(module);
         }
 #endif
-    }
-
-    // These defaults mirror the current HDA interface. Extension point: add
-    // optional authoring rules here; they are compiled only in the Editor.
-    [Serializable]
-    public sealed class StreetBuildingLayerRules
-    {
-        public int groundUse;
-        [Range(0, 2)] public int layoutMode;
-        [Range(0, 4)] public int rhythm;
-        [Range(0, 1)] public float shopfrontRatio = .65f;
-        public int entranceMin = 1, entranceMax = 1;
-        public int shopDoorMin, shopDoorMax = 1;
-        public int shopfrontMin = 1, shopfrontMax = 4;
-        public int windowMin = 2, windowMax = 8;
-        public int blankMin, blankMax = 4;
-        public bool trimEnabled = true, attachmentsEnabled = true, roofEnabled = true;
-        // Independent from the roof surface; initializer preserves existing serialized styles.
-        public bool parapetEnabled = true;
-        [Min(0)] public float parapetHeight = .6f;
-        [Range(0, 1)] public float density = .6f;
-        public StreetBuildingAttachmentRule awning = new(1f, 8);
-        public StreetBuildingAttachmentRule sign = new(.72f, 8);
-        public StreetBuildingAttachmentRule fireEscape = new(.5f, 4);
-        public StreetBuildingAttachmentRule wallAC = new(.28f, 16);
-        public StreetBuildingAttachmentRule roofProps = new(.55f, 8);
-    }
-
-    [Serializable]
-    public sealed class StreetBuildingAttachmentRule
-    {
-        public bool enabled = true;
-        [Range(0, 1)] public float density;
-        [Range(0, 64)] public int maxCount;
-        public StreetBuildingFacadeMask facades = StreetBuildingFacadeMask.All;
-        public StreetBuildingAttachmentRule(float density, int maxCount)
-        { this.density = density; this.maxCount = maxCount; }
     }
 
     [Serializable]

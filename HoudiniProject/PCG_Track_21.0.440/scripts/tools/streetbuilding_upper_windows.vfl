@@ -1,0 +1,133 @@
+// STREETBUILDING_WINDOW_MODULE_COUNTS_20260927
+// 编辑期求解：模块数量与占格分开。运行时仅消费 Bake 结果。
+// 扩展点：候选过滤、规则来源、诊断均独立于首层门/橱窗分配。
+function int[] sbw_dp(int size; int limit; int begin[]; int ends[]; int spans[]; int wins[];
+                     int first; int last)
+{
+    int dp[]; resize(dp,(size+1)*(limit+1)); dp[last*(limit+1)]=1;
+    for(int c=last-1;c>=first;c--) for(int k=0;k<=limit;k++)
+        for(int v=begin[c];v<ends[c];v++)
+            if(c+spans[v]<=last && k>=wins[v] && dp[(c+spans[v])*(limit+1)+k-wins[v]])
+            {dp[c*(limit+1)+k]=1;break;}
+    return dp;
+}
+
+void sbw_allocate()
+{
+    string raw=detail("op:../PARSE_UNITY_INSTANCE_CATALOG","catalog_raw",0);
+    float cw=detail("op:../PARSE_UNITY_INSTANCE_CATALOG","style_cell_width",0);
+    float height=detail("op:../PARSE_UNITY_INSTANCE_CATALOG","style_typical_height",0);
+    int seed=detail(0,"effective_seed",0);
+    string payloads[]=array(string(detail(0,"rule_payload_hda",0)),string(detail(0,"rule_payload_parcel",0)));
+    string report=""; int compressed=0;
+    for(int floor=1;floor<detail(0,"effective_floor_count",0);floor++) for(int face=0;face<4;face++)
+    {
+        int pts[],targets[],runstart[],runend[];
+        for(int p=0;p<npoints(0);p++) if(point(0,"floor_index",p)==floor && point(0,"face_index",p)==face)
+        {
+            if(point(0,"run_local_cell",p)==0)append(runstart,len(pts));
+            append(pts,p);int t=point(0,"facade_target",p);if(find(targets,t)<0)append(targets,t);
+            if(point(0,"run_local_cell",p)==point(0,"run_cell_count",p)-1)append(runend,len(pts));
+        }
+        int size=len(pts);if(size==0)continue;
+        int mode=chi("../../facade_layout_mode"),rhythm=chi("../../facade_rhythm");
+        int lo=chi("../../window_count_min"),hi=chi("../../window_count_max");string source="instance";
+        if(find(payloads[1],"G|")>=0)
+        {mode=detail(0,"effective_facade_mode",0);rhythm=detail(0,"effective_rhythm",0);source+="+parcel";}
+        // 保留 O 行结构、优先级和空 Auto 行无副作用；同方向只解析一个最终配额。
+        for(int layer=0;layer<2;layer++) foreach(string row;split(payloads[layer],"\n"))
+        {
+            string f[]=split(strip(row),"|");
+            if(len(f)!=16 || f[0]!="O" || find(targets,atoi(f[1]))<0 || floor+1<atoi(f[2]) || floor+1>atoi(f[3]))continue;
+            int empty=1;for(int j=6;j<14;j++)if(atoi(f[j])!=0)empty=0;
+            if(atoi(f[4])==0 && atoi(f[5])==0 && empty)continue;
+            mode=atoi(f[4])==1?1:0;rhythm=atoi(f[5]);lo=atoi(f[12]);hi=atoi(f[13]);
+            source=layer==0?"instance_override":"parcel_override";
+        }
+        mode=mode==1?1:0;lo=clamp(lo,0,64);hi=clamp(hi,lo,64);
+        int requested=mode==0?lo:lo+int(floor(rand(set(seed,face*503+floor*101,47))*(hi-lo+1)));
+        int limit=min(requested,size);
+        // 每格候选缓存；DP 不反复扫描目录，不枚举指数级组合。
+        int begin[],ends[],spans[],wins[];float weights[];string variants[],roles[];
+        for(int c=0;c<size;c++)
+        {
+            int p=pts[c],target=point(0,"facade_target",p),mask=int(pow(2,target));
+            int available=point(0,"run_cell_count",p)-point(0,"run_local_cell",p);
+            string dedicated=face==3?"RearWall":face>0?"SideWall":"MiddleBlank";
+            int dedicated_id=face==3?11:face>0?10:5;
+            int has_dedicated=0;
+            foreach(string row;split(raw,"\n"))
+            {
+                string f[]=split(strip(row),"|");if(len(f)!=18 || f[0]!="M")continue;
+                if(atoi(f[2])==dedicated_id && (atoi(f[10])&mask) && (atoi(f[11])&2)
+                    && abs(atof(f[8])-height)<.01 && atof(f[9])>0 && atoi(f[5])>=1 && atoi(f[5])<=available)has_dedicated=1;
+            }
+            append(begin,len(spans));int has_wall=0;
+            foreach(string row;split(raw,"\n"))
+            {
+                string f[]=split(strip(row),"|");if(len(f)!=18 || f[0]!="M")continue;
+                int role=atoi(f[2]),span=atoi(f[5]);
+                if(!(atoi(f[10])&mask) || !(atoi(f[11])&2) || abs(atof(f[8])-height)>.01
+                    || atof(f[9])<=0 || span<1)continue;
+                if(role!=4 && role!=(has_dedicated?dedicated_id:5))continue;
+                if(role!=4)has_wall=1;
+                if(span>available)continue;
+                append(spans,span);append(wins,role==4);append(weights,atof(f[9]));append(variants,f[3]);
+                append(roles,role==4?"MiddleWindow":has_dedicated?dedicated:"MiddleBlank");
+                if(role!=4)has_wall=1;
+            }
+            // 缺墙资源只生成既有预览标记；不得冒用窗模块填墙。
+            if(!has_wall)
+            {append(spans,1);append(wins,0);append(weights,1);append(variants,"");append(roles,dedicated);}
+            append(ends,len(spans));
+        }
+        int suffix[]=sbw_dp(size,limit,begin,ends,spans,wins,0,size);
+        int actual=limit;while(actual>=0 && !suffix[actual])actual--;
+        if(actual<0){error("StreetBuilding: upper wall spans cannot cover floor %d face %d",floor+1,face);continue;}
+        int remaining=actual,occupied=0,missing=0,ordinal=0;
+        for(int run=0;run<len(runstart);run++)
+        {
+            int first=runstart[run],last=runend[run];
+            int local[]=sbw_dp(size,limit,begin,ends,spans,wins,first,last);
+            float ideal=float(remaining)*(last-first)/max(1,size-first),best=1e9;int quota=-1;
+            for(int k=0;k<=remaining;k++)if(local[first*(limit+1)+k] && suffix[last*(limit+1)+remaining-k])
+            {float score=abs(k-ideal);if(score<best){best=score;quota=k;}}
+            if(quota<0){error("StreetBuilding: upper quota partition failed");continue;}
+            remaining-=quota;
+            for(int c=first;c<last;)
+            {
+                int options[];float total=0;
+                for(int v=begin[c];v<ends[c];v++)if(c+spans[v]<=last && quota>=wins[v]
+                    && local[(c+spans[v])*(limit+1)+quota-wins[v]])
+                {append(options,v);total+=weights[v];}
+                // 不含楼层的款式种子：同配置、同配额标准层保持竖向对齐。
+                float pick=rand(set(seed,face*503+c*37,71))*total;int chosen=options[len(options)-1];
+                foreach(int v;options){pick-=weights[v];if(pick<=0){chosen=v;break;}}
+                int span=spans[chosen],window=wins[chosen];quota-=window;
+                if(window){occupied+=span;ordinal++;}if(variants[chosen]=="")missing++;
+                for(int j=0;j<span;j++)
+                {
+                    int p=pts[c+j];
+                    setpointattrib(0,"facade_planned_start",p,j==0,"set");
+                    setpointattrib(0,"facade_planned_span",p,span,"set");
+                    setpointattrib(0,"facade_planned_role",p,roles[chosen],"set");
+                    setpointattrib(0,"facade_planned_variant",p,variants[chosen],"set");
+                    setpointattrib(0,"semantic_role",p,window?"window":"blank","set");
+                    setpointattrib(0,"rule_mode",p,mode,"set");setpointattrib(0,"rule_rhythm",p,rhythm,"set");
+                    setpointattrib(0,"rule_compressed",p,actual<requested,"set");
+                    setpointattrib(0,"upper_window_requested",p,requested,"set");
+                    setpointattrib(0,"upper_window_actual",p,actual,"set");
+                }
+                c+=span;
+            }
+        }
+        int has_window=0;foreach(int w;wins)has_window|=w;
+        string reason=actual<requested?(has_window?"insufficient_contiguous_capacity":"no_compatible_window"):"none";
+        if(missing)reason+=";missing_wall_preview";
+        report+=sprintf("F%d Face%d source=%s mode=%s requested=%d actual=%d occupied=%d reason=%s\n",
+            floor+1,face,source,mode==0?"precise":"random",requested,actual,occupied,reason);
+        compressed|=actual<requested;
+    }
+    setdetailattrib(0,"upper_window_report",report,"set");
+    setdetailattrib(0,"upper_window_compressed",compressed,"set");
+}

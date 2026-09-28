@@ -28,7 +28,7 @@ MonoBehaviour:
       _absoluteHeight: 0
       _weight: 1
       _enabled: 1
-      _allowedFacades: 1
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 919132149155446097, guid: c365f10e5e6540c4985c91daafdc471f,
         type: 3}
@@ -50,59 +50,13 @@ MonoBehaviour:
       _absoluteHeight: 0
       _weight: 1
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 0
     _sideRear: []
     _corners: []
     _trim: []
     _roofSurface: []
     _attachments: []
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _upper:
     _height: 3
     _facade:
@@ -166,52 +120,6 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 15
       _allowedFloors: 2
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _roof:
     _height: 0
     _facade: []
@@ -231,52 +139,6 @@ MonoBehaviour:
       _allowedFacades: 15
       _allowedFloors: 4
     _attachments: []
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _groundFacade: []
   _upperFacade: []
   _sideRear: []

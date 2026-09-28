@@ -9,22 +9,6 @@ namespace PCGBike.Editor.Buildings
 {
     public static class StreetBuildingLayerMigration
     {
-        // Explicit one-time scene migration. Existing instances keep their
-        // selected HDA rule source, including instances without a saved hash.
-        public static int PreserveOpenedSceneRuleSources()
-        {
-            int changed = 0;
-            foreach (var authoring in Resources.FindObjectsOfTypeAll<StreetBuildingAuthoring>())
-            {
-                if (!authoring.gameObject.scene.IsValid() || authoring.StyleRuleSourceInitialized) continue;
-                Undo.RecordObject(authoring, "保留已有建筑实例规则");
-                authoring.SetEditorRuleSourceInitialized(true);
-                EditorUtility.SetDirty(authoring);
-                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(authoring.gameObject.scene);
-                changed++;
-            }
-            return changed;
-        }
         public static void Migrate(StreetBuildingStyleConfig style)
         {
             Undo.RecordObject(style, "迁移建筑三层配置");

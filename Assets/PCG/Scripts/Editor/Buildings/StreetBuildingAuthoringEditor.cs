@@ -17,7 +17,7 @@ namespace PCGBike.Editor.Buildings
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_fixedStyleConfig"),
                 new GUIContent("固定风格配置 / Fixed StyleConfig"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("_randomizeOnRecook"),
-                new GUIContent("Recook 随机布局", "关闭后锁定当前布局；保存和 Bake 不改变随机结果。"));
+                new GUIContent("商业门数变更时重抽布局种子"));
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
@@ -26,6 +26,30 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
             var root = authoring.GetComponent<HEU_HoudiniAssetRoot>();
             var parameters = root != null && root.HoudiniAsset != null ? root.HoudiniAsset.Parameters : null;
+            EditorGUILayout.HelpBox("素材配置只提供模块与尺寸。生成数量、用途、排列和开关使用 HDA 实例面板；局部覆盖的生效范围见 Cook 诊断。", MessageType.Info);
+            if (authoring.RandomizeOnRecook)
+                EditorGUILayout.HelpBox("商业门数变更后 Recook 会重抽门位布局种子；随机首层用途由独立的变化种子保持稳定。",
+                    MessageType.Info);
+            if (!string.IsNullOrEmpty(authoring.LastCookDiagnostic)
+                && authoring.LastCookDiagnostic.Contains("实际首层：住宅")
+                && authoring.LastCookDiagnostic.Contains("入户门 0"))
+                EditorGUILayout.HelpBox("当前实际用途为住宅，且住宅入户门已关闭；商业门数不会在住宅首层生成门。需要商铺时将本实例首层用途设为“商业”并 Recook。",
+                    MessageType.Warning);
+            if (parameters != null && parameters.GetIntParameterValue("rear_facade_mode", out int rearMode)
+                && rearMode == 0)
+                EditorGUILayout.HelpBox("后立面当前关闭：额外商业门只能在可用的左、右立面抽取。开启后立面后才会参与后门抽取。",
+                    MessageType.Info);
+            using (new EditorGUI.DisabledScope(root?.HoudiniAsset == null))
+            if (GUILayout.Button("重抽布局种子并 Cook"))
+                {
+                    Undo.RecordObject(authoring, "重抽 StreetBuilding 布局种子");
+                    int next = (int)(DateTime.UtcNow.Ticks & 0x7fffffff);
+                    if (next == authoring.LayoutSeed) next++;
+                    authoring.SetEditorLayout(next, authoring.EntranceCell);
+                    StreetBuildingInstanceParameters.SetInt(root.HoudiniAsset, "layout_seed", next);
+                    EditorUtility.SetDirty(authoring);
+                    root.HoudiniAsset.RequestCook(true, false, true, true);
+                }
             var automatic = parameters?.GetParameter("site_source_auto");
             var siteInput = root?.HoudiniAsset?.GetInputNodeByIndex(0);
             string resolvedSite = siteInput != null && siteInput.GetConnectedInputCount() > 0
@@ -56,7 +80,7 @@ namespace PCGBike.Editor.Buildings
             }
             EditorGUILayout.HelpBox(style == null
                     ? "必须为当前 HDA 显式指定 StyleConfig。"
-                    : $"当前风格：{style.name}\nRecook 自动同步配置。随机仅影响墙面模块，体块尺寸保留。",
+                    : $"当前风格：{style.name}\nRecook 自动同步配置；固定种子重复生成一致。",
                 style == null ? MessageType.Error : MessageType.Info);
 
             using (new EditorGUI.DisabledScope(style == null))

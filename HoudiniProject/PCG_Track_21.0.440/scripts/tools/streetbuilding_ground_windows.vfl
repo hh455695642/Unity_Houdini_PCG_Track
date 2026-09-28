@@ -1,0 +1,100 @@
+// STREETBUILDING_INSTANCE_RULES_20260927
+// 首层编辑期求解：先锁门，再按模块数/占格比例填橱窗；每个物理立面共享额度。
+// 性能：缓存每格候选，动态规划验证后缀可达性，不枚举全部排列。
+void sbg_allocate(int selected[]; int door_points[]; int door_spans[]; string door_roles[]; string door_variants[])
+{
+    if(int(detail(0,"effective_ground_use",0))!=2)return;
+    string raw=detail("op:../PARSE_UNITY_INSTANCE_CATALOG","catalog_raw",0);
+    float height=detail("op:../PARSE_UNITY_INSTANCE_CATALOG","style_ground_height",0);
+    int seed=chi("../../layout_seed");if(seed<0)seed=detail(0,"effective_seed",0);
+    int mask= chi("../../shopfront_face_0")+2*chi("../../shopfront_face_1")+4*chi("../../shopfront_face_2")+8*chi("../../shopfront_face_3");
+    int total_shops=0,total_eligible=0,total_occupied=0;string report="";
+    string payloads[]=array(string(detail(0,"rule_payload_hda",0)),string(detail(0,"rule_payload_parcel",0)));
+    for(int face=0;face<4;face++)
+    {
+        int pts[],targets[];
+        for(int p=0;p<npoints(0);p++)if(point(0,"floor_index",p)==0 && point(0,"face_index",p)==face)
+        {append(pts,p);int t=point(0,"facade_target",p);if(find(targets,t)<0)append(targets,t);}
+        int size=len(pts);if(size==0)continue;
+        int d=-1,ds=0;if(selected[face]){d=find(pts,door_points[face]);ds=door_spans[face];}
+        int eligible=size-ds;total_eligible+=eligible;
+        int control=chi("../../shopfront_control"),mode=chi("../../shopfront_quantity_mode");
+        int lo=clamp(chi("../../shopfront_count_min"),0,64),hi=clamp(chi("../../shopfront_count_max"),lo,64);
+        int rhythm=chi("../../ground_rhythm");string source="instance";
+        if(mode==0)lo=clamp(chi("../../shopfront_count"),0,64);
+        for(int layer=0;layer<2;layer++)foreach(string row;split(payloads[layer],"\n"))
+        {
+            string f[]=split(strip(row),"|");
+            if(len(f)!=16 || f[0]!="O" || find(targets,atoi(f[1]))<0 || atoi(f[2])>1 || atoi(f[3])<1)continue;
+            int empty=1;for(int j=6;j<14;j++)if(atoi(f[j])!=0)empty=0;
+            if(atoi(f[4])==0 && atoi(f[5])==0 && empty)continue;
+            control=0;mode=atoi(f[4])==1?1:0;rhythm=atoi(f[5]);lo=clamp(atoi(f[10]),0,64);hi=clamp(atoi(f[11]),lo,64);
+            source=layer==0?"instance_override":"parcel_override";
+        }
+        int requested=control==1?int(floor(eligible*clamp(float(detail(0,"effective_shopfront_ratio",0)),0,1)+.5)):
+            mode==0?lo:lo+int(floor(rand(set(seed,face*503,173))*(hi-lo+1)));
+        if(!(mask&int(pow(2,face))))requested=0;
+        int limit=min(requested,eligible);
+        int begin[],ends[],spans[],metrics[];float weights[];string variants[],roles[];
+        for(int c=0;c<size;c++)
+        {
+            append(begin,len(spans));int p=pts[c],target=point(0,"facade_target",p);
+            int available=point(0,"run_cell_count",p)-point(0,"run_local_cell",p);
+            if(c==d)
+            {append(spans,ds);append(metrics,0);append(weights,1);append(variants,door_variants[face]);append(roles,door_roles[face]);}
+            else if(d<0 || c<d || c>=d+ds)
+            {
+                if(d>=0 && c<d)available=min(available,d-c);
+                int wall=0;
+                foreach(string row;split(raw,"\n"))
+                {
+                    string f[]=split(strip(row),"|");if(len(f)!=18 || f[0]!="M")continue;
+                    int role=atoi(f[2]),span=atoi(f[5]);
+                    if((role!=0 && role!=2) || !(atoi(f[10])&int(pow(2,target))) || !(atoi(f[11])&1)
+                        || abs(atof(f[8])-height)>.01 || atof(f[9])<=0 || span<1)continue;
+                    if(role==2)wall=1;
+                    if(span>available)continue;
+                    append(spans,span);append(metrics,role==0?(control==1?span:1):0);
+                    append(weights,atof(f[9]));append(variants,f[3]);append(roles,role==0?"GroundShop":"GroundWall");
+                }
+                if(!wall){append(spans,1);append(metrics,0);append(weights,1);append(variants,"");append(roles,"GroundWall");}
+            }
+            append(ends,len(spans));
+        }
+        int dp[]=sbw_dp(size,limit,begin,ends,spans,metrics,0,size);
+        int actual=limit;while(actual>=0 && !dp[actual])actual--;
+        if(actual<0){error("StreetBuilding: ground wall spans cannot tile face %d around fixed doors",face);continue;}
+        int remaining=actual,shops=0,occupied=0,missing=0;
+        for(int c=0;c<size;)
+        {
+            int options[];float total=0;
+            for(int v=begin[c];v<ends[c];v++)if(c+spans[v]<=size && remaining>=metrics[v]
+                && dp[(c+spans[v])*(limit+1)+remaining-metrics[v]]){append(options,v);total+=weights[v];}
+            float pick=rand(set(seed,face*503+c*37,179))*total;int chosen=options[len(options)-1];
+            foreach(int v;options){pick-=weights[v];if(pick<=0){chosen=v;break;}}
+            int span=spans[chosen];remaining-=metrics[chosen];
+            int shop=roles[chosen]=="GroundShop",door=roles[chosen]=="Entrance" || roles[chosen]=="GroundShopDoor";
+            shops+=shop;if(shop)occupied+=span;if(variants[chosen]=="")missing++;
+            for(int j=0;j<span;j++)
+            {
+                int p=pts[c+j];setpointattrib(0,"facade_planned_start",p,j==0,"set");
+                setpointattrib(0,"facade_planned_span",p,span,"set");setpointattrib(0,"facade_planned_role",p,roles[chosen],"set");
+                setpointattrib(0,"facade_planned_variant",p,variants[chosen],"set");
+                setpointattrib(0,"semantic_role",p,door?"commercial_door":shop?"shopfront":"blank","set");
+                setpointattrib(0,"rule_rhythm",p,rhythm,"set");setpointattrib(0,"rule_mode",p,mode,"set");
+                setpointattrib(0,"ground_shopfront_actual",p,0,"set");
+            }
+            c+=span;
+        }
+        foreach(int p;pts)setpointattrib(0,"ground_shopfront_actual",p,shops,"set");
+        string reason=actual<requested?"insufficient_contiguous_capacity_or_modules":"none";
+        if(missing)reason+=";missing_wall_preview";
+        report+=sprintf("Face%d source=%s mode=%s requested=%d actual=%d occupied=%d eligible=%d reason=%s\n",face,source,
+            control==1?"ratio":mode==1?"random":"count",requested,shops,occupied,eligible,reason);
+        total_shops+=shops;total_occupied+=occupied;
+    }
+    setdetailattrib(0,"ground_shopfront_count",total_shops,"set");
+    setdetailattrib(0,"ground_eligible_shopfront_count",total_eligible,"set");
+    setdetailattrib(0,"ground_shopfront_occupied",total_occupied,"set");
+    setdetailattrib(0,"ground_shopfront_report",report,"set");
+}

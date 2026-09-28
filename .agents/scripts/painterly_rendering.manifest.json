@@ -1,0 +1,32 @@
+{
+  "baseline": ".agents/backups/PainterlyCrocodile-20260922-181930/baseline",
+  "scene": "Assets/Art/New Scene.unity",
+  "allowedFiles": [
+    ".agents/scripts/rendering_regression.py",
+    ".agents/scripts/painterly_render_tests.cs",
+    ".agents/scripts/painterly_rendering.manifest.json",
+    ".agents/scripts/PainterlyShader-validation.md",
+    "Assets/Art/Custom_URP_Lassyla Painterly Dither BaseColor.mat"
+  ],
+  "materials": [
+    "Assets/Art/Custom_URP_Stylized Procedural Directional.mat",
+    "Assets/Art/Custom_URP_Lassyla Painterly Dither BaseColor.mat"
+  ],
+  "contracts": [
+    "interior-opaque",
+    "finite-shading",
+    "origin-invariance",
+    "mesh-unit-invariance",
+    "distance-filtering",
+    "forward-depth-coverage",
+    "shader-errors",
+    "asset-reference-preservation",
+    "soft-brush-boundaries",
+    "mobile-backend-compilation",
+    "geometric-normal-preservation",
+    "live-mesh-bounds-match-material"
+  ],
+  "applyMaterials": {
+    "crocodile": "Assets/Art/Custom_URP_Lassyla Painterly Dither BaseColor.mat"
+  }
+}

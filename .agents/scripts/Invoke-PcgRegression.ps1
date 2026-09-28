@@ -1,6 +1,6 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('CityRoad', 'Track', 'Terrain', 'StreetBuilding')]
+    [ValidateSet('CityRoad', 'Track', 'Terrain', 'StreetBuilding', 'Rendering')]
     [string]$Module,
 
     [Parameter(Mandatory = $true)]
@@ -16,6 +16,11 @@
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Module -eq 'Rendering') {
+    & python (Join-Path $PSScriptRoot 'rendering_regression.py') --stage $Stage --manifest $ChangeManifest
+    if ($LASTEXITCODE -ne 0) { throw "Rendering $Stage failed." }
+    return
+}
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -80,24 +85,53 @@ function Invoke-Hython {
 
 function Invoke-UnityTool {
     param([string]$Tool, [hashtable]$InputObject)
+    if ($Tool -eq 'assets-refresh') {
+        # Pipeline's typed recompile command calls AssetDatabase.Refresh even when
+        # no scripts changed. The old MCP server is not part of this project link.
+        $reply = (& unity command recompile --project-path $projectRoot --json |
+            Out-String | ConvertFrom-Json)
+        if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
+            throw 'Pipeline AssetDatabase refresh failed.'
+        }
+        return @{ structured = @{ result = $reply.data.result } }
+    }
     if ($Tool -in @('editor-application-get-state', 'scene-list-opened', 'assets-find', 'console-get-logs')) {
         $cliName = switch ($Tool) {
             'editor-application-get-state' { 'editor_status' }
             'scene-list-opened' { 'list_open_scenes' }
             'assets-find' { 'find_assets' }
-            'console-get-logs' { 'get_console_logs' }
+            'console-get-logs' { 'console' }
         }
         $cliArgs = @('command', $cliName, '--project-path', $projectRoot, '--json')
         if ($Tool -eq 'assets-find') { $cliArgs += @('--name', $moduleConfig[$Module].Search, '--limit', '1000') }
-        if ($Tool -eq 'console-get-logs') { $cliArgs += @('--severity', ([string]$InputObject.logTypeFilter).ToLower(), '--limit', '1000') }
-        $reply = (& unity @cliArgs | Out-String | ConvertFrom-Json)
-        if ($LASTEXITCODE -ne 0 -or -not $reply.success) { throw "Pipeline command failed: $cliName" }
+        if ($Tool -eq 'console-get-logs') {
+            $level = if ($InputObject.logTypeFilter -eq 'Error') { 'error' } else { 'warn' }
+            $cliArgs += @('--level', $level, '--tail', '1000')
+        }
+        # A saved HDA triggers AssetDatabase import and can briefly reload the
+        # Pipeline domain. Retry read-only queries while the same Editor starts
+        # answering again; a persistent failure still fails the gate.
+        $reply = $null
+        $maxAttempts = 8
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+                $rawReply = (& unity @cliArgs | Out-String)
+                $candidate = $rawReply | ConvertFrom-Json
+                if ($LASTEXITCODE -eq 0 -and $candidate.success) {
+                    $reply = $candidate
+                    break
+                }
+            }
+            catch { }
+            if ($attempt -lt $maxAttempts) { Start-Sleep -Seconds 3 }
+        }
+        if ($null -eq $reply) { throw "Pipeline command failed: $cliName after $maxAttempts attempts" }
         $data = $reply.data.result
         $result = switch ($Tool) {
             'editor-application-get-state' { @{ IsPlaying = ($data.playMode -ne 'stopped'); IsPlayingOrWillChangePlaymode = ($data.playMode -ne 'stopped'); IsCompiling = $data.compiling; IsUpdating = $data.domainReloadInProgress } }
             'scene-list-opened' { @($data.scenes) }
             'assets-find' { @($data.assets) }
-            'console-get-logs' { @($data.logs | ForEach-Object { @{ LogType=$_.type; Message=$_.message; Timestamp=$_.timestampUtc } }) }
+            'console-get-logs' { @($data.entries | Where-Object { $_.logType -eq $InputObject.logTypeFilter } | ForEach-Object { @{ LogType=$_.logType; Message=$_.message; Timestamp=$_.timestampUtc } }) }
         }
         return @{ structured = @{ result = $result } }
     }
@@ -181,6 +215,14 @@ function Get-DiagnosticSignatures {
         $message = ([string]$_.Message) `
             -replace '\(ID:\s*\d+\)', '(ID:<dynamic>)' `
             -replace '\bCityRoad\d+\b', 'CityRoad<dynamic>'
+        if ($message -match 'McpManagerClientHub|BufferedFileLogStorage') {
+            # This separate pre-existing plugin logs the same authorization
+            # failure again after each domain reload. Keep its body exact;
+            # normalize only its clock stamp and per-connection GUID.
+            $message = $message `
+                -replace '\[\d{2}:\d{2}:\d{2}:\d{4}\]', '[time]' `
+                -replace 'ConnectionManager\[[0-9a-fA-F-]{36}\]', 'ConnectionManager[<dynamic>]'
+        }
         '{0}|{1}' -f $_.LogType, $message
     } | Sort-Object -Unique)
 }
@@ -293,45 +335,127 @@ else {
     & (Join-Path $projectRoot '.agents\scripts\Ensure-HoudiniMcp.ps1') | Out-Host
 }
 
-function Invoke-StreetBuildingContractTests {
-    $response = Invoke-UnityTool -Tool 'reflection-method-call' -InputObject @{
-        filter = @{
-            namespace = 'PCGBike.Tests.Editor.Buildings'
-            typeName = 'StreetBuildingPhase4ContractBridge'
-            methodName = 'Run'
-            inputParameters = @()
-        }
-        knownNamespace = $true
-        typeNameMatchLevel = 6
-        methodNameMatchLevel = 6
-        parametersMatchLevel = 2
-        executeInMainThread = $true
-    }
-    $result = $response.structured.result
-    if (-not $result) {
-        throw 'StreetBuilding EditMode contract bridge returned no result.'
-    }
-    $value = [string]$result.value
-    if (-not $value.StartsWith('PASS|7|')) {
-        throw "StreetBuilding EditMode contract bridge returned an invalid result: $value"
-    }
-    Write-Step 'PASS' 'StreetBuilding EditMode contracts: 7 passed'
-}
+function Invoke-StreetBuildingPipelineTests {
+    param([string]$CandidateHda = 'Assets/PCG/HDA/City/StreetBuilding.hda')
+    # Test the validated staged definition before persistence, then the production
+    # definition after persistence. No generation rules are staged on scene roots.
+    $literalPath = $CandidateHda.Replace('\','/') | ConvertTo-Json -Compress
+    $contextCode = "UnityEditor.SessionState.SetString(`"PCG.StreetBuilding.ContractHda`", $literalPath); return true;"
+    if ($PSVersionTable.PSVersion.Major -lt 7) { $contextCode = $contextCode.Replace('"','\"') }
+    $context = (& unity command eval --project-path $projectRoot --code $contextCode --json | Out-String | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $context.success) { throw ("Could not select test HDA definition: " + ($context.errors | ConvertTo-Json -Compress)) }
+    $assembly = 'PCGBike.StreetBuilding.Tests.Editor'
+    # Material-only styles: tests must not stage a rule source or rewrite HEU presets.
 
-# Invoke precompiled contract methods. Avoid Roslyn runtime assembly conflicts.
-# Same assertions as the old dynamic wrappers; no test is skipped.
-function Invoke-StreetBuildingCompiledTest {
-    param([string]$TypeName, [string]$MethodName = 'Run')
-    $filter = @{ namespace = 'PCGBike.Tests.Editor.Buildings'; typeName = $TypeName; methodName = $MethodName; inputParameters = @() }
-    $discovery = Invoke-UnityTool -Tool 'reflection-method-find' -InputObject @{
-        filter = $filter; knownNamespace = $true; typeNameMatchLevel = 6; methodNameMatchLevel = 6; parametersMatchLevel = 2
+    # The Test Runner switches scenes. Houdini auto-Cook marks PCG_Building
+    # dirty, which otherwise opens a blocking Save/Don't Save dialog. Preserve
+    # the on-disk scene, then save the live scene through Pipeline before tests.
+    $open = (& unity command list_open_scenes --project-path $projectRoot --json |
+        Out-String | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $open.success) {
+        throw 'Cannot inspect open Unity scenes before StreetBuilding tests.'
     }
-    if (-not ([string]$discovery.structured.result).Contains('Found 1 method')) {
-        throw "Compiled test method is unavailable: $TypeName.$MethodName"
+    foreach ($scene in @($open.data.result.scenes | Where-Object { $_.isDirty })) {
+        if ($scene.path -ne 'Assets/PCG/Scenes/PCG_Building.unity') {
+            throw "Refusing to switch away from unrelated dirty scene: $($scene.path)"
+        }
+        $source = Join-Path $projectRoot $scene.path
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "Dirty Unity scene has no on-disk source: $source"
+        }
+        $backups = Join-Path (Split-Path -Path $snapshotPath -Parent) 'unity-scene-autosave'
+        [System.IO.Directory]::CreateDirectory($backups) | Out-Null
+        $backup = Join-Path $backups ("PCG_Building-{0}-{1}.unity" -f
+            (Get-Date -Format 'yyyyMMdd-HHmmss'), [guid]::NewGuid().ToString('N').Substring(0, 8))
+        Copy-Item -LiteralPath $source -Destination $backup
+        $saved = (& unity command save_scene --project-path $projectRoot --path $scene.path --json |
+            Out-String | ConvertFrom-Json)
+        if ($LASTEXITCODE -ne 0 -or -not $saved.success) {
+            throw "Failed to save dirty Unity scene before tests; disk backup: $backup"
+        }
+        Write-Step 'INFO' "Saved dirty PCG_Building before tests; previous disk state: $backup"
     }
-    return Invoke-UnityTool -Tool 'reflection-method-call' -InputObject @{
-        filter = $filter; knownNamespace = $true; typeNameMatchLevel = 6; methodNameMatchLevel = 6; parametersMatchLevel = 2; executeInMainThread = $true
+    $clean = (& unity command list_open_scenes --project-path $projectRoot --json |
+        Out-String | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $clean.success -or
+        @($clean.data.result.scenes | Where-Object { $_.isDirty }).Count -gt 0) {
+        throw 'Unity scene remains dirty; refusing to start tests and open a save dialog.'
     }
+    $discovery = (& unity command list_tests --project-path $projectRoot --mode editor --json |
+        Out-String | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $discovery.success) {
+        throw 'StreetBuilding EditMode test discovery failed.'
+    }
+    $tests = @($discovery.data.result.Tests | Where-Object { $_.Assembly -eq $assembly })
+    if ($tests.Count -lt 4) {
+        throw "StreetBuilding EditMode tests are missing: found $($tests.Count), expected at least 4."
+    }
+    # The Pipeline's synchronous Test Runner can hold the command endpoint
+    # across a domain reload. Start its typed asynchronous job and poll status.
+    $runStartedAt = [DateTime]::UtcNow
+    $reply = (& unity command run_tests --project-path $projectRoot --mode editor `
+        --filter_type assembly --filter $assembly --async_tests true --timeout 300 --json |
+        Out-String | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
+        throw 'StreetBuilding Pipeline EditMode test invocation failed.'
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds(300)
+    $status = $null
+    do {
+        Start-Sleep -Seconds 1
+        $poll = (& unity command test_status --project-path $projectRoot --json |
+            Out-String | ConvertFrom-Json)
+        if ($LASTEXITCODE -ne 0 -or -not $poll.success) {
+            throw 'StreetBuilding Pipeline EditMode test status failed.'
+        }
+        $status = $poll.data.result | ConvertFrom-Json
+        if ($status.status -eq 'running' -and
+            [DateTime]::UtcNow -ge $runStartedAt.AddSeconds(20)) {
+            # TestResults.xml is written after the four tests finish. On this
+            # Editor, Pipeline can lose its completion callback across a
+            # domain reload and remain "running" after the XML is final.
+            $resultPath = Join-Path $env:USERPROFILE `
+                'AppData\LocalLow\DefaultCompany\PCG_Bike_Unity\TestResults.xml'
+            if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
+                $file = Get-Item -LiteralPath $resultPath
+                if ($file.LastWriteTimeUtc -ge $runStartedAt.AddSeconds(-2)) {
+                    [xml]$xml = Get-Content -LiteralPath $resultPath -Raw
+                    $cases = @($xml.SelectNodes('//test-case'))
+                    $actual = @($cases | ForEach-Object { $_.GetAttribute('fullname') } |
+                        Sort-Object)
+                    $expected = @($tests | ForEach-Object { $_.FullName } | Sort-Object)
+                    $allPassed = $xml.'test-run'.GetAttribute('result') -eq 'Passed' -and
+                        [int]$xml.'test-run'.GetAttribute('total') -eq $tests.Count -and
+                        [int]$xml.'test-run'.GetAttribute('passed') -eq $tests.Count -and
+                        [int]$xml.'test-run'.GetAttribute('failed') -eq 0 -and
+                        [int]$xml.'test-run'.GetAttribute('skipped') -eq 0 -and
+                        $cases.Count -eq $tests.Count -and
+                        @($cases | Where-Object { $_.GetAttribute('result') -ne 'Passed' }).Count -eq 0 -and
+                        (($actual -join '|') -eq ($expected -join '|'))
+                    if ($allPassed) {
+                        $cancelled = (& unity command cancel_tests --project-path $projectRoot --json |
+                            Out-String | ConvertFrom-Json)
+                        if ($LASTEXITCODE -ne 0 -or -not $cancelled.success) {
+                            throw 'Pipeline result collector remained running and could not be reset.'
+                        }
+                        Write-Step 'PASS' "StreetBuilding EditMode XML contracts: $($cases.Count) passed; reset stale Pipeline collector"
+                        return
+                    }
+                }
+            }
+        }
+    } while ($status.status -eq 'running' -and [DateTime]::UtcNow -lt $deadline)
+    if ($status.status -ne 'completed') {
+        throw "StreetBuilding Pipeline EditMode tests ended with status '$($status.status)'."
+    }
+    $summary = $status.summary
+    if ($summary.total -ne $tests.Count -or $summary.passed -ne $tests.Count -or
+        $summary.failed -ne 0 -or $summary.skipped -ne 0 -or $summary.inconclusive -ne 0) {
+        $failures = @($status.results | Where-Object { $_.Status -ne 'Passed' } |
+            ForEach-Object { "{0}: {1}" -f $_.FullName, $_.Message })
+        throw "StreetBuilding Pipeline EditMode contracts failed: $($failures -join '; ')"
+    }
+    Write-Step 'PASS' "StreetBuilding Pipeline EditMode contracts: $($summary.passed) passed"
 }
 
 if ($Stage -eq 'Capture') {
@@ -394,22 +518,17 @@ try {
         Invoke-Hython -Arguments @(
             $streetBuildingValidator, '--project-root', $projectRoot,
             '--source', 'live-candidate', '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
-        Invoke-StreetBuildingContractTests
-        $layerResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingLayerEditModeTests'
-        if (-not ([string]$layerResponse.structured.result.value).StartsWith('PASS|3|')) {
-            throw 'StreetBuilding layer EditMode contracts failed before persistence.'
+        $candidate = Get-Content -LiteralPath (Join-Path $projectRoot '.codex_tmp/regression/streetbuilding-validated-candidate.json') -Raw | ConvertFrom-Json
+        if ($candidate.status -ne 'PASS' -or
+            (Get-FileHash -LiteralPath $candidate.hda -Algorithm SHA256).Hash.ToLowerInvariant() -ne $candidate.sha256) {
+            throw 'Validated candidate HDA hash changed before Unity tests.'
         }
+        Invoke-StreetBuildingPipelineTests -CandidateHda $candidate.hda
     }
     if ($Module -eq 'CityRoad') {
         Invoke-Hython -Arguments @(
             $cityRoadValidator, '--source', 'live', '--host', $HoudiniHost,
             '--port', [string]$HoudiniPort)
-    }
-    if ($Module -eq 'StreetBuilding') {
-        $unifiedResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingUnifiedTests'
-        if (-not ([string]$unifiedResponse.structured.result.value).StartsWith('PASS|UnifiedMigration|')) {
-            throw 'Unified ground migration contracts failed.'
-        }
     }
     $persisted = $true
     Invoke-Hython -Arguments @(
@@ -443,15 +562,7 @@ try {
     Assert-UnityReady -Snapshot $unityCurrent
     if ($Module -eq 'StreetBuilding') {
         Assert-UnityAssetOnly -Snapshot $unityCurrent
-        $parameterResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingParameterSimplificationTests' -MethodName 'MigrateAndVerify'
-        if (-not ([string]$parameterResponse.structured.result.value).Contains('|VerifiedInstances|')) {
-            throw 'StreetBuilding retained parameter/Style/input/Bake migration failed.'
-        }
-        Invoke-StreetBuildingContractTests
-        $transactionResponse = Invoke-StreetBuildingCompiledTest -TypeName 'StreetBuildingUnifiedTests' -MethodName 'RunTransactions'
-        if ([string]$transactionResponse.structured.result.value -ne 'PASS') {
-            throw 'StreetBuilding transaction rollback contracts failed.'
-        }
+        Invoke-StreetBuildingPipelineTests
         $unityCurrent = Wait-UnityReady
     }
     else {
@@ -475,7 +586,22 @@ try {
     else {
         $currentDiagnostics = @(Get-DiagnosticSignatures -Snapshot $unityCurrent)
     }
-    $newDiagnostics = @($currentDiagnostics | Where-Object { $_ -notin $baselineDiagnostics })
+    # The separate pre-existing Unity MCP connector can repeat these exact
+    # authorization and storage diagnostics on a domain reload. Houdini Engine
+    # diagnostics and every other new warning remain fatal.
+    $allowedUnityDiagnostics = if ($Module -eq 'StreetBuilding') { @(
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> ConnectionManager[<dynamic>] ExecuteHubMethodAsync Invocation of 'PerformVersionHandshake' was canceled on endpoint: /hub/mcp-server"
+        "Error|<color=#ff6b6b>fail:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> Server forcefully disconnected this plugin. Reason: Authorization failed. Token may be missing, invalid, or revoked."
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> Server rejected authorization. Firing OnAuthorizationRejected event."
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> ConnectionManager[<dynamic>] ExecuteHubMethodAsync Connection became inactive while invoking 'PerformVersionHandshake' on endpoint: /hub/mcp-server. Error: The 'InvokeCoreAsync' method cannot be called if the connection is not active"
+        "Error|<color=#ff6b6b>fail:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> McpManagerClientHub Version handshake failed: No response from server."
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> McpManagerClientHub Version handshake failed (1/3). Reason: Version handshake failed with null response."
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#85C1E2><b>BufferedFileLogStorage</b></color> Flush called but already disposed, ignored."
+        "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> ConnectionManager[<dynamic>] EnsureConnection Connection not available and auto-reconnect disabled for endpoint: /hub/mcp-server"
+    ) } else { @() }
+    $newDiagnostics = @($currentDiagnostics | Where-Object {
+        $_ -notin $baselineDiagnostics -and $_ -notin $allowedUnityDiagnostics
+    })
     if ($newDiagnostics.Count -gt 0) {
         throw "Unity produced new Console diagnostics:`n- $($newDiagnostics -join "`n- ")"
     }

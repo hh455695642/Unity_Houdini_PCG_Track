@@ -28,7 +28,7 @@ MonoBehaviour:
       _absoluteHeight: 3
       _weight: 1
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 6370016066608996344, guid: c010bb052cd16c9488c5264ddb9f2f06,
         type: 3}
@@ -39,7 +39,7 @@ MonoBehaviour:
       _absoluteHeight: 3
       _weight: 0.45
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 61137608165969114, guid: 2197da902c0c80e4aba8a6014d06213e,
         type: 3}
@@ -50,7 +50,7 @@ MonoBehaviour:
       _absoluteHeight: 3
       _weight: 1
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 2115228737020647468, guid: 8f661e2caea06014bad8c7f99fcc588d,
         type: 3}
@@ -61,7 +61,7 @@ MonoBehaviour:
       _absoluteHeight: 3
       _weight: 0.65
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 3270426431276137335, guid: 43a4aa264d31a5549bfc4c6c4901548c,
         type: 3}
@@ -72,7 +72,7 @@ MonoBehaviour:
       _absoluteHeight: 3
       _weight: 0.55
       _enabled: 1
-      _allowedFacades: 3
+      _allowedFacades: 15
       _allowedFloors: 1
     - _prefab: {fileID: 3139449169823053378, guid: 920f0893244f30b4e967579912d6a054,
         type: 3}
@@ -200,51 +200,6 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 3
       _allowedFloors: 1
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _upper:
     _height: 3
     _facade:
@@ -484,51 +439,6 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 15
       _allowedFloors: 2
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _roof:
     _height: 0
     _facade: []
@@ -680,51 +590,6 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 15
       _allowedFloors: 4
-    _rules:
-      groundUse: 0
-      layoutMode: 0
-      rhythm: 0
-      shopfrontRatio: 0.65
-      entranceMin: 1
-      entranceMax: 1
-      shopDoorMin: 0
-      shopDoorMax: 1
-      shopfrontMin: 1
-      shopfrontMax: 4
-      windowMin: 2
-      windowMax: 8
-      blankMin: 0
-      blankMax: 4
-      trimEnabled: 1
-      attachmentsEnabled: 1
-      roofEnabled: 1
-      parapetHeight: 0.6
-      density: 0.6
-      awning:
-        enabled: 1
-        density: 1
-        maxCount: 8
-        facades: 15
-      sign:
-        enabled: 1
-        density: 0.72
-        maxCount: 8
-        facades: 15
-      fireEscape:
-        enabled: 1
-        density: 0.5
-        maxCount: 4
-        facades: 15
-      wallAC:
-        enabled: 1
-        density: 0.28
-        maxCount: 16
-        facades: 15
-      roofProps:
-        enabled: 1
-        density: 0.55
-        maxCount: 8
-        facades: 15
   _groundFacade: []
   _upperFacade: []
   _sideRear: []

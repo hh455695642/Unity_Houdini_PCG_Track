@@ -62,7 +62,6 @@ namespace PCGBike.Editor.Buildings
                     DrawModules(list, property, field.Item1,
                         property != "_roof" && field.Item1 == "_facade" ? "墙面 / 门窗" : field.Item2);
                 }
-                DrawRules(layer.FindPropertyRelative("_rules"), property);
                 EditorGUI.indentLevel--;
             }
             if (serializedObject.ApplyModifiedProperties()) _audited = false;
@@ -205,66 +204,6 @@ namespace PCGBike.Editor.Buildings
             }
             if ((property.intValue & allowed) == 0 || (property.intValue & ~allowed) != 0)
                 EditorGUILayout.HelpBox("已有立面范围与用途不匹配。配置审计可列出可修复项。", MessageType.Warning);
-        }
-
-        private static void DrawRules(SerializedProperty rules, string layer)
-        {
-            rules.isExpanded = EditorGUILayout.Foldout(rules.isExpanded, "默认生成规则", true);
-            if (!rules.isExpanded) return;
-            EditorGUI.indentLevel++;
-            void Field(string name, string label) => EditorGUILayout.PropertyField(
-                rules.FindPropertyRelative(name), new GUIContent(label), true);
-            if (layer == "_ground")
-            {
-                var use = rules.FindPropertyRelative("groundUse");
-                use.intValue = EditorGUILayout.Popup("首层用途", use.intValue, new[] { "自动", "住宅", "商业", "混合" });
-                Field("shopfrontRatio", "铺面比例");
-            }
-            if (layer != "_roof")
-            {
-                var mode = rules.FindPropertyRelative("layoutMode");
-                mode.intValue = EditorGUILayout.Popup("布局模式", mode.intValue, new[] { "自动", "随机范围", "手动数量" });
-                var rhythm = rules.FindPropertyRelative("rhythm");
-                // Keep wire values stable; legacy alternating (2) reads as uniform.
-                int current = rhythm.intValue == 2 ? 1 : rhythm.intValue;
-                EditorGUI.BeginChangeCheck();
-                int selected = EditorGUILayout.IntPopup("排列方式", current,
-                    new[] { "随机", "均匀分布", "左右对称", "成组" }, new[] { 0, 1, 3, 4 });
-                if (EditorGUI.EndChangeCheck()) rhythm.intValue = selected;
-                EditorGUILayout.HelpBox("每段墙面独立排列，入口位置保留。同配置标准层上下对齐；成组默认两个，左右对称使用同款同宽模块。实例选择风格默认后生效，局部覆盖优先。", MessageType.Info);
-                foreach (var pair in new[] { ("entrance", "入口"), ("shopDoor", "铺门"),
-                             ("shopfront", "铺面"), ("window", "窗"), ("blank", "空白") })
-                {
-                    if (layer == "_upper" && (pair.Item1 is "entrance" or "shopDoor" or "shopfront")) continue;
-                    Field(pair.Item1 + "Min", pair.Item2 + "最少数量");
-                    Field(pair.Item1 + "Max", pair.Item2 + "最多数量");
-                }
-            }
-            else { Field("roofEnabled", "生成屋顶"); Field("parapetEnabled", "生成女儿墙"); Field("parapetHeight", "女儿墙高度 (m)"); }
-            Field("trimEnabled", "启用柱 / 腰线 / 檐口");
-            Field("attachmentsEnabled", "启用本层配件"); Field("density", "本层配件密度");
-            foreach (var pair in new[] { ("awning", "雨棚"), ("sign", "招牌"), ("fireEscape", "消防梯"),
-                         ("wallAC", "空调"), ("roofProps", "屋顶配件") })
-            {
-                if (layer == "_roof" ? pair.Item1 != "roofProps" : pair.Item1 == "roofProps") continue;
-                if (layer == "_ground" && (pair.Item1 is "fireEscape" or "wallAC")) continue;
-                var attachment = rules.FindPropertyRelative(pair.Item1);
-                attachment.isExpanded = EditorGUILayout.Foldout(attachment.isExpanded, pair.Item2, true);
-                if (!attachment.isExpanded) continue;
-                EditorGUI.indentLevel++;
-                foreach (var option in new[] { ("enabled", "启用"), ("density", "密度"),
-                             ("maxCount", "数量上限"), ("facades", "适用立面") })
-                {
-                    if (option.Item1 == "facades")
-                    {
-                        if (layer != "_roof") DrawFacades(attachment.FindPropertyRelative(option.Item1),
-                            pair.Item1 is "awning" or "sign" ? 3 : pair.Item1 == "fireEscape" ? 8 : 12);
-                    }
-                    else EditorGUILayout.PropertyField(attachment.FindPropertyRelative(option.Item1), new GUIContent(option.Item2));
-                }
-                EditorGUI.indentLevel--;
-            }
-            EditorGUI.indentLevel--;
         }
 
         private static void PingFirstMissing(StreetBuildingStyleConfig style)

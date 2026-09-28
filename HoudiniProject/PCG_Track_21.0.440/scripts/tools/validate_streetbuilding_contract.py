@@ -219,6 +219,227 @@ def configure(asset: hou.Node, catalog: str, *, width: float = 12, depth: float 
     }
     for name, value in values.items():
         asset.parm(name).set(value)
+    # Historical contracts exercise the frozen V1 allocation path. New ground
+    # contracts opt in to V2 explicitly; this keeps cumulative coverage intact.
+    if asset.parm("ground_rule_schema_version") is not None:
+        asset.parm("ground_rule_schema_version").set(0)
+
+
+def assert_ground_use_v2(asset: hou.Node) -> dict[str, Any]:
+    """Cumulative fixture for the unified V2 ground-use and shopfront rules."""
+    configure(asset, STYLE_CATALOG, attachments=0)
+    asset.parm("ground_rule_schema_version").set(2)
+    asset.parm("ground_floor_use").set(1)
+    asset.parm("ground_quantity_mode").set(0)
+    asset.parm("residential_door_enabled").set(0)
+    cells = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
+    ground = [p for p in cells.points() if p.intAttribValue("floor_index") == 0]
+    require(ground and all(p.stringAttribValue("semantic_role") == "window" for p in ground),
+            "Residential ground floor without a door must fill all eligible bays with windows")
+    style = geometry(asset, "PARSE_UNITY_INSTANCE_CATALOG")
+    require(abs(style.floatAttribValue("style_ground_height")
+                - style.floatAttribValue("style_typical_height")) < 1e-5,
+            "Residential ground floor did not use typical-floor height")
+    selected = geometry(asset, "SELECT_FACADE_VARIANTS")
+    require(sum(p.intAttribValue("is_building_entrance") for p in selected.points()) == 0,
+            "Zero-door residence emitted an entrance")
+
+    door_catalog = STYLE_CATALOG + "\n" + style_row(3, SOURCE_PREFIX + "Door_2.fbx",
+                                                    height=3, facades=1, floors=1)
+    asset.parm("unity_style_catalog").set(door_catalog)
+    asset.parm("residential_door_enabled").set(1)
+    selected = geometry(asset, "SELECT_FACADE_VARIANTS")
+    entrances = [p for p in selected.points() if p.intAttribValue("is_building_entrance")]
+    require(len(entrances) == 1 and entrances[0].intAttribValue("face_index") == 0,
+            "Enabled residential entrance did not create exactly one front door")
+    require(entrances[0].intAttribValue("preview_missing") == 0
+            and bool(entrances[0].stringAttribValue("unity_instance")),
+            "Residential entrance resolved to a missing preview instead of a Prefab")
+
+    asset.parm("unity_style_catalog").set(STYLE_CATALOG)
+    asset.parm("residential_door_enabled").set(0)
+    asset.parm("ground_floor_use").set(2)
+    asset.setParms(dict(shopfront_control=1,ground_quantity_mode=0))
+    observed = {}
+    for requested in (1, 2, 3, 4):
+        asset.parm("entrance_count_min").set(requested)
+        asset.parm("entrance_count_max").set(requested)
+        for ratio in (0.0, 0.5, 1.0):
+            asset.parm("shopfront_ratio").set(ratio)
+            cells = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
+            eligible = cells.intAttribValue("ground_eligible_shopfront_count")
+            shops = cells.intAttribValue("ground_shopfront_count")
+            face_cells = {}
+            for p in cells.points():
+                if p.intAttribValue("floor_index")==0 and p.stringAttribValue("semantic_role")!="commercial_door":
+                    f=p.intAttribValue("face_index");face_cells[f]=face_cells.get(f,0)+1
+            require(shops == sum(int(n * ratio + 0.5) for n in face_cells.values()),
+                    f"Shopfront ratio {ratio} produced {shops}/{eligible}")
+            chosen = geometry(asset, "SELECT_FACADE_VARIANTS")
+            doors = [p for p in chosen.points() if p.intAttribValue("floor_index") == 0
+                     and p.intAttribValue("is_shop_entrance")]
+            faces = [p.intAttribValue("face_index") for p in doors]
+            require(len(doors) == requested and len(set(faces)) == requested
+                    and faces.count(0) == 1,
+                    f"Commercial {requested} doors did not occupy unique physical faces: {faces}")
+            require(all(p.intAttribValue("preview_missing") == 0
+                        and bool(p.stringAttribValue("unity_instance")) for p in doors),
+                    "Commercial door count included missing Prefab previews")
+            meta = geometry(asset, "BUILD_METADATA")
+            require(meta.intAttribValue("commercial_door_count") == requested
+                    and meta.intAttribValue("shopfront_count") == shops
+                    and meta.intAttribValue("eligible_shopfront_count") == eligible
+                    and abs(meta.floatAttribValue("effective_shopfront_ratio") - ratio) < 1e-5,
+                    "Metadata does not report the actual door/shopfront allocation")
+            observed[f"{requested}:{ratio}"] = [faces, shops, eligible]
+
+    # The hidden random minimum must not change the precise door count.
+    asset.parm("entrance_count_min").set(4)
+    asset.parm("entrance_count_max").set(1)
+    chosen = geometry(asset, "SELECT_FACADE_VARIANTS")
+    require(sum(p.intAttribValue("is_shop_entrance") for p in chosen.points()) == 1,
+            "Precise commercial count was raised by the random minimum")
+    asset.parm("entrance_count_min").set(1)
+    asset.parm("entrance_count_max").set(2)
+
+    # Closing the rear removes that physical face from door capacity. Exact
+    # requests must fail; random requests must stay within the remaining faces.
+    asset.parm("rear_facade_mode").set(0)
+    asset.parm("entrance_count_max").set(4)
+    target = node(asset, "ALLOCATE_FACADE_CAPACITY")
+    try:
+        target.cook(force=True)
+    except hou.OperationFailed:
+        pass
+    require(any("exceeds" in message for message in target.errors()),
+            "Exact four-door layout accepted a closed rear face")
+    asset.parm("ground_quantity_mode").set(1)
+    asset.parm("entrance_count_min").set(4)
+    for seed in range(8):
+        asset.parm("layout_seed").set(seed)
+        chosen = geometry(asset, "SELECT_FACADE_VARIANTS")
+        doors = [p for p in chosen.points() if p.intAttribValue("floor_index") == 0
+                 and p.intAttribValue("is_shop_entrance")]
+        require(1 <= len(doors) <= 3 and all(p.intAttribValue("face_index") != 3 for p in doors),
+                "Random layout exceeded closed-rear physical capacity")
+        parsed = geometry(asset, "PARSE_GENERATION_RULES")
+        ratio = parsed.floatAttribValue("effective_shopfront_ratio")
+        require(0 <= ratio <= 1 and
+                ratio == geometry(asset, "PARSE_GENERATION_RULES").floatAttribValue("effective_shopfront_ratio"),
+                "Random shopfront ratio escaped [0,1] or changed for a fixed seed")
+    asset.parm("rear_facade_mode").set(2)
+    asset.parm("ground_quantity_mode").set(0)
+    asset.parm("entrance_count_min").set(1)
+    asset.parm("entrance_count_max").set(2)
+
+    # A secondary L frontage belongs to the same physical front. It cannot
+    # receive a second front door even when both frontage runs have cells.
+    asset.parm("massing_shape").set(1)
+    chosen = geometry(asset, "SELECT_FACADE_VARIANTS")
+    doors = [p for p in chosen.points() if p.intAttribValue("floor_index") == 0
+             and p.intAttribValue("is_shop_entrance")]
+    require(len(doors) == 2 and sum(p.intAttribValue("face_index") == 0 for p in doors) == 1,
+            "L footprint received two doors on its physical front")
+    asset.parm("massing_shape").set(0)
+
+    asset.parm("ground_floor_use").set(0)
+    uses = set()
+    commercial_seed = None
+    for seed in range(20):
+        asset.parm("variation_seed").set(seed)
+        first = geometry(asset, "PARSE_GENERATION_RULES").intAttribValue("effective_ground_use")
+        second = geometry(asset, "PARSE_GENERATION_RULES").intAttribValue("effective_ground_use")
+        require(first == second, "Random ground use changed without a variation seed change")
+        uses.add(first)
+        if first == 2 and commercial_seed is None:
+            commercial_seed = seed
+    require(uses == {1, 2}, f"Random ground use did not cover both choices: {uses}")
+    missing_shop = "\n".join(row for row in STYLE_CATALOG.splitlines()
+                             if not (row.startswith("M|") and row.split("|")[2] == "2"))
+    asset.parm("unity_style_catalog").set(missing_shop)
+    asset.parm("variation_seed").set(commercial_seed)
+    parsed = geometry(asset, "PARSE_GENERATION_RULES")
+    require(parsed.intAttribValue("effective_ground_use") == 1
+            and parsed.stringAttribValue("ground_fallback_reason") == "commercial_modules_missing",
+            "Random ground use did not record its residential fallback")
+    asset.parm("ground_floor_use").set(2)
+    parser = asset.node("StreetBuildingCore/PARSE_GENERATION_RULES")
+    try:
+        parser.cook(force=True)
+    except hou.OperationFailed:
+        pass
+    require(any("explicit Commercial" in message for message in parser.errors()),
+            "Explicit Commercial accepted a missing GroundWall module")
+    asset.parm("unity_style_catalog").set(STYLE_CATALOG)
+    asset.parm("layout_seed").set(-1)
+    asset.parm("variation_seed").set(1)
+    asset.parm("ground_floor_use").set(1)
+    return {"residential_windows": len(ground), "commercial_cases": observed,
+            "random_uses": sorted(uses)}
+
+
+def assert_ground_use_seed_isolation(asset: hou.Node) -> dict[str, Any]:
+    """A commercial door redraw cannot silently turn its ground floor residential."""
+    configure(asset, STYLE_CATALOG, attachments=0, rear=2)
+    asset.parm("ground_rule_schema_version").set(2)
+    asset.parm("ground_floor_use").set(0)
+    choices = set()
+    for use_seed in range(24):
+        asset.parm("variation_seed").set(use_seed)
+        asset.parm("layout_seed").set(0)
+        expected = geometry(asset, "PARSE_GENERATION_RULES").intAttribValue("effective_ground_use")
+        choices.add(expected)
+        for door_seed in (1, 2, 19, 32767):
+            asset.parm("layout_seed").set(door_seed)
+            parsed = geometry(asset, "PARSE_GENERATION_RULES")
+            require(parsed.intAttribValue("effective_ground_use") == expected,
+                    f"Door-layout seed {door_seed} changed ground use for variation seed {use_seed}")
+            require(parsed.intAttribValue("ground_use_seed") == use_seed,
+                    "Ground-use seed metadata does not identify the stable choice")
+    require(choices == {1, 2}, f"Variation seeds did not sample both ground uses: {choices}")
+    asset.parm("ground_floor_use").set(2)
+    asset.parm("entrance_count_max").set(1)
+    for door_seed in (0, 1, 2, 19):
+        asset.parm("layout_seed").set(door_seed)
+        selected = geometry(asset, "SELECT_FACADE_VARIANTS")
+        doors = [p for p in selected.points() if p.intAttribValue("floor_index") == 0
+                 and p.intAttribValue("is_shop_entrance")]
+        require(len(doors) == 1 and doors[0].intAttribValue("face_index") == 0,
+                f"Explicit Commercial with one door lost its front door at seed {door_seed}")
+    return {"random_uses": sorted(choices), "door_seeds_checked": 4}
+
+
+def assert_side_door_seed_diversity(asset: hou.Node) -> dict[str, Any]:
+    """A fixed seed reproduces the choice; seeds cover all eligible side faces."""
+    configure(asset, STYLE_CATALOG, attachments=0, rear=2)
+    asset.parm("ground_rule_schema_version").set(2)
+    asset.parm("ground_floor_use").set(2)
+    asset.parm("facade_layout_mode").set(0)
+    asset.parm("entrance_count_max").set(2)
+    counts = {1: 0, 2: 0, 3: 0}
+    for seed in range(48):
+        asset.parm("layout_seed").set(seed)
+        def door_faces() -> tuple[int, ...]:
+            selected = geometry(asset, "SELECT_FACADE_VARIANTS")
+            return tuple(sorted(p.intAttribValue("face_index") for p in selected.points()
+                                if p.intAttribValue("floor_index") == 0
+                                and p.intAttribValue("is_shop_entrance")))
+        faces = door_faces()
+        require(faces == door_faces(), f"Seed {seed} changed side-door face on recook")
+        require(len(faces) == 2 and faces[0] == 0 and faces[1] in counts,
+                f"Seed {seed} did not place one front and one eligible side/rear door: {faces}")
+        counts[faces[1]] += 1
+    require(all(count >= 8 for count in counts.values()),
+            f"Fixed-seed side-door selection is biased or excludes a face: {counts}")
+    asset.parm("rear_facade_mode").set(0)
+    for seed in range(12):
+        asset.parm("layout_seed").set(seed)
+        faces = tuple(sorted(p.intAttribValue("face_index") for p in
+                             geometry(asset, "SELECT_FACADE_VARIANTS").points()
+                             if p.intAttribValue("floor_index") == 0
+                             and p.intAttribValue("is_shop_entrance")))
+        require(3 not in faces, f"Closed rear accepted a side door at seed {seed}: {faces}")
+    return {"seed_count": 48, "face_counts": counts}
 
 
 def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
@@ -245,8 +466,13 @@ def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
             and group.find("style_id") is None
             and group.find("unity_bridge_revision") is None,
             "Removed generation/style bridge parameters are still public")
-    require(group.find("sb_bridge") is not None and not group.find("sb_bridge").isHidden(),
-            "Unity bridge folder must remain HAPI-visible")
+    for name in ('unity_style_catalog','unity_bridge_end_marker','ground_rule_schema_version',
+                 'shop_door_count_min','shop_door_count_max','unity_style_rules','style_rule_source'):
+        require(group.find(name) is not None and group.find(name).isHidden(),
+                'Internal compatibility parameter must be hidden: '+name)
+    require(group.find('sb_internal').isHidden(), 'Internal bridge folder is visible')
+    require(group.find('sb_ground') is not None and group.find('sb_upper') is not None,
+            'Task-based instance groups missing')
     floor_template = group.find("floor_count")
     require(floor_template.maxValue() == 12 and floor_template.maxIsStrict(),
             "Floor Count must be strictly limited to 12")
@@ -262,7 +488,7 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
         require(target is not None and target.type().name() == expected,
                 f"Required node/type mismatch: {name}/{expected}")
     require(core.node("PARSE_GENERATION_RULES").inputs()[:2] == (
-        core.node("RESOLVE_FRONTAGES"), core.node("PARSE_UNITY_INSTANCE_CATALOG")),
+        core.node("RESOLVE_FRONTAGES"), core.node("EMPTY_GEOMETRY")),
         "Generation-rule parser wiring failed")
     require(core.node("RESOLVE_MASSING").input(0) == core.node("PARSE_GENERATION_RULES"),
             "Massing rule wiring failed")
@@ -465,9 +691,9 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
         floor = point.intAttribValue("floor_index")
         cell = point.intAttribValue("cell_index")
         if role in ("Awning", "Sign"):
-            require(face in (0, 2) and floor == 0
-                    and (face != 0 or cell != entrance_cell),
-                    f"{role} overlaps the entrance or escaped a ground frontage")
+            require(face in (0, 2) and 0 <= floor < 4
+                    and (floor != 0 or face != 0 or cell != entrance_cell),
+                    f"{role} overlaps the entrance or escaped its eligible frontage")
         elif role == "FireEscape":
             require(face == 3 and floor == 1,
                     "FireEscape must attach to the rear and start above ground")
@@ -622,6 +848,52 @@ def semantic_counts(value: hou.Geometry, target: int, floor_one_based: int) -> d
     return result
 
 
+def assert_override_add_defaults(asset: hou.Node) -> dict[str, Any]:
+    """A newly inserted UI multiparm must cook before any child is edited."""
+    test = asset.parent().createNode(asset.type().name(), "VERIFY_FACADE_OVERRIDE_ADD")
+    try:
+        return _assert_override_add_defaults(test)
+    finally:
+        test.destroy()
+
+
+def _assert_override_add_defaults(asset: hou.Node) -> dict[str, Any]:
+    configure(asset, STYLE_CATALOG, attachments=0)
+    asset.parm("style_rule_source").set(0)
+    asset.parm("unified_ground_walls").set(1)
+    asset.parm("facade_layout_mode").set(0)
+    asset.parm("facade_overrides").set(0)
+
+    def roles() -> list[tuple[int, int, int, str]]:
+        value = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
+        return sorted((p.intAttribValue("facade_target"),
+                       p.intAttribValue("floor_1based"),
+                       p.intAttribValue("cell_index"),
+                       p.stringAttribValue("semantic_role")) for p in value.points())
+
+    baseline = roles()
+    asset.parm("facade_overrides").set(1)
+    require(roles() == baseline, "Adding a default facade override changed the building")
+    asset.parm("facade_overrides").set(2)
+    require(roles() == baseline, "Adding a second default facade override changed the building")
+    for name, value in {
+        "facade_override_floor_start1": 3,
+        "facade_override_floor_end1": 3,
+        "facade_override_layout_mode1": 2,
+        "facade_override_window_min1": 2,
+        "facade_override_window_max1": 2,
+    }.items():
+        asset.parm(name).set(value)
+    allocated = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
+    require(semantic_counts(allocated, 0, 3).get("window", 0) == 2,
+            "Third-floor window override was not applied")
+    require(semantic_counts(allocated, 0, 1).get("entrance", 0) == 1,
+            "Adding an override changed the single ground-floor entrance")
+    asset.parm("facade_overrides").set(0)
+    require(roles() == baseline, "Removing facade overrides did not restore the original layout")
+    return {"default_adds": 2, "upper_windows": 2, "single_entrance": 1}
+
+
 def generation_global(seed: int, mode: int = 2, corner: int = 1) -> str:
     return (f"SBR1\nG|12|10|0|4|4|0|4|{corner}|3|{mode}|2|.65|2|2|1|.6|1|1|1|{seed}")
 
@@ -707,11 +979,10 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
             "Removed schema/family metadata was emitted")
 
     asset.parm("variation_seed").set(29)
-    asset.parm("facade_layout_mode").set(2)
-    for name, value in {
-        "entrance_count_min": 1, "shop_door_count_min": 1,
-        "shopfront_count_min": 2, "window_count_min": 0, "blank_count_min": 2,
-    }.items(): asset.parm(name).set(value)
+    asset.parm("facade_layout_mode").set(0)
+    set_facade_override(asset, floor_from=1, floor_to=1, mode=2, rhythm=0,
+                        entrance=(1, 1), shop_door=(1, 1), shopfront=(2, 2),
+                        window=(0, 0), blank=(2, 2))
     allocated = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
     counts = semantic_counts(allocated, 0, 1)
     require(counts == {"entrance": 1, "shop_door": 1, "shopfront": 2, "blank": 2},
@@ -723,10 +994,9 @@ def assert_generation_rules(asset: hou.Node, contract: dict[str, Any]) -> dict[s
     require({point.intAttribValue("facade_target") for point in selected.points()} == {0, 2, 3},
             "Rectangle must expose front, side and rear targets without artificial frontage")
 
-    for name, value in {
-        "entrance_count_min": 2, "shop_door_count_min": 2,
-        "shopfront_count_min": 4, "window_count_min": 0, "blank_count_min": 3,
-    }.items(): asset.parm(name).set(value)
+    set_facade_override(asset, floor_from=1, floor_to=1, mode=2, rhythm=0,
+                        entrance=(2, 2), shop_door=(2, 2), shopfront=(4, 4),
+                        window=(0, 0), blank=(3, 3))
     compressed = geometry(asset, "ALLOCATE_FACADE_CAPACITY")
     report = str(compressed.attribValue("streetbuilding_rule_report"))
     require(int(compressed.attribValue("streetbuilding_rule_compressed")) == 1
@@ -902,32 +1172,29 @@ def assert_layer_rules(asset: hou.Node) -> dict[str, Any]:
     points=records()
     require(any(role=='Awning' and floor>0 for role,floor,*_ in points), 'Explicit upper awning did not generate')
     require(any(role=='Sign' and floor>0 for role,floor,*_ in points), 'Explicit upper sign did not generate')
-    unaffected=[p for p in points if p[1]>0]
+    unaffected=points
     rules['ground']['density']=0; apply_rules()
     reduced=records()
-    require(not any(p[1]==0 for p in reduced), 'Ground density zero ignored')
-    require([p for p in reduced if p[1]>0]==unaffected, 'Changing Ground changed another layer')
+    require(reduced==unaffected, 'Retired ground density still affects instances')
     rules['upper']['attachmentsEnabled']=False; apply_rules()
-    require(all(p[0]=='RoofProp' for p in records()), 'Upper off toggle ignored')
+    require(records()==unaffected, 'Retired upper toggle still affects instances')
     rules['roof']['roofProps']['maxCount']=0; apply_rules()
-    require(not records(), 'Roof maximum zero ignored')
-    rules['ground']=defaults(); rules['upper']=defaults(); rules['roof']=defaults(); apply_rules()
+    require(records()==unaffected, 'Retired roof limit still affects instances')
     asset.parm('attachments_enabled').set(0)
-    require(not records(), 'Global off must constrain style defaults')
+    require(not records(), 'Instance attachment toggle ignored')
     setup()
     rules['ground']['groundUse']=3; apply_rules()
-    parsed=node(asset,'PARSE_GENERATION_RULES').geometry()
-    require(parsed.intAttribValue('effective_ground_use')==3, 'Style ground use not consumed')
-    asset.parm('ground_floor_use').set(1); asset.parm('style_override_ground').set(1)
-    require(node(asset,'PARSE_GENERATION_RULES').geometry().intAttribValue('effective_ground_use')==1,
-            'Explicit instance layer override did not win')
+    asset.parm('ground_floor_use').set(1)
+    require(geometry(asset,'PARSE_GENERATION_RULES').intAttribValue('effective_ground_use')==1,
+            'Instance ground use did not win')
     setup()
     asset.parm('massing_shape').set(1)
-    rules['roof']['roofEnabled']=False; apply_rules()
+    rules['roof']['roofEnabled']=True; apply_rules()
+    asset.parm('roof_enabled').set(0)
     require(not any(p.stringAttribValue('module_role') == 'RoofSurface'
                     for p in geometry(asset,'OUT_BUILDING_LOD0').points()), 'Disabled L roof still emitted roof modules')
     require(not any(p[0]=='RoofProp' for p in records()), 'Disabled L roof still emitted props')
-    rules['roof']['roofEnabled']=True; rules['roof']['parapetHeight']=0; apply_rules()
+    asset.parm('roof_enabled').set(1); asset.parm('parapet_height').set(0)
     require(not any(p.stringAttribValue('module_role').startswith('Parapet')
                     for p in geometry(asset,'OUT_BUILDING_LOD0').points()), 'L parapet zero still emitted edges')
     return {'status':'PASS','seed_floor_cases':cases,'upper_awning_sign':True,
@@ -1436,8 +1703,8 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
                         'Legacy JSON without parapetEnabled must preserve parapets')
                 rules['parapetEnabled'] = False
                 test.parm('unity_style_rules').set(json.dumps(dict(version=1, ground=rules, upper=rules, roof=rules)))
-                require(geometry(test, 'PARSE_GENERATION_RULES').floatAttribValue('effective_parapet') == 0,
-                        'Explicit style parapet disable ignored')
+                require(abs(geometry(test, 'PARSE_GENERATION_RULES').floatAttribValue('effective_parapet')-.6)<1e-5,
+                        'Retired style rules still override panel parapets')
                 # Upper wall and roof layer must not both allocate the same cornice.
                 test.parm('architectural_trim_enabled').set(1)
                 cornices = [p for p in geometry(test, 'MERGE_DIRECT_BUILDING_INSTANCES').points()
@@ -1521,6 +1788,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.V10.VersionlessStylePayload",
                 "StreetBuilding.V9.GenerationModes",
                 "StreetBuilding.V9.FacadeFloorOverrides",
+                "StreetBuilding.Facade.OverrideAddNoop",
                 "StreetBuilding.V9.FunctionPriorityCompression",
                 "StreetBuilding.V9.ParcelFrontageRulePayload",
                 "StreetBuilding.V9.AttachmentGroups",
@@ -1545,21 +1813,29 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     from validate_streetbuilding_facade_modes import validate_facade_modes
     from validate_streetbuilding_arrangement import validate_arrangement
     arrangement = validate_arrangement(fresh)
-    return {"facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_window_counts import validate_window_counts
+    window_counts = validate_window_counts(fresh)
+    from validate_streetbuilding_instance_rules import validate_instance_rules
+    instance_rules = validate_instance_rules(fresh)
+    return {"instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
             "v6_1_modular_details": assert_details(fresh, contract),
             "l_shape_topology": assert_l_shape(fresh),
+            "override_add_defaults": assert_override_add_defaults(fresh),
             "generation_rules": assert_generation_rules(fresh, contract),
             "dimension_contract": assert_dimension_contract(),
             "three_layer_rules": assert_layer_rules(fresh),
             "partial_preview": assert_partial_preview(fresh),
             "unified_ground": assert_unified_ground(fresh),
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
-            "upper_windows": assert_upper_windows(fresh),
+            "upper_windows": assert_upper_windows(fresh), "window_module_counts": window_counts,
             "roof_trim": assert_roof_trim(fresh),
-            "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement}
+            "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement,
+            "ground_use_v2": assert_ground_use_v2(fresh),
+            "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
+            "side_door_seed_diversity": assert_side_door_seed_diversity(fresh)}
 
 
 def validate_live_candidate(root: Path, hda: Path, contract: Path, host: str, port: int) -> dict[str, Any]:
@@ -1653,6 +1929,8 @@ def _sb_export_candidate(path):
     result = validate(candidate_hda, candidate_hip, contract)
     result['candidate_directory'] = str(candidate)
     result['production_saved'] = False
+    (root / '.codex_tmp/regression/streetbuilding-validated-candidate.json').write_text(
+        json.dumps(dict(hda=str(candidate_hda),sha256=hashlib.sha256(candidate_hda.read_bytes()).hexdigest(),status='PASS')),encoding='utf-8')
     return result
 
 

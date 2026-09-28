@@ -106,6 +106,8 @@
     "ground_floor_use": 0,
     "facade_rhythm": 0,
     "facade_layout_mode": 0,
+    "ground_rule_schema_version": 2,
+    "residential_door_enabled": 0,
     "entrance_count_min": 1,
     "entrance_count_max": 1,
     "shop_door_count_min": 0,
@@ -167,10 +169,9 @@
       "front_right"
     ],
     "ground_floor_use": [
-      "auto",
+      "random",
       "residential",
-      "retail",
-      "mixed"
+      "commercial"
     ],
     "facade_rhythm": [
       "0",
@@ -179,9 +180,8 @@
       "4"
     ],
     "facade_layout_mode": [
-      "auto",
-      "random_range",
-      "manual"
+      "precise",
+      "random"
     ],
     "rear_facade_mode": [
       "0",
@@ -248,6 +248,7 @@
     "StreetBuilding.V10.VersionlessStylePayload",
     "StreetBuilding.V9.GenerationModes",
     "StreetBuilding.V9.FacadeFloorOverrides",
+    "StreetBuilding.Facade.OverrideAddNoop",
     "StreetBuilding.V9.FunctionPriorityCompression",
     "StreetBuilding.V9.ParcelFrontageRulePayload",
     "StreetBuilding.V9.AttachmentGroups",
@@ -291,7 +292,25 @@
     "StreetBuilding.Arrangement.AlignedFloors",
     "StreetBuilding.Arrangement.SymmetricVariants",
     "StreetBuilding.Arrangement.FixedEntranceAndCounts",
-    "StreetBuilding.Arrangement.ContinuousCoverage"
+    "StreetBuilding.Arrangement.ContinuousCoverage",
+    "StreetBuilding.GroundUse.ResidentialWindowsAndHeight",
+    "StreetBuilding.GroundUse.CommercialDoorsAndShopfronts",
+    "StreetBuilding.GroundUse.RandomDeterminismAndFallback",
+    "StreetBuilding.GroundUse.LegacyMigration",
+    "StreetBuilding.GroundUse.SideDoorSeedDiversity",
+    "StreetBuilding.GroundUse.DoorCountRecookBehavior",
+    "StreetBuilding.GroundUse.SeedIsolationAndExplicitDoor",
+    "StreetBuilding.Windows.PreciseModuleCount",
+    "StreetBuilding.Windows.PhysicalFaceSharedQuota",
+    "StreetBuilding.Windows.SpanFeasibility",
+    "StreetBuilding.Windows.AutomaticWallRemainder",
+    "StreetBuilding.Windows.SourceAndFinalReport",
+    "StreetBuilding.InstanceRules.MaterialOnly",
+    "StreetBuilding.InstanceRules.PanelAuthority",
+    "StreetBuilding.Shopfront.ModuleCount",
+    "StreetBuilding.Shopfront.IndependentFacades",
+    "StreetBuilding.Shopfront.RatioOccupancy",
+    "StreetBuilding.Interface.TaskPanel"
   ],
   "three_layer_rules": {
     "version": 1,

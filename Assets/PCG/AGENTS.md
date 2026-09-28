@@ -4,6 +4,15 @@
 
 ## Unity 与资产
 
+### StreetBuilding 素材桥接与面板
+
+- 遵守根目录“StreetBuilding 素材与生成参数职责边界”：素材编译器只输出模块目录与尺寸，不编译默认生成规则。
+- Unity 桥接不得发送风格规则 JSON，不得通过缓存、首绑初始化或重载回填生成配额；实例数量和用途不存在第二套 Authoring 覆盖值。
+- 素材校验和 Inspector 重绘不得隐式修改生成规则或实例参数。隐藏桥接字段通过 HAPI/项目接口可靠读写，不依赖 HEU 可见缓存，不修改插件。
+- 当前显示且可编辑的参数必须生效；数量明确统计范围，模式互斥，诊断区分模块数与占格数，失败恢复覆盖本次全部技术写入。
+
+### 通用资产规则
+
 - 使用 Unity URP，不使用 Built-in Render Pipeline。
 - Shader 放在 `Assets/PCG/Shaders/`，Material 放在 `Assets/PCG/Materials/`，Texture 放在 `Assets/PCG/Texture/`。
 - 生成 Road Bake 资产放在 `Assets/PCG/Generated/Road/`。

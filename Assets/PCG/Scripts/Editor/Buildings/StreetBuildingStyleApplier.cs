@@ -9,17 +9,16 @@ using UnityEditor.SceneManagement;
 namespace PCGBike.Editor.Buildings
 {
     /// <summary>
-    /// 编辑期事务桥：一次提交三层素材、默认规则和尺寸，然后请求一次 Cook。
-    /// 实例已有的规则来源与覆盖保留；运行时只消费 Bake 结果。
+    /// 编辑期事务桥：只提交三层素材目录与尺寸，然后请求一次 Cook。
+    /// 实例生成参数不由素材配置写入；运行时只消费 Bake 结果。
     /// </summary>
     public static class StreetBuildingStyleApplier
     {
         internal static Func<HEU_HoudiniAsset, bool> RequestCook = DefaultRequestCook;
         internal static Func<UnityEngine.SceneManagement.Scene, bool> SaveScene = EditorSceneManager.SaveScene;
 
-        private static readonly string[] IntParameters = { "module_source", "style_rule_source", "unified_ground_walls", "layout_seed", "previous_entrance_cell" };
-        private static readonly string[] StringParameters =
-            { "unity_style_catalog", "unity_style_rules", "unity_bridge_end_marker" };
+        private static readonly string[] IntParameters = { "module_source", "unified_ground_walls", "layout_seed", "previous_entrance_cell", "ground_rule_schema_version", "ground_quantity_mode", "ground_rhythm", "shopfront_control" };
+        private static readonly string[] StringParameters = { "unity_style_catalog", "unity_bridge_end_marker" };
 
         public static string Validate(StreetBuildingStyleConfig style)
         {
@@ -40,24 +39,19 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingCompiledStyle compiled = StreetBuildingStyleCompiler.Compile(style);
             HEU_HoudiniAsset asset = root.HoudiniAsset;
             HEU_Parameters parameters = asset.Parameters;
-            ParameterSnapshot snapshot = ParameterSnapshot.Capture(parameters);
+            ParameterSnapshot snapshot = ParameterSnapshot.Capture(asset);
             string oldPayloadSha = authoring.LastAppliedPayloadSha256;
             string oldDiagnostic = authoring.LastCookDiagnostic;
             string oldMissingSummary = authoring.MissingModuleSummary;
             int oldLayoutSeed = authoring.LayoutSeed;
             int oldEntranceCell = authoring.EntranceCell;
+            bool oldDoorMigration = authoring.GroundDoorMigrationComplete;
             string oldTag = root.gameObject.tag;
-            bool oldRuleSourceInitialized = authoring.StyleRuleSourceInitialized;
+            int oldRuleSchema = authoring.InstanceRuleSchema;
             try
             {
-                Write(parameters, style, compiled.Payload);
-                // The obsolete display parameter is hidden and omitted by HEU.
-                // Generation diagnostics, rather than UI parameters, identify support.
-                SetString(parameters, "unity_style_rules", compiled.RulesPayload);
-                // Existing applied instances retain their HDA rules. A newly
-                // bound instance starts from its style's layer defaults.
-                if (!oldRuleSourceInitialized && string.IsNullOrEmpty(oldPayloadSha))
-                    SetInt(parameters, "style_rule_source", 1);
+                Write(asset, style, compiled.Payload);
+                StreetBuildingRecook.Attach();
                 if (!RequestCook(asset))
                     throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult);
 
@@ -66,11 +60,12 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingPartialBake.Attach();
 
                 authoring.SetEditorAppliedPayloadSha256(compiled.Sha256);
-                authoring.SetEditorRuleSourceInitialized(true);
+                
                 int missing = StreetBuildingPartialBake.MissingSlotCount(asset, false);
                 authoring.SetEditorMissingModuleSummary(StreetBuildingPartialBake.MissingSummary(asset));
                 authoring.SetEditorCookDiagnostic("Cook PASS: " + asset.LastCookResult
                     + "；模块条目 " + compiled.ModuleCount
+                    + "；" + StreetBuildingRecook.ReadGroundSummary(asset, authoring.EntranceCell, authoring.LayoutSeed)
                     + (missing < 0 ? "；无可验证的真实模块输出，可继续预览；正式 Bake 需要有效输出。" : "；缺失位置 " + missing));
                 root.gameObject.tag = "EditorOnly";
                 EditorUtility.SetDirty(authoring);
@@ -84,12 +79,13 @@ namespace PCGBike.Editor.Buildings
                 Exception rollbackFailure = null;
                 try
                 {
-                    snapshot.Restore(parameters);
+                    snapshot.Restore(asset);
                     authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
-                    authoring.SetEditorRuleSourceInitialized(oldRuleSourceInitialized);
+                    authoring.SetEditorInstanceRuleSchema(oldRuleSchema);
                     authoring.SetEditorCookDiagnostic(oldDiagnostic);
                     authoring.SetEditorMissingModuleSummary(oldMissingSummary);
                     authoring.SetEditorLayout(oldLayoutSeed, oldEntranceCell);
+                    authoring.SetEditorGroundDoorMigrationComplete(oldDoorMigration);
                     root.gameObject.tag = oldTag;
                     EditorUtility.SetDirty(authoring);
                     using (StreetBuildingRecook.Suppress())
@@ -104,11 +100,11 @@ namespace PCGBike.Editor.Buildings
         }
 
         internal static void Write(
-            HEU_Parameters parameters, StreetBuildingStyleConfig style, string stylePayload)
+            HEU_HoudiniAsset asset, StreetBuildingStyleConfig style, string stylePayload)
         {
-            SetInt(parameters, "module_source", 1);
-            SetString(parameters, "unity_style_catalog", stylePayload);
-            SetString(parameters, "unity_bridge_end_marker", "END");
+            StreetBuildingInstanceParameters.SetInt(asset, "module_source", 1);
+            StreetBuildingInstanceParameters.SetString(asset, "unity_style_catalog", stylePayload);
+            StreetBuildingInstanceParameters.SetString(asset, "unity_bridge_end_marker", "END");
         }
 
         internal static void SetInt(HEU_Parameters p, string name, int value)
@@ -133,20 +129,19 @@ namespace PCGBike.Editor.Buildings
             private readonly Dictionary<string, int> _ints = new();
             private readonly Dictionary<string, string> _strings = new();
 
-            public static ParameterSnapshot Capture(HEU_Parameters p)
+            public static ParameterSnapshot Capture(HEU_HoudiniAsset a)
             {
                 var result = new ParameterSnapshot();
                 foreach (string name in IntParameters)
-                    if (p.GetParameter(name) != null && p.GetIntParameterValue(name, out int value)) result._ints[name] = value;
+                    if (StreetBuildingInstanceParameters.Exists(a, name)) result._ints[name] = StreetBuildingInstanceParameters.Int(a, name);
                 foreach (string name in StringParameters)
-                    if (p.GetStringParameterValue(name, out string value)) result._strings[name] = value;
+                    if (StreetBuildingInstanceParameters.Exists(a, name)) result._strings[name] = StreetBuildingInstanceParameters.String(a, name);
                 return result;
             }
-
-            public void Restore(HEU_Parameters p)
+            public void Restore(HEU_HoudiniAsset a)
             {
-                foreach (var pair in _ints) SetInt(p, pair.Key, pair.Value);
-                foreach (var pair in _strings) SetString(p, pair.Key, pair.Value);
+                foreach (var pair in _ints) StreetBuildingInstanceParameters.SetInt(a, pair.Key, pair.Value);
+                foreach (var pair in _strings) StreetBuildingInstanceParameters.SetString(a, pair.Key, pair.Value);
             }
         }
     }
