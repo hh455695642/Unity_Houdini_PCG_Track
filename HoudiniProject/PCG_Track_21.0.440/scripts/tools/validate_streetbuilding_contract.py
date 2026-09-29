@@ -1821,6 +1821,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     instance_rules = validate_instance_rules(fresh)
     from validate_streetbuilding_trim_endpoints import validate_trim_endpoints
     trim_endpoints = validate_trim_endpoints(fresh)
+    from validate_streetbuilding_single_ground_trim import validate_single_ground_trim
+    single_ground_trim = validate_single_ground_trim(fresh)
     return {"trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
@@ -1835,7 +1837,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "unified_ground": assert_unified_ground(fresh),
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
             "upper_windows": assert_upper_windows(fresh), "window_module_counts": window_counts,
-            "roof_trim": assert_roof_trim(fresh),
+            "roof_trim": assert_roof_trim(fresh), "single_ground_trim": single_ground_trim,
             "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
