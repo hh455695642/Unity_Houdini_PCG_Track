@@ -1675,10 +1675,11 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
                                         'Independent parapet switch/zero height ignored')
                                 require(bool(set(roles) & trim_roles) == bool(trim), 'Trim switch ignored')
                                 if trim:
-                                    require(trim_roles.issubset(roles), 'Trim role positions are missing')
+                                    require({'FloorBand','FacadeColumn'}.issubset(roles), 'Retained trim positions are missing')
+                                    require('Cornice' not in roles, 'Removed lower cornice remains')
                                 previews = geometry(test, 'OUT_BUILDING_PREVIEW')
                                 if catalog == 'STYLE|2|4|3' and trim:
-                                    require(trim_roles.issubset(p.stringAttribValue('module_role') for p in previews.prims()),
+                                    require({'FloorBand','FacadeColumn'}.issubset(p.stringAttribValue('module_role') for p in previews.prims()),
                                             'Missing trim modules are not previewed')
                                 if not parapet or not height:
                                     require(not any(p.stringAttribValue('module_role').startswith('Parapet') for p in previews.prims()),
@@ -1823,6 +1824,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     trim_endpoints = validate_trim_endpoints(fresh)
     from validate_streetbuilding_single_ground_trim import validate_single_ground_trim
     single_ground_trim = validate_single_ground_trim(fresh)
+    from validate_streetbuilding_roof_lower_trim import validate_roof_lower_trim
+    roof_lower_trim = validate_roof_lower_trim(fresh)
     return {"trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
@@ -1838,6 +1841,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
             "upper_windows": assert_upper_windows(fresh), "window_module_counts": window_counts,
             "roof_trim": assert_roof_trim(fresh), "single_ground_trim": single_ground_trim,
+            "roof_lower_trim": roof_lower_trim,
             "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),

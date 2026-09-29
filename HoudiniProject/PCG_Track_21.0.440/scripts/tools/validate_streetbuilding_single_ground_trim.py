@@ -38,8 +38,9 @@ def validate_single_ground_trim(parent):
             bands=[p for p in g.points() if p.stringAttribValue('module_role')=='FloorBand']
             cornices=[p for p in g.points() if p.stringAttribValue('module_role')=='Cornice']
             require(bands and all(abs(p.position()[1]-(ground-.1))<1e-4 for p in bands),'Layer boundary band changed: '+key)
-            require(cornices and all(p.intAttribValue('floor_index')==3 and abs(p.position()[1]-(roof-1))<1e-4
-                    for p in cornices),'Ground cornice exists or roof cornice changed: '+key)
+            # 20260930: the user also removed the lower roof cornice. Keep this
+            # ground contract focused on preventing the original regression.
+            require(not any(p.intAttribValue('floor_index')==0 for p in cornices),'Ground cornice exists: '+key)
             require(len({(tuple(p.position()),tuple(p.attribValue('orient'))) for p in bands})==len(bands),'Duplicate bands: '+key)
             require(not any(p.stringAttribValue('module_role')=='Cornice' and p.intAttribValue('floor_index')==0
                             for p in geometry(a).points()),'Ground cornice in real output: '+key)
@@ -55,7 +56,7 @@ def validate_single_ground_trim(parent):
             a.parm('architectural_trim_enabled').set(1)
             require(signature(geometry(a,'MERGE_DIRECT_BUILDING_INSTANCES'))==first,'Trim toggle roundtrip changed output')
             count+=1
-        return {'status':'PASS','cases':count,'ground_cornice':0,'boundary_band_and_roof':'preserved'}
+        return {'status':'PASS','cases':count,'ground_cornice':0,'boundary_band':'preserved'}
     finally: a.destroy()
 
 if __name__=='__main__':

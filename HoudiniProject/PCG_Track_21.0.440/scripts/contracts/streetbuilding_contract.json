@@ -317,7 +317,8 @@
     "StreetBuilding.Trim.SpanIndependent",
     "StreetBuilding.Trim.MissingPreviewAndToggle",
     "StreetBuilding.Trim.NonTrimUnchanged",
-    "StreetBuilding.Trim.SingleGroundBand"
+    "StreetBuilding.Trim.SingleGroundBand",
+    "StreetBuilding.Trim.NoLowerRoofCornice"
   ],
   "three_layer_rules": {
     "version": 1,
