@@ -312,7 +312,11 @@
     "StreetBuilding.Core.StageLayout",
     "StreetBuilding.Core.RetiredBuildersAbsent",
     "StreetBuilding.Core.OutputEquivalence",
-    "StreetBuilding.Core.HiddenLodCompatibility"
+    "StreetBuilding.Core.HiddenLodCompatibility",
+    "StreetBuilding.Trim.FrontRunEndpoints",
+    "StreetBuilding.Trim.SpanIndependent",
+    "StreetBuilding.Trim.MissingPreviewAndToggle",
+    "StreetBuilding.Trim.NonTrimUnchanged"
   ],
   "three_layer_rules": {
     "version": 1,

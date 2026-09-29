@@ -1819,7 +1819,9 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     window_counts = validate_window_counts(fresh)
     from validate_streetbuilding_instance_rules import validate_instance_rules
     instance_rules = validate_instance_rules(fresh)
-    return {"core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_trim_endpoints import validate_trim_endpoints
+    trim_endpoints = validate_trim_endpoints(fresh)
+    return {"trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
