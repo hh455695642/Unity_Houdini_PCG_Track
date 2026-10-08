@@ -155,7 +155,8 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingModuleGroup.ConvexConcaveCorner => role is StreetBuildingModuleRole.CornerConvex
                     or StreetBuildingModuleRole.CornerConcave,
                 StreetBuildingModuleGroup.ColumnTrimCornice => role is StreetBuildingModuleRole.FacadeColumn
-                    or StreetBuildingModuleRole.FloorBand or StreetBuildingModuleRole.Cornice,
+                    or StreetBuildingModuleRole.FloorBand or StreetBuildingModuleRole.Cornice
+                    or StreetBuildingModuleRole.FloorBandCorner,
                 StreetBuildingModuleGroup.RoofParapet => role is StreetBuildingModuleRole.RoofSurface
                     or StreetBuildingModuleRole.Parapet or StreetBuildingModuleRole.ParapetCorner
                     or StreetBuildingModuleRole.ParapetConcaveCorner,

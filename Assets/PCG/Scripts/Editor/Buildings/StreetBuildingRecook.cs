@@ -135,7 +135,7 @@ namespace PCGBike.Editor.Buildings
             {
                 pending.Snapshot.Restore(data.Asset);
                 author.SetEditorInstanceRuleSchema(pending.SchemaBefore);
-                author.SetEditorCookDiagnostic("Cook FAIL：保留实例参数，请检查模块与生成诊断。");
+                author.SetEditorCookDiagnostic("Cook FAIL：本次生成失败，结果未更新；保留实例参数。\n上次成功 Cook／历史诊断：\n" + author.LastCookDiagnostic);
                 return;
             }
             ObservedDoors[data.Asset]=DoorValues(data.Asset);
@@ -176,12 +176,14 @@ namespace PCGBike.Editor.Buildings
             if (core == null || session == null) return "输出元数据不可读；布局种子 " + seed;
             int use = 0, commercialDoors = 0, shops = 0, eligible = 0;
             float ratio = 0;
-            string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty;
+            string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty, attachments = string.Empty;
             bool hasUse = false, hasRatio = false;
             int? outputLayoutSeed = null;
             foreach (var geo in core.GeoNodes)
             foreach (var part in geo.GetParts())
             {
+                if (ReadDetailString(session, geo.GeoID, part.PartID, "attachment_diagnostics", out string a) && !string.IsNullOrEmpty(a))
+                    attachments = a;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "effective_ground_use", out int u))
                 { use = u; hasUse = true; }
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "commercial_door_count", out int d))
@@ -215,7 +217,56 @@ namespace PCGBike.Editor.Buildings
             if (!string.IsNullOrWhiteSpace(shopReport)) summary += "\n首层橱窗：\n" + shopReport;
             if (!string.IsNullOrWhiteSpace(upperWindows))
                 summary += "\n标准层窗模块（F 为从 1 开始的楼层；Face 0/1/2/3 为正/左/右/后）：\n" + upperWindows;
+            if (!string.IsNullOrWhiteSpace(attachments)) summary += "\n附件（实际生成过程）：\n" + FormatAttachments(attachments);
             return summary;
+        }
+        // Only format metadata from the completed Cook. Do not duplicate HDA
+        // placement rules or read StyleConfig as a second generation authority.
+        internal static string FormatAttachments(string report)
+        {
+            string[] names = { "雨棚", "招牌", "消防梯", "墙面空调", "屋顶配件" };
+            var text = new System.Text.StringBuilder();
+            foreach (string row in report.Split('\n'))
+            {
+                var f = row.Split('|');
+                if (f.Length == 6 && f[0] == "G")
+                {
+                    text.AppendLine($"全局附件密度：基础 {f[1]}，生效 {f[2]}；来源 {(f[3] == "instance" ? "基础面板" : "地块全局覆盖第 " + f[3].Substring("parcel_global:".Length) + " 行")}；附件开关：基础 {f[4]}，生效 {f[5]}");
+                    continue;
+                }
+                if (f.Length != 16 || !int.TryParse(f[0], out int kind) || kind < 0 || kind >= names.Length) continue;
+                int band = int.Parse(f[1], CultureInfo.InvariantCulture);
+                int actual = int.Parse(f[14], CultureInfo.InvariantCulture);
+                if (actual == 0 && band != (kind < 2 ? 0 : kind == 4 ? 2 : 1) && f[11] == "0") continue;
+                string source = f[6] == "instance" ? "基础面板" : f[6].StartsWith("attachment_override:")
+                    ? "附件覆盖第 " + f[6].Substring("attachment_override:".Length) + " 条"
+                    : f[6].StartsWith("parcel:") ? "地块覆盖第 " + f[6].Substring(7) + " 条" : f[6];
+                string reason = f[15].TrimEnd(',').Replace("attachments_disabled", "附件关闭")
+                    .Replace("probability_zero", "概率为零").Replace("maximum_zero", "上限为零")
+                    .Replace("no_material", "缺少素材").Replace("material_scope", "无适用素材（楼层／立面范围）")
+                    .Replace("scope_restricted", "楼层／立面限制").Replace("rear_facade_condition", "后立面条件未满足（须为消防梯模式）")
+                    .Replace("floor_condition", "至少需要三层").Replace("no_eligible_host", "无合格挂点")
+                    .Replace("random_miss", "随机未命中").Replace("budget_truncated", "预算截断")
+                    .Replace("maximum_truncated", "数量上限截断").Replace("none", "无阻止原因");
+                text.AppendLine($"{names[kind]} [{(band == 0 ? "首层" : band == 1 ? "标准层" : "屋顶")}] 实际 {actual}；基础概率 {f[2]}／上限 {f[3]}；生效概率 {f[4]}／上限 {f[5]}；来源：{source}；楼层 {f[8]}～{f[9]}，立面掩码 {f[7]}；素材 {f[10]}／适用 {f[11]}；挂点 {f[12]}，命中 {f[13]}；{reason}");
+            }
+            return text.ToString().TrimEnd();
+        }
+        internal static string FormatCookState(string history, bool validSession, bool cooking, bool failed)
+        {
+            string state = !validSession ? "会话无效：结果未更新。" : cooking ? "正在生成：结果未更新。"
+                : failed ? "本次 Cook 失败：结果未更新。" : "已完成的输出记录；修改参数后请 Cook。";
+            return state + (string.IsNullOrEmpty(history) ? "\n尚无成功 Cook 记录。" : "\n上次成功 Cook／历史诊断：\n" + history);
+        }
+        internal static string CurrentCookDiagnostic(HEU_HoudiniAsset asset, string history)
+        {
+            // No session creation, no warning logging, and no HAPI geometry reads
+            // in Inspector repaint. Native validity is supplied by the public API.
+            var session = asset?.GetAssetSession(false);
+            bool valid = session != null && session.IsSessionValid() && session.IsAssetRegistered(asset);
+            bool cooking = asset != null && (asset.CookStatus.ToString() == "COOKING" || asset.CookStatus.ToString() == "LOADING" || PendingCooks.ContainsKey(asset));
+            bool failed = asset != null && (asset.LastCookResult == HEU_AssetCookResultWrapper.ERRORED || history?.StartsWith("Cook FAIL") == true);
+            return FormatCookState(history, valid, cooking, failed);
         }
         internal static int ResolveReportedLayoutSeed(int cookSeed, int? outputLayoutSeed)
             => outputLayoutSeed ?? cookSeed;

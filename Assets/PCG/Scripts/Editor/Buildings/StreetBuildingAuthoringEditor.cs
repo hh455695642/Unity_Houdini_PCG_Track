@@ -97,8 +97,7 @@ namespace PCGBike.Editor.Buildings
                 EditorGUILayout.HelpBox("最后 Style Payload SHA-256:\n" + authoring.LastAppliedPayloadSha256,
                     MessageType.None);
             if (!string.IsNullOrEmpty(authoring.LastCookDiagnostic))
-                EditorGUILayout.HelpBox("Cook 诊断：\n" + authoring.LastCookDiagnostic,
-                    authoring.LastCookDiagnostic.Contains("PASS") ? MessageType.Info : MessageType.Warning);
+                EditorGUILayout.HelpBox("Cook 诊断：\n" + StreetBuildingRecook.CurrentCookDiagnostic(root?.HoudiniAsset, authoring.LastCookDiagnostic), MessageType.Info);
         }
 
         private static void Validate(StreetBuildingAuthoring authoring, StreetBuildingStyleConfig style)

@@ -12,6 +12,8 @@ namespace PCGBike.Buildings
         SecondaryFront = 1 << 1,
         Side = 1 << 2,
         Rear = 1 << 3,
+        // 素材适配约束：只有实例选中的首层外侧临街墙段可匹配。
+        StreetSide = 1 << 4,
         All = Front | SecondaryFront | Side | Rear,
     }
 

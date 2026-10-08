@@ -53,7 +53,8 @@ namespace PCGBike.Editor.Buildings
                 Write(asset, style, compiled.Payload);
                 StreetBuildingRecook.Attach();
                 if (!RequestCook(asset))
-                    throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult);
+                    throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult
+                        + ReadCookFailure(asset));
 
                 // Rebuild/domain reload can replace UnityEvent instances. Attach
                 // synchronously before exposing freshly generated outputs to Bake.
@@ -82,7 +83,7 @@ namespace PCGBike.Editor.Buildings
                     snapshot.Restore(asset);
                     authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
                     authoring.SetEditorInstanceRuleSchema(oldRuleSchema);
-                    authoring.SetEditorCookDiagnostic(oldDiagnostic);
+                    authoring.SetEditorCookDiagnostic("Cook FAIL：本次应用失败，结果未更新。\n上次成功 Cook／历史诊断：\n" + oldDiagnostic);
                     authoring.SetEditorMissingModuleSummary(oldMissingSummary);
                     authoring.SetEditorLayout(oldLayoutSeed, oldEntranceCell);
                     authoring.SetEditorGroundDoorMigrationComplete(oldDoorMigration);
@@ -123,6 +124,20 @@ namespace PCGBike.Editor.Buildings
         private static bool DefaultRequestCook(HEU_HoudiniAsset asset) =>
             asset.RequestCook(true, false, true, true)
             && asset.LastCookResult == HEU_AssetCookResultWrapper.SUCCESS;
+
+        // 回滚会覆盖 HAPI 的最近一次 Cook 状态，先保留失败节点的真实诊断。
+        // 仅失败时查询，正常编辑和 Bake 不增加接口调用。
+        private static string ReadCookFailure(HEU_HoudiniAsset asset)
+        {
+            var session = asset.GetAssetSession(false);
+            if (session == null) return string.Empty;
+            string detail = session.ComposeNodeCookResult(asset.AssetID,
+                HAPI_StatusVerbosity.HAPI_STATUSVERBOSITY_ALL);
+            if (string.IsNullOrWhiteSpace(detail))
+                detail = session.GetStatusString(HAPI_StatusType.HAPI_STATUS_COOK_RESULT,
+                    HAPI_StatusVerbosity.HAPI_STATUSVERBOSITY_ALL);
+            return string.IsNullOrWhiteSpace(detail) ? string.Empty : "\n" + detail.Trim();
+        }
 
         internal sealed class ParameterSnapshot
         {

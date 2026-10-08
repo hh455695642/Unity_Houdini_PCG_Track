@@ -103,7 +103,12 @@ function Invoke-UnityTool {
             'console-get-logs' { 'console' }
         }
         $cliArgs = @('command', $cliName, '--project-path', $projectRoot, '--json')
-        if ($Tool -eq 'assets-find') { $cliArgs += @('--name', $moduleConfig[$Module].Search, '--limit', '1000') }
+        if ($Tool -eq 'assets-find') {
+            # Keep the requested HDA-folder scope: unrelated Engine caches can
+            # otherwise fill the result limit before the production HDA appears.
+            $cliArgs += @('--name', $moduleConfig[$Module].Search, '--search_in',
+                $InputObject.searchInFolders[0], '--limit', '1000')
+        }
         if ($Tool -eq 'console-get-logs') {
             $level = if ($InputObject.logTypeFilter -eq 'Error') { 'error' } else { 'warn' }
             $cliArgs += @('--level', $level, '--tail', '1000')

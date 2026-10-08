@@ -192,9 +192,9 @@ namespace PCGBike.Editor.Buildings
 
         internal static void DrawFacades(SerializedProperty property, int allowed)
         {
-            string[] labels = { "主正面", "次正面", "侧面", "背面" };
+            string[] labels = { "主正面", "次正面", "侧面", "背面", "临街侧面（首层转角）" };
             EditorGUILayout.LabelField(new GUIContent("可用立面", "限制候选模块可放置的立面；实际生成还受用途与生成规则约束。"));
-            for (int bit = 0; bit < 4; bit++)
+            for (int bit = 0; bit < labels.Length; bit++)
             {
                 int flag = 1 << bit;
                 if ((allowed & flag) == 0) continue;

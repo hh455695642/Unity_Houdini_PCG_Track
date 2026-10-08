@@ -1757,6 +1757,71 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
         test.destroy()
 
 
+def assert_attachment_diagnostics(parent: hou.Node) -> dict[str, Any]:
+    """Probe real locked outputs, including removal of previous Cook objects."""
+    asset = parent.parent().createNode(parent.type().name(), 'VERIFY_ATTACHMENT_DIAGNOSTICS')
+    rows = [r for r in STYLE_CATALOG.splitlines() if not (r.startswith('M|') and int(r.split('|')[2]) in (14, 15, 16))]
+    rows += [style_row(role, DETAIL_PREFIX + name + '.prefab', facades=1, floors=1)
+             for role, name in ((14, 'AwningDiagnostic'), (15, 'SignDiagnostic'))]
+    configure(asset, '\n'.join(rows), floors=6, roof=0, attachments=1, density=1)
+    asset.setParms(dict(ground_attachment_placement=1, ground_floor_use=2,
+        ground_rule_schema_version=2, entrance_count_max=1, shopfront_control=0,
+        shopfront_quantity_mode=0, shopfront_count=3, shopfront_face_0=1,
+        shopfront_face_1=0, shopfront_face_2=0, shopfront_face_3=0,
+        awning_density=1, sign_density=1, fire_escape_density=1,
+        awning_max_count=2, sign_max_count=2, rear_facade_mode=0))
+    set_attachment_overrides(asset, [])
+    cases = 0
+    def result():
+        nonlocal cases
+        report = geometry(asset, 'BUILD_METADATA').stringAttribValue('attachment_diagnostics')
+        require(report.startswith('v1\n'), 'Missing diagnostics on empty output')
+        records = {(int(f[0]), int(f[1])): f for r in report.splitlines()[1:] if len(f := r.split('|')) == 16}
+        require(len(records) == 15, 'Diagnostics must cover all types and bands')
+        counts = {}
+        for p in geometry(asset, 'DETAIL_INSTANCE_POINTS').points():
+            role = p.stringAttribValue('module_role')
+            if role not in ('Awning', 'Sign', 'FireEscape', 'ACUnit', 'RoofProp'): continue
+            kind = ('Awning', 'Sign', 'FireEscape', 'ACUnit', 'RoofProp').index(role)
+            band = 2 if p.intAttribValue('face_index') == 4 else 0 if p.intAttribValue('floor_index') == 0 else 1
+            counts[kind, band] = counts.get((kind, band), 0) + 1
+        for key, f in records.items(): require(int(f[14]) == counts.get(key, 0), f'Actual diagnostic count differs: {key}')
+        cases += 1
+        return records
+    initial = result()
+    require(initial[0, 0][14] == '2' and initial[1, 0][14] == '2', 'Probability one must fill cap with sufficient hosts')
+    asset.parm('sign_density').set(0)
+    zero = result()
+    require(zero[1, 0][14] == '0' and 'probability_zero' in zero[1, 0][15], 'Zero probability kept previous signs')
+    require(zero[1, 0][6] == 'instance', 'Incorrect base parameter source')
+    require('no_material' in zero[2, 1][15] and 'rear_facade_condition' in zero[2, 1][15], 'Missing fire escape conditions')
+    asset.parm('awning_max_count').set(0)
+    cap = result()
+    require(cap[0, 0][14] == '0' and 'maximum_zero' in cap[0, 0][15], 'Cap zero kept previous awnings')
+    set_attachment_overrides(asset, [(0, 1, 2, 1, 1, 1), (1, 1, 2, 1, 1, 1)])
+    override = result()
+    require(override[1, 0][14] == '2' and override[1, 0][6] == 'attachment_override:2', 'Explicit override precedence/source changed')
+    asset.parm('attachments_enabled').set(0)
+    off = result()
+    require(all(f[14] == '0' and 'attachments_disabled' in f[15] for f in off.values()), 'Switch did not clear or explain outputs')
+    asset.parm('attachments_enabled').set(1)
+    set_attachment_overrides(asset, [(0, 1, 2, 8, 4, 4)])
+    limited = result()
+    require(limited[0, 0][14] == '0' and 'scope_restricted' in limited[0, 0][15], 'Range rejection not reported')
+    set_attachment_overrides(asset, [])
+    asset.setParms(dict(awning_max_count=2, awning_density=1, ground_floor_use=1, residential_door_enabled=0, shopfront_count=0))
+    no_host = result()
+    require(no_host[0, 0][14] == '0' and 'no_eligible_host' in no_host[0, 0][15], 'No-opening diagnosis inaccurate')
+    set_attachment_overrides(asset, [(1, 1, 2, 1, 1, 1)])
+    parcel = make_external_input('VERIFY_ATTACHMENT_DIAG_PARCEL', [(-6, 0, 0), (6, 0, 0), (6, 0, -10), (-6, 0, -10)], closed=True, payload='A|1|0|0|1|1|1')
+    asset.setInput(0, parcel)
+    asset.parm('site_source_auto').set(1)
+    parcel_result = result()
+    require(parcel_result[1, 0][6] == 'parcel:1' and parcel_result[1, 0][14] == '0', 'Parcel authority/source differs')
+    asset.setInput(0, None); parcel.destroy(); asset.destroy()
+    return dict(status='PASS', cases=cases)
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -1826,7 +1891,14 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     single_ground_trim = validate_single_ground_trim(fresh)
     from validate_streetbuilding_roof_lower_trim import validate_roof_lower_trim
     roof_lower_trim = validate_roof_lower_trim(fresh)
-    return {"trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_ground_attachment_hosts import validate_ground_attachment_hosts
+    ground_attachment_hosts = validate_ground_attachment_hosts(fresh)
+    from validate_streetbuilding_ground_corner import validate_ground_corner
+    ground_corner = validate_ground_corner(fresh)
+    from validate_streetbuilding_trim_missing import validate_trim_missing
+    trim_missing = validate_trim_missing(fresh)
+    attachment_diagnostics = assert_attachment_diagnostics(fresh)
+    return {"attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -1842,6 +1914,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "upper_windows": assert_upper_windows(fresh), "window_module_counts": window_counts,
             "roof_trim": assert_roof_trim(fresh), "single_ground_trim": single_ground_trim,
             "roof_lower_trim": roof_lower_trim,
+            "ground_attachment_hosts": ground_attachment_hosts,
             "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
@@ -1919,7 +1992,7 @@ def _sb_export_candidate(path):
             templates.replace(name, template)
     from streetbuilding_notch_interface import promote, install_events
     templates = promote(hou, templates, asset)
-    for name in ('corner_building', 'floor_height_ground', 'floor_height_typical'):
+    for name in ('floor_height_ground', 'floor_height_typical'):
         if templates.find(name) is not None: templates.remove(name)
     from streetbuilding_facade_interface import promote as promote_facades, install_events as install_facade_events
     templates = promote_facades(templates, asset)
@@ -1973,3 +2046,5 @@ if __name__ == "__main__":
     except (ContractFailure, OSError, ValueError, json.JSONDecodeError) as exception:
         print(f"STREETBUILDING_CONTRACT_FAIL: {exception}", file=sys.stderr)
         raise SystemExit(1)
+
+

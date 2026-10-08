@@ -54,9 +54,108 @@ MonoBehaviour:
       _allowedFloors: 0
     _sideRear: []
     _corners: []
-    _trim: []
+    _trim:
+    - _prefab: {fileID: 4058529712492726279, guid: c88317c2a2ca68148846e41bb344c1b5,
+        type: 3}
+      _moduleRole: 12
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 1485767428256905660, guid: ef26bedbea9d1bc469c00919ee7fcd6f,
+        type: 3}
+      _moduleRole: 13
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 6459710187930878375, guid: 556e6839a6a2fff4bb0bf874c192bf04,
+        type: 3}
+      _moduleRole: 8
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 0
+      _allowedFacades: 1
+      _allowedFloors: 1
+    - _prefab: {fileID: 2974671092780022108, guid: 2eae00e73108cc440abcb5d9f7ad3c4a,
+        type: 3}
+      _moduleRole: 22
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 16
+      _allowedFloors: 1
     _roofSurface: []
-    _attachments: []
+    _attachments:
+    - _prefab: {fileID: 2578180941776357187, guid: 0fb73656a90b71749b4752ef516a734c,
+        type: 3}
+      _moduleRole: 14
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 0
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 1257794917613450604, guid: 5f6865b9cb2c91946a407f86b3a740eb,
+        type: 3}
+      _moduleRole: 15
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 0
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 519059050975182116, guid: 37d2f94463bd00b48b7d271a9313b744,
+        type: 3}
+      _moduleRole: 14
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 2042542091701538004, guid: e902330b1003906448aff4087706f1e1,
+        type: 3}
+      _moduleRole: 15
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+    - _prefab: {fileID: 6744047699037558627, guid: 95cfe4349c0f893458fab7b180a67938,
+        type: 3}
+      _moduleRole: 15
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
   _upper:
     _height: 3
     _facade:
@@ -106,7 +205,18 @@ MonoBehaviour:
       _allowedFloors: 2
     _sideRear: []
     _corners: []
-    _trim: []
+    _trim:
+    - _prefab: {fileID: 7274383855222020193, guid: 80d02d8c2485c204a9a4ae2d242b62ff,
+        type: 3}
+      _moduleRole: 12
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 3
+      _allowedFloors: 2
     _roofSurface: []
     _attachments:
     - _prefab: {fileID: 919132149155446097, guid: 3bc4607de4f81e6459edf969478901bb,

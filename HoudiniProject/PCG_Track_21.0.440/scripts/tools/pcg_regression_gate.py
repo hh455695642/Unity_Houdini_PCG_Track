@@ -1104,7 +1104,7 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     removing_heights = (expected_type == 'pcgbike::StreetBuilding::1.0'
         and 'STREETBUILDING_STYLE_HEIGHT_SINGLE_SOURCE_20260914' in asset.node('StreetBuildingCore/PARSE_UNITY_INSTANCE_CATALOG').evalParm('snippet'))
     if removing_heights:
-        for name in ('corner_building','floor_height_ground','floor_height_typical'):
+        for name in ('floor_height_ground','floor_height_typical'):
             if promoted_templates.find(name) is not None: promoted_templates.remove(name)
     simplifying_facades = (expected_type == 'pcgbike::StreetBuilding::1.0'
         and 'STREETBUILDING_FACADE_MODES_SIMPLIFIED_20260914' in asset.node('StreetBuildingCore/PARSE_GENERATION_RULES').evalParm('snippet'))
@@ -1140,7 +1140,7 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         # synthesized folders back into the public definition.
         live_templates = asset.parmTemplateGroup()
         changed = False
-        for name in ('corner_building','floor_height_ground','floor_height_typical'):
+        for name in ('floor_height_ground','floor_height_typical'):
             if live_templates.find(name) is not None:
                 live_templates.remove(name); changed = True
         if changed: asset.setParmTemplateGroup(live_templates)

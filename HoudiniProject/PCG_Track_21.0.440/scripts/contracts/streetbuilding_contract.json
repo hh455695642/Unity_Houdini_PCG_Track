@@ -119,6 +119,7 @@
     "facade_overrides": 0,
     "shopfront_ratio": 0.65,
     "attachment_global_density": 0.6,
+    "ground_attachment_placement": 0,
     "architectural_trim_enabled": 1,
     "attachments_enabled": 1,
     "awning_density": 1.0,
@@ -148,6 +149,10 @@
     "l_notch_units": 1
   },
   "menus": {
+    "ground_attachment_placement": [
+      "0",
+      "1"
+    ],
     "site_source": [
       "internal",
       "external"
@@ -318,7 +323,17 @@
     "StreetBuilding.Trim.MissingPreviewAndToggle",
     "StreetBuilding.Trim.NonTrimUnchanged",
     "StreetBuilding.Trim.SingleGroundBand",
-    "StreetBuilding.Trim.NoLowerRoofCornice"
+    "StreetBuilding.Trim.NoLowerRoofCornice",
+    "StreetBuilding.Attachments.GroundHosts",
+    "StreetBuilding.Trim.CornerSideEligibility",
+    "StreetBuilding.Trim.SharedCornerAndBandCap",
+    "StreetBuilding.Trim.GroundOnly",
+    "StreetBuilding.Attachments.IndependentGroundSampling",
+    "StreetBuilding.Trim.InsetBandCoverage",
+    "StreetBuilding.Trim.OptionalSideNoPhantomPreview",
+    "StreetBuilding.Attachments.DiagnosticSources",
+    "StreetBuilding.Attachments.DiagnosticZeroReasons",
+    "StreetBuilding.Attachments.DiagnosticActualCounts"
   ],
   "three_layer_rules": {
     "version": 1,
@@ -340,7 +355,6 @@
     }
   },
   "removed_parameters": [
-    "corner_building",
     "floor_height_ground",
     "floor_height_typical"
   ],
@@ -400,7 +414,8 @@
       "PREVIEW_MISSING_MODULES",
       "BUILD_METADATA",
       "LOD0_MODULE_SOURCE_SWITCH",
-      "DETAIL_MODULE_SOURCE_SWITCH"
+      "DETAIL_MODULE_SOURCE_SWITCH",
+      "METADATA_ATTACHMENT_INPUTS"
     ],
     "80_OUTPUT_VALIDATE": [
       "OUT_BUILDING_LOD0",

@@ -25,5 +25,6 @@ namespace PCGBike.Buildings
         RoofSurface,
         ParapetCorner,
         ParapetConcaveCorner,
+        FloorBandCorner, // 首层凸角腰线收口；追加编号 22，保持已有载荷兼容。
     }
 }

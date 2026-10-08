@@ -13,20 +13,21 @@ namespace PCGBike.Editor.Buildings
         public static readonly string[] Lists = { "_facade", "_sideRear", "_corners", "_trim", "_roofSurface", "_attachments" };
         public static readonly string[] Names = { "商铺立面", "店铺门", "墙面", "建筑主入口", "标准层窗", "墙面",
             "建筑阳角", "建筑阴角", "檐口", "女儿墙", "侧墙", "背墙", "立面柱", "层间腰线",
-            "雨棚", "招牌", "消防梯", "外墙空调", "屋顶设备", "屋面板", "女儿墙阳角", "女儿墙阴角" };
+            "雨棚", "招牌", "消防梯", "外墙空调", "屋顶设备", "屋面板", "女儿墙阳角", "女儿墙阴角", "腰线凸转角收口" };
         public static string RoleName(int role) => role >= 0 && role < Names.Length ? Names[role] : $"未知用途 ({role})";
         public static int[] Roles(string layer, string list) => list switch {
             "_facade" => layer == "_ground" ? new[] { 3, 0, 1, 2 } : layer == "_upper" ? new[] { 4, 5 } : Array.Empty<int>(),
             "_sideRear" => layer == "_roof" ? Array.Empty<int>() : new[] { 10, 11 },
             "_corners" => layer == "_roof" ? Array.Empty<int>() : new[] { 6, 7 },
-            "_trim" => layer == "_roof" ? new[] { 8 } : new[] { 12, 13, 8 },
+            "_trim" => layer == "_roof" ? new[] { 8 } : layer == "_ground" ? new[] { 12, 13, 22, 8 } : new[] { 12, 13, 8 },
             "_roofSurface" => layer == "_roof" ? new[] { 19, 9, 20, 21 } : Array.Empty<int>(),
             "_attachments" => layer == "_roof" ? new[] { 18 } : layer == "_ground" ? new[] { 14, 15 } : new[] { 14, 15, 16, 17 },
             _ => Array.Empty<int>() };
         public static int Facades(int role) => role switch {
-            0 or 1 or 3 or 14 or 15 => 3, 10 => 4, 11 or 16 => 8, 17 => 12, _ => 15 };
+            0 or 1 or 3 => 3, 14 or 15 => 23, 12 or 13 or 22 => 31,
+            10 => 4, 11 or 16 => 8, 17 => 12, _ => 15 };
         public static int DefaultHeight(string layer, int role) =>
-            role >= 14 && role <= 18 ? 3 : role is 8 or 9 or 13 or 19 or 20 or 21 ? 2 : layer == "_ground" ? 0 : 1;
+            (role >= 14 && role <= 18) || role == 22 ? 3 : role is 8 or 9 or 13 or 19 or 20 or 21 ? 2 : layer == "_ground" ? 0 : 1;
         public static int[] Heights(string layer, int role) => role >= 14 && role <= 18 ? new[] { 3 } :
             layer == "_roof" ? new[] { 2, 3 } : new[] { layer == "_ground" ? 0 : 1, 2, 3 };
         public static void Initialize(SerializedProperty entry, string layer, int role)

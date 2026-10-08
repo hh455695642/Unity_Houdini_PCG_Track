@@ -21,6 +21,14 @@ def promote(templates, asset, hou_module=None):
         if name not in entries:
             entries[name]=hou.MenuParmTemplate(name,label,items,labels,default_value=default)
     menu('ground_quantity_mode','商业门数量模式',('precise','random'),('固定数量','随机范围'))
+    menu('ground_attachment_placement','首层雨棚／招牌挂点',('0','1'),('网格随机','跟随实际门窗'))
+    entries['ground_attachment_placement'].setMenuUseToken(True)
+    entries['ground_attachment_placement'].setHelp('仅影响首层雨棚和招牌；跟随最终实际门窗。密度、上限及立面/楼层覆盖继续由实例附件规则控制。')
+    if 'STREETBUILDING_GROUND_CORNER_20261003' in asset.node('StreetBuildingCore/SELECT_FACADE_VARIANTS').evalParm('snippet'):
+        if 'corner_building' not in entries:
+            entries['corner_building']=hou.ToggleParmTemplate('corner_building','街角建筑（首层侧面装饰）',default_value=False)
+        menu('corner_street_side','首层临街侧面',('0','1','2'),('左侧','右侧','两侧'),1)
+        entries['corner_street_side'].setMenuUseToken(True)
     menu('shopfront_control','橱窗控制方式',('count','ratio'),('按模块数量','按占格比例'))
     menu('shopfront_quantity_mode','橱窗数量模式',('precise','random'),('固定数量','随机范围'))
     if 'shopfront_facades' not in entries:
@@ -70,7 +78,11 @@ def promote(templates, asset, hou_module=None):
     upper=[take('facade_layout_mode','标准层数量模式'),take('window_count_min','窗模块数量／随机最小值（每层每立面）'),
         take('window_count_max','窗模块随机最大数量（每层每立面）','{ facade_layout_mode != random }'),take('facade_rhythm','标准层排列方式')]
     roof=[take(n) for n in ('roof_enabled','parapet_enabled','parapet_height','architectural_trim_enabled')]
-    attach=[take('attachments_enabled'),take('attachment_global_density',hide='{ attachments_enabled == 0 }')]
+    if 'corner_building' in entries:
+        roof += [take('corner_building',help='只控制首层侧面装饰，不改变墙体、门窗、上层、屋顶或道路识别。'),
+            take('corner_street_side',hide='{ corner_building == 0 }',help='主正面的局部左／右；仅外侧墙段，L 形凹口内墙不自动临街。')]
+    attach=[take('attachments_enabled'),take('attachment_global_density',hide='{ attachments_enabled == 0 }'),
+        take('ground_attachment_placement',hide='{ attachments_enabled == 0 }')]
     for key,label in (('awning','雨棚'),('sign','招牌'),('fire_escape','消防梯'),('wall_ac','墙面空调'),('roof_props','屋顶附件')):
         attach.append(group('sb_attachments_'+key,label,[take(key+'_density',hide='{ attachments_enabled == 0 }'),take(key+'_max_count',hide='{ attachments_enabled == 0 }')]))
     local=[take('facade_overrides'),take('attachment_overrides')]

@@ -2,7 +2,7 @@
 import re
 import hou
 
-REMOVED=('corner_building','floor_height_ground','floor_height_typical')
+REMOVED=('floor_height_ground','floor_height_typical')
 
 def height_catalog(raw, ground, upper):
     rows=raw.splitlines(); rows[0]=f'STYLE|2|{ground}|{upper}'
