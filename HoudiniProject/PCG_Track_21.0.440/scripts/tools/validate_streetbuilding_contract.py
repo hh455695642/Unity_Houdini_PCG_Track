@@ -192,9 +192,20 @@ def quaternion_matches(actual, yaw_degrees: float) -> bool:
     return abs(abs(dot) - 1.0) <= 1e-4
 
 
-def assert_ac_support_plane(point: hou.Point, width: float, depth: float) -> None:
+def assert_ac_support_plane(point: hou.Point, width: float, depth: float, asset=None) -> None:
     face = point.intAttribValue("face_index")
     x, _, z = (float(value) for value in point.position())
+    surface = point.stringAttribValue('surface_role')
+    if surface in ('notch_inner', 'notch_rear'):
+        require(asset is not None, 'Notch support verification requires the current asset')
+        hosts = geometry(asset, 'SELECT_FACADE_MODULES')
+        matching = [h for h in hosts.points() if h.stringAttribValue('surface_role') == surface
+                    and h.intAttribValue('face_index') == face
+                    and h.intAttribValue('floor_index') == point.intAttribValue('floor_index')]
+        require(matching and any(abs(x-h.position()[0]) <= .001 if face < 3
+                                 else abs(z-h.position()[2]) <= .001 for h in matching),
+                'Notch AC is detached from its actual host plane')
+        return
     plane_error = abs(x - width * .5) if face == 1 else (
         abs(x + width * .5) if face == 2 else abs(z + depth))
     require(plane_error <= .001,
@@ -700,7 +711,7 @@ def assert_details(asset: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
         elif role == "ACUnit":
             require(face in (1, 2, 3) and floor >= 1,
                     "ACUnit must attach to an upper side/rear surface")
-            assert_ac_support_plane(point, 12, 10)
+            assert_ac_support_plane(point, 12, 10, asset)
         elif role == "RoofProp":
             x_cell = cell % width_cells
             z_cell = cell // width_cells
@@ -808,7 +819,13 @@ def assert_l_shape(asset: hou.Node) -> dict[str, Any]:
                      if point.stringAttribValue("module_role") == "ACUnit"]
         require(ac_points, f"{label} did not exercise AC placement")
         for point in ac_points:
-            assert_ac_support_plane(point, 12, 10)
+            assert_ac_support_plane(point, 12, 10, asset)
+            if point.stringAttribValue('surface_role') in ('notch_inner', 'notch_rear'):
+                # Concave runs have their own local cells; validate full footprints
+                # through the independent spatial oracle, not outer-envelope cells.
+                from validate_streetbuilding_ac_notches import assert_notch_support
+                assert_notch_support(asset)
+                continue
             face = point.intAttribValue("face_index")
             cell = point.intAttribValue("cell_index")
             unity_x = -float(point.position()[0])
@@ -1520,6 +1537,9 @@ def assert_ac_wall_records(asset: hou.Node, host_name: str = 'SELECT_FACADE_MODU
     hosts = geometry(asset, host_name).freeze()
     details = geometry(asset, 'OUT_DETAIL_INSTANCES').freeze()
     ac = [p for p in details.points() if p.stringAttribValue('module_role') == 'ACUnit']
+    from validate_streetbuilding_ac_notches import assert_notch_support
+    notch_count = assert_notch_support(asset, host_name)
+    ac = [p for p in ac if p.stringAttribValue('surface_role') not in ('notch_inner', 'notch_rear')]
     catalog = catalog_module_rows(asset.parm('unity_style_catalog').evalAsString())
     cw = float(asset.parm('unity_style_catalog').evalAsString().splitlines()[0].split('|')[1])
     occupied = set()
@@ -1557,7 +1577,7 @@ def assert_ac_wall_records(asset: hou.Node, host_name: str = 'SELECT_FACADE_MODU
         expected_u = (cell + span * .5) * cw
         actual_u = p.position()[2] + depth if face == 1 else -p.position()[2] if face == 2 else p.position()[0] + width * .5
         require(abs(actual_u - expected_u) < .001, 'AC pivot is not centered within its supported footprint')
-    return len(ac)
+    return len(ac) + notch_count
 
 
 def assert_ac_solid_walls(parent_asset: hou.Node) -> dict[str, Any]:
@@ -1898,6 +1918,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     from validate_streetbuilding_trim_missing import validate_trim_missing
     trim_missing = validate_trim_missing(fresh)
     attachment_diagnostics = assert_attachment_diagnostics(fresh)
+    from validate_streetbuilding_ac_notches import validate_ac_notches
+    ac_notches = validate_ac_notches(fresh)
     return {"attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
@@ -1915,7 +1937,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "roof_trim": assert_roof_trim(fresh), "single_ground_trim": single_ground_trim,
             "roof_lower_trim": roof_lower_trim,
             "ground_attachment_hosts": ground_attachment_hosts,
-            "ac_solid_walls": assert_ac_solid_walls(fresh), "arrangement": arrangement,
+            "ac_solid_walls": assert_ac_solid_walls(fresh), "ac_notches": ac_notches, "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
             "side_door_seed_diversity": assert_side_door_seed_diversity(fresh)}

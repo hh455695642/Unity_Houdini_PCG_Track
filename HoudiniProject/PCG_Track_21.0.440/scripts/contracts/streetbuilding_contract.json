@@ -333,7 +333,16 @@
     "StreetBuilding.Trim.OptionalSideNoPhantomPreview",
     "StreetBuilding.Attachments.DiagnosticSources",
     "StreetBuilding.Attachments.DiagnosticZeroReasons",
-    "StreetBuilding.Attachments.DiagnosticActualCounts"
+    "StreetBuilding.Attachments.DiagnosticActualCounts",
+    "StreetBuilding.Arrangement.UpperUniformA",
+    "StreetBuilding.Arrangement.OrderedWallOptimality",
+    "StreetBuilding.Arrangement.FinalInstancePreservation",
+    "StreetBuilding.Arrangement.UnityHapiRoundTrip",
+    "StreetBuilding.AC.NotchSolidWallSupport",
+    "StreetBuilding.AC.NotchFourCorners",
+    "StreetBuilding.AC.NotchSpanIsolation",
+    "StreetBuilding.AC.NotchBudgetAndDeterminism",
+    "StreetBuilding.Tests.IsolatedHapiSession"
   ],
   "three_layer_rules": {
     "version": 1,
