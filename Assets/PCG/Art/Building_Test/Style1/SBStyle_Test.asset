@@ -248,7 +248,95 @@ MonoBehaviour:
       _enabled: 1
       _allowedFacades: 15
       _allowedFloors: 4
-    _attachments: []
+    - _prefab: {fileID: 5952804502548269029, guid: 40080b0c7b5c2ad40a4ee76069c1db9f,
+        type: 3}
+      _moduleRole: 9
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 8656312819588551914, guid: 5be9856beafd3174994f458da19e8bd9,
+        type: 3}
+      _moduleRole: 20
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 7512089191086494549, guid: 421570b52fb0ecc489c9e03d0b33d6a4,
+        type: 3}
+      _moduleRole: 21
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    _attachments:
+    - _prefab: {fileID: 3013368231953675169, guid: 5df6f60f4ae8d844f8833221c0686daa,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 1411457902746600151, guid: d993cbecd9f83b149b4dd149855f6a06,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 372920900577846414, guid: 2bf11f1aa26c48d41bfc159c94a7e2e7,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 1065807793587682657, guid: deaa22194a2ed45408508c3867667411,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+    - _prefab: {fileID: 2292865399698446366, guid: 4833faeb4a38c674aa95b8bd661fa51e,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
   _groundFacade: []
   _upperFacade: []
   _sideRear: []

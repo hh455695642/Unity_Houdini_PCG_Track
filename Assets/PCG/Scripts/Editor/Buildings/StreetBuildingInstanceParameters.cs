@@ -9,6 +9,10 @@ namespace PCGBike.Editor.Buildings
     internal static class StreetBuildingInstanceParameters
     {
         internal static bool Exists(HEU_HoudiniAsset a, string name) =>
+            // Scene reopen/domain reload leaves a cold asset at ID -1 until
+            // HEU reloads it. Session Sync can invoke BeforeCook in this gap;
+            // there is no HAPI node to query and no instance value to rewrite.
+            a != null && a.AssetID >= 0 &&
             a.GetAssetSession(false)?.GetParmIDFromName(a.AssetID, name, out _) == true;
 
         internal static int Int(HEU_HoudiniAsset a, string name, int fallback = 0)

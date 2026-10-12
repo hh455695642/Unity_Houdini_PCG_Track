@@ -424,7 +424,15 @@ function Invoke-StreetBuildingPipelineTests {
             if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
                 $file = Get-Item -LiteralPath $resultPath
                 if ($file.LastWriteTimeUtc -ge $runStartedAt.AddSeconds(-2)) {
-                    [xml]$xml = Get-Content -LiteralPath $resultPath -Raw
+                    # The writer truncates the file before replacing its XML.
+                    # An incomplete read is not a result; keep polling the
+                    # typed job and require the same complete acceptance below.
+                    $resultText = Get-Content -LiteralPath $resultPath -Raw
+                    if ([string]::IsNullOrWhiteSpace($resultText)) { continue }
+                    try { [xml]$xml = $resultText }
+                    catch { continue }
+                    if ($null -eq $xml.DocumentElement -or
+                        $xml.DocumentElement.Name -ne 'test-run') { continue }
                     $cases = @($xml.SelectNodes('//test-case'))
                     $actual = @($cases | ForEach-Object { $_.GetAttribute('fullname') } |
                         Sort-Object)
