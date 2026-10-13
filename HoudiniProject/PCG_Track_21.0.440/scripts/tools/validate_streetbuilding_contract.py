@@ -514,18 +514,15 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
     require(core.node("SELECT_FACADE_VARIANTS").inputs()[:2] == (
         core.node("ALLOCATE_FACADE_CAPACITY"), core.node("PARSE_UNITY_INSTANCE_CATALOG")),
         "Facade selector wiring failed")
-    require(core.node("DIRECT_UNITY_INSTANCE_FACADE").input(0)
-            == core.node("SELECT_FACADE_MODULES"), "Front semantic-consumer wiring failed")
-    require(core.node("BUILD_DIRECT_SIDE_REAR_INSTANCES").input(0)
-            == core.node("SELECT_FACADE_MODULES"), "Side/rear semantic-consumer wiring failed")
+    from validate_streetbuilding_maintenance import assert_native_network
+    assert_native_network(asset)
     require(core.node("MERGE_DIRECT_BUILDING_INSTANCES").inputs()[:4] == (
         core.node("DIRECT_UNITY_INSTANCE_FACADE"),
         core.node("BUILD_DIRECT_SIDE_REAR_INSTANCES"),
         core.node("BUILD_DIRECT_ROOF_INSTANCES"),
         core.node("BUILD_DIRECT_ROOF_EDGE_INSTANCES")), "Full-envelope merge wiring failed")
     require(core.node("VALIDATE_DIRECT_BUILDING_INSTANCES").input(0)
-            == core.node("FILTER_REAL_INSTANCES") and core.node("FILTER_REAL_INSTANCES").input(0)
-            == core.node("MERGE_DIRECT_BUILDING_INSTANCES"), "Preview filter/validator wiring failed")
+            == core.node("FILTER_REAL_INSTANCES"), "Preview filter/validator wiring failed")
     require(core.node("LOD0_MODULE_SOURCE_SWITCH").input(1)
             == core.node("VALIDATE_DIRECT_BUILDING_INSTANCES"), "V6 shell switch wiring failed")
     require(core.node("DETAIL_INSTANCE_POINTS").input(0)
@@ -1896,6 +1893,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     assert_network(fresh, contract)
     from validate_streetbuilding_core_cleanup import validate_core_cleanup
     core_cleanup = validate_core_cleanup(fresh)
+    from validate_streetbuilding_maintenance import validate_maintenance
+    maintenance = validate_maintenance(fresh)
     from validate_streetbuilding_notches import validate_notches
     from validate_streetbuilding_parameters import validate_parameters
     from validate_streetbuilding_facade_modes import validate_facade_modes
@@ -1920,7 +1919,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     attachment_diagnostics = assert_attachment_diagnostics(fresh)
     from validate_streetbuilding_ac_notches import validate_ac_notches
     ac_notches = validate_ac_notches(fresh)
-    return {"attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    return {"attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),

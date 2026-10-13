@@ -413,7 +413,10 @@ function Invoke-StreetBuildingPipelineTests {
         if ($LASTEXITCODE -ne 0 -or -not $poll.success) {
             throw 'StreetBuilding Pipeline EditMode test status failed.'
         }
-        $status = $poll.data.result | ConvertFrom-Json
+        # Pipeline 0.8 returns the typed result directly; older servers returned
+        # JSON text. Normalize the transport without changing acceptance checks.
+        $status = $poll.data.result
+        if ($status -is [string]) { $status = $status | ConvertFrom-Json }
         if ($status.status -eq 'running' -and
             [DateTime]::UtcNow -ge $runStartedAt.AddSeconds(20)) {
             # TestResults.xml is written after the four tests finish. On this

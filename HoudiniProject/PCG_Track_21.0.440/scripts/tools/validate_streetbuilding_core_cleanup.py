@@ -15,13 +15,16 @@ STAGES = {
     '20_FACADE_CAPACITY': ['BUILD_FACADE_CELLS', 'ALLOCATE_FACADE_CAPACITY'],
     '30_FACADE_SELECTION': ['SELECT_FACADE_VARIANTS', 'SELECT_FACADE_MODULES'],
     '40_BUILDING_INSTANCES': ['DIRECT_UNITY_INSTANCE_FACADE', 'BUILD_DIRECT_SIDE_REAR_INSTANCES',
-        'BUILD_DIRECT_ROOF_INSTANCES', 'BUILD_DIRECT_ROOF_EDGE_INSTANCES'],
+        'BUILD_DIRECT_ROOF_INSTANCES', 'BUILD_DIRECT_ROOF_EDGE_INSTANCES',
+        'FRONT_TARGET_FILTER', 'FRONT_POINTS_ONLY', 'FRONT_INSTANCE_ATTRIBUTES',
+        'SIDE_REAR_TARGET_FILTER', 'SIDE_REAR_POINTS_ONLY', 'SIDE_REAR_INSTANCE_ATTRIBUTES'],
     '50_ATTACHMENT_INSTANCES': ['SELECT_ATTACHMENT_MODULES', 'DETAIL_INSTANCE_POINTS'],
     '60_PROXY_MODEL': ['RESOLVE_MASSING', 'RESOLVE_FACADE_GRAMMAR', 'VALIDATE_MODULE_LIBRARY',
         'BUILD_LOD0', 'NORMAL_LOD0'],
     '70_UNITY_CONTRACT': ['MERGE_DIRECT_BUILDING_INSTANCES', 'FILTER_REAL_INSTANCES',
         'VALIDATE_DIRECT_BUILDING_INSTANCES', 'VALIDATE_DIRECT_DETAIL_INSTANCES',
-        'PREVIEW_MISSING_MODULES', 'BUILD_METADATA', 'METADATA_ATTACHMENT_INPUTS', 'LOD0_MODULE_SOURCE_SWITCH', 'DETAIL_MODULE_SOURCE_SWITCH'],
+        'PREVIEW_MISSING_MODULES', 'BUILD_METADATA', 'METADATA_ATTACHMENT_INPUTS', 'LOD0_MODULE_SOURCE_SWITCH', 'DETAIL_MODULE_SOURCE_SWITCH',
+        'REAL_INSTANCE_FILTER', 'REAL_INSTANCE_ATTRIBUTES'],
     '80_OUTPUT_VALIDATE': ['OUT_BUILDING_LOD0', 'OUT_BUILDING_LOD1', 'OUT_BUILDING_LOD2',
         'OUT_DETAIL_INSTANCES', 'OUT_BUILDING_COLLISION', 'OUT_BUILDING_METADATA', 'OUT_BUILDING_PREVIEW'],
 }
@@ -36,7 +39,7 @@ def validate_core_cleanup(asset):
     from validate_streetbuilding_contract import require, configure, geometry, STYLE_CATALOG, signature
     c = asset.node('StreetBuildingCore')
     require(set(n.name() for n in c.children()) == {n for names in STAGES.values() for n in names},
-            'Core node inventory differs from the 40-node contract')
+            'Core node inventory differs from the explicitly maintained stage contract')
     boxes = {b.name(): b for b in c.networkBoxes()}
     require(set(boxes) == set(STAGES), 'Missing/obsolete stage boxes')
     for name, members in STAGES.items():
@@ -84,7 +87,7 @@ def validate_core_cleanup(asset):
                 require(not g.points() and not g.prims(), 'Retired output emits geometry')
     finally:
         a.destroy()
-    return dict(status='PASS', nodes=40, stages=9, stable_outputs=7, retired_builders=6,
+    return dict(status='PASS', nodes=len(c.children()), stages=9, stable_outputs=7, retired_builders=6,
                 lod_value_has_no_generation_semantics=True)
 
 

@@ -16,7 +16,7 @@
 - 使用 Unity URP，不使用 Built-in Render Pipeline。
 - Shader 放在 `Assets/PCG/Shaders/`，Material 放在 `Assets/PCG/Materials/`，Texture 放在 `Assets/PCG/Texture/`。
 - 生成 Road Bake 资产放在 `Assets/PCG/Generated/Road/`。
-- 移动、删除、重命名必须通过 AssetDatabase / Unity MCP 并保留 GUID 与 `.meta`。
+- 移动、删除、重命名必须优先通过 Unity Pipeline CLI 的类型化资产命令调用 AssetDatabase，并保留 GUID 与 `.meta`；仅在 Pipeline 健康且缺少对应命令时，按根目录回退规则使用 Unity MCP。
 - Bake 输出结构必须允许美术和地编局部锁定、替换、覆盖；重新生成不得无提示覆盖人工修改。
 - 资产引用不得硬编码具体美术资源，配置优先使用 ScriptableObject。
 
@@ -54,7 +54,7 @@ Track Path、Road Surface、Terrain、Water、Bridge、Vegetation、Decoration�
 
 ## Unity 验证
 
-完成修改后必须通过 Unity MCP：
+完成修改后必须通过 Unity Pipeline CLI 的类型化命令完成以下验证。仅在 Pipeline 健康且确认缺少对应命令时，才允许按根目录回退规则使用 Unity MCP，并记录缺失命令和回退原因：
 
 1. 检查 Editor 是否编译或 domain reload。
 2. 检查相关场景、资产、Renderer 和引用。

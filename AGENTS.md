@@ -21,7 +21,7 @@
 - 禁止覆盖、回退、格式化或清理与当前任务无关的用户改动和未跟踪文件。
 - 禁止把 Git HEAD、历史提交、备份 HDA、旧 patch 或 builder 当作当前现场的默认事实源。
 - 禁止在移动端运行时依赖 Houdini Cook；运行时只消费 Bake 后的 Unity 原生或 GPU 可直接消费的数据。
-- Unity 资产移动、删除、重命名必须保留 `.meta`，优先使用 Unity AssetDatabase / Unity MCP。
+- Unity 资产移动、删除、重命名必须保留 `.meta`，优先通过 Unity Pipeline CLI 的类型化资产命令调用 AssetDatabase；仅在 Pipeline 健康且缺少对应命令时，按下述回退规则使用 Unity MCP。
 
 若功能只能通过侵入 Houdini Engine Unity 插件或破坏上述边界实现，必须停止并说明限制，等待用户重新明确授权。
 
@@ -96,7 +96,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Invoke-PcgRe
 - 禁止盲目替换 VEX 文本；前置内容不匹配必须失败退出。
 - `build_curve_road_test.py` 只允许在用户明确要求整套重建时使用；其清空 HIP、删除 HDA 和备份的逻辑默认禁止执行。
 
-## MCP 与验证
+## Unity CLI、Houdini MCP 与验证
 
 ### Unity Pipeline CLI 强制前置门禁
 
@@ -112,7 +112,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-Unity
 
 首次修复导致 Pipeline Server 无法启动的编译错误属于引导例外：允许先应用已经明确授权的最小源码补丁，再立即恢复上述 CLI 门禁。脚本不得自动关闭、强制终止或重启已有 Editor，不得丢弃未保存 Scene，也不得删除 `Library/`。
 
-Pipeline 健康且目标操作缺少 CLI 命令时，必须主动使用 Unity MCP 获取真实状态并验证；CLI 能完成的状态、Console、编译、测试与资产操作仍以 CLI 为准。
+Unity 的状态、Console、编译、测试、场景及资产操作必须优先使用 Unity Pipeline CLI。仅在 Pipeline 健康且确认缺少目标类型化命令时，才允许使用 Unity MCP 获取对应真实状态、执行操作与验证，并记录缺失命令和回退原因；不得以 MCP 替代 CLI 已支持的操作。
 
 涉及 Houdini、HDA、HIP、SOP、Cook、Bake 或 Houdini 到 Unity 数据链路时，必须先运行：
 
