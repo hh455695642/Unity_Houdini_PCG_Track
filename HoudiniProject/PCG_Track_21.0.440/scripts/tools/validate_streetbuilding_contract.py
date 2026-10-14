@@ -1904,6 +1904,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     window_counts = validate_window_counts(fresh)
     from validate_streetbuilding_instance_rules import validate_instance_rules
     instance_rules = validate_instance_rules(fresh)
+    from validate_streetbuilding_doors import validate_doors
+    door_weight_placement = validate_doors(fresh)
     from validate_streetbuilding_trim_endpoints import validate_trim_endpoints
     trim_endpoints = validate_trim_endpoints(fresh)
     from validate_streetbuilding_single_ground_trim import validate_single_ground_trim
@@ -1938,6 +1940,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "ground_attachment_hosts": ground_attachment_hosts,
             "ac_solid_walls": assert_ac_solid_walls(fresh), "ac_notches": ac_notches, "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
+            "door_weight_placement": door_weight_placement,
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
             "side_door_seed_diversity": assert_side_door_seed_diversity(fresh)}
 

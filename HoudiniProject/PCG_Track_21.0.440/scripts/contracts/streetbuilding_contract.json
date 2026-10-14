@@ -356,7 +356,12 @@
     "StreetBuilding.Maintenance.NavigationIdempotence",
     "StreetBuilding.Maintenance.DetailValidationSinglePass",
     "StreetBuilding.Tests.PipelineStatusEnvelope",
-    "StreetBuilding.Maintenance.TransactionalRollback"
+    "StreetBuilding.Maintenance.TransactionalRollback",
+    "StreetBuilding.Doors.WeightedStyles",
+    "StreetBuilding.Doors.PlacementCountIndependent",
+    "StreetBuilding.Doors.CompletePlacement",
+    "StreetBuilding.Doors.NoPrematureShopCompression",
+    "StreetBuilding.Doors.DeterministicCatalogOrder"
   ],
   "three_layer_rules": {
     "version": 1,
