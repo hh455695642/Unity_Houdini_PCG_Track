@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using HoudiniEngineUnity;
 using PCGBike.Buildings;
 using UnityEditor;
@@ -90,7 +91,10 @@ namespace PCGBike.Editor.Buildings
             // An old loaded definition must be rebuilt before the new bridge can migrate it.
             if (!StreetBuildingInstanceParameters.Exists(asset,"ground_quantity_mode")) return;
             if (PendingCooks.ContainsKey(asset)) throw new InvalidOperationException("StreetBuilding Cook already pending.");
-            var compiled=StreetBuildingStyleCompiler.Compile(author.ResolveStyle());
+            StreetBuildingPanelState.Begin(asset, author);
+            StreetBuildingCompiledStyle compiled;
+            try { compiled = StreetBuildingStyleCompiler.Compile(author.ResolveStyle()); }
+            catch (Exception failure) { StreetBuildingPanelState.Fail(author, failure.Message); throw; }
             var current=DoorValues(asset);
             bool observed=ObservedDoors.TryGetValue(asset,out var previous);
             int seed=StreetBuildingInstanceParameters.Int(asset,"layout_seed",author.LayoutSeed);
@@ -113,8 +117,10 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingInstanceParameters.SetInt(asset,"unified_ground_walls",1);
                 StreetBuildingInstanceParameters.SetInt(asset,"layout_seed",seed);
                 PendingCooks.Add(asset,pending);
+                // 提交版本包含本次已确定的布局种子和一次迁移；之后的编辑不归入此结果。
+                StreetBuildingPanelState.Get(author).Submitted = StreetBuildingPanelState.CaptureInputs(asset, author);
             }
-            catch { pending.Snapshot.Restore(asset); throw; }
+            catch (Exception failure) { RollbackFailure(asset, pending, failure.Message); throw; }
         }
         internal static int NormalizeLegacyPanelValue(string name, int value) =>
             name == "ground_floor_use" && value == 3 ? 2 :
@@ -133,9 +139,16 @@ namespace PCGBike.Editor.Buildings
             var author=pending.Authoring;
             if (!data.CookSuccess)
             {
-                pending.Snapshot.Restore(data.Asset);
-                author.SetEditorInstanceRuleSchema(pending.SchemaBefore);
-                author.SetEditorCookDiagnostic("Cook FAIL：本次生成失败，结果未更新；保留实例参数。\n上次成功 Cook／历史诊断：\n" + author.LastCookDiagnostic);
+                string reason = "Cook 失败";
+                try { reason = data.Asset.GetAssetSession(false)?.ComposeNodeCookResult(data.Asset.AssetID, HAPI_StatusVerbosity.HAPI_STATUSVERBOSITY_ERRORS); }
+                catch (Exception e) { reason += "；会话诊断不可读：" + e.Message; }
+                RollbackFailure(data.Asset, pending, reason);
+                return;
+            }
+            try { StreetBuildingPanelState.Commit(data.Asset, author); }
+            catch (Exception failure)
+            {
+                RollbackFailure(data.Asset, pending, failure.Message);
                 return;
             }
             ObservedDoors[data.Asset]=DoorValues(data.Asset);
@@ -147,6 +160,17 @@ namespace PCGBike.Editor.Buildings
             author.SetEditorMissingModuleSummary(StreetBuildingPartialBake.MissingSummary(data.Asset));
             author.SetEditorCookDiagnostic("Cook PASS：素材已同步；生成规则：实例面板／显式局部覆盖；"+ReadGroundSummary(data.Asset,cell,pending.Seed));
             EditorUtility.SetDirty(author);EditorSceneManager.MarkSceneDirty(author.gameObject.scene);
+        }
+
+        private static void RollbackFailure(HEU_HoudiniAsset asset, Pending pending, string reason)
+        {
+            var author = pending.Authoring;
+            try { pending.Snapshot.Restore(asset); }
+            catch (Exception e) { reason += "\n技术参数恢复失败：" + e.Message; }
+            author.SetEditorInstanceRuleSchema(pending.SchemaBefore);
+            author.SetEditorCookDiagnostic("Cook FAIL：本次生成失败，结果未更新。\n上次诊断：\n" + author.LastCookDiagnostic);
+            // 无论技术参数能否恢复，都执行真实输出保全，不能由断线异常跳过。
+            StreetBuildingPanelState.Fail(author, reason);
         }
 
         internal static int ReadEntranceCell(HEU_HoudiniAsset asset)
@@ -214,44 +238,28 @@ namespace PCGBike.Editor.Buildings
             summary += "；布局种子 " + seed;
             if (!string.IsNullOrWhiteSpace(fallback) && fallback != "none")
                 summary += "；回退原因 " + fallback;
-            if (!string.IsNullOrWhiteSpace(shopReport)) summary += "\n首层橱窗：\n" + shopReport;
+            if (!string.IsNullOrWhiteSpace(shopReport)) summary += "\n首层橱窗：\n" + FormatQuantityReport(shopReport);
             if (!string.IsNullOrWhiteSpace(upperWindows))
-                summary += "\n标准层窗模块（F 为从 1 开始的楼层；Face 0/1/2/3 为正/左/右/后）：\n" + upperWindows;
+                summary += "\n标准层窗模块：\n" + FormatQuantityReport(upperWindows);
             if (!string.IsNullOrWhiteSpace(attachments)) summary += "\n附件（实际生成过程）：\n" + FormatAttachments(attachments);
             return summary;
         }
+        internal static string FormatQuantityReport(string report)
+        {
+            string result = Regex.Replace(report, @"source=instance_override:(\d+)", m => "来源=局部覆盖第" + m.Groups[1].Value + "条");
+            result = Regex.Replace(result, @"source=parcel_override:(\d+)", m => "来源=地块覆盖第" + m.Groups[1].Value + "行");
+            result = result.Replace("source=instance+parcel", "来源=基础参数及地块全局覆盖").Replace("source=instance", "来源=基础参数");
+            result = Regex.Replace(result, @"\bF(\d+)\b", m => "第" + m.Groups[1].Value + "层");
+            result = result.Replace("Face0", "正面").Replace("Face1", "左侧").Replace("Face2", "右侧").Replace("Face3", "背面")
+                .Replace("mode=precise", "模式=固定数量").Replace("mode=random", "模式=随机范围").Replace("mode=ratio", "模式=占格比例")
+                .Replace("requested=", "请求=").Replace("actual=", "实际模块=").Replace("occupied=", "占格=")
+                .Replace("eligible=", "可用格=").Replace("resolved_metric=", "实际指标=").Replace("reason=", "原因=")
+                .Replace("none", "无阻止原因").Replace("no_candidate", "无适用素材").Replace("span_infeasible", "连续空间不足");
+            return result;
+        }
         // Only format metadata from the completed Cook. Do not duplicate HDA
         // placement rules or read StyleConfig as a second generation authority.
-        internal static string FormatAttachments(string report)
-        {
-            string[] names = { "雨棚", "招牌", "消防梯", "墙面空调", "屋顶配件" };
-            var text = new System.Text.StringBuilder();
-            foreach (string row in report.Split('\n'))
-            {
-                var f = row.Split('|');
-                if (f.Length == 6 && f[0] == "G")
-                {
-                    text.AppendLine($"全局附件密度：基础 {f[1]}，生效 {f[2]}；来源 {(f[3] == "instance" ? "基础面板" : "地块全局覆盖第 " + f[3].Substring("parcel_global:".Length) + " 行")}；附件开关：基础 {f[4]}，生效 {f[5]}");
-                    continue;
-                }
-                if (f.Length != 16 || !int.TryParse(f[0], out int kind) || kind < 0 || kind >= names.Length) continue;
-                int band = int.Parse(f[1], CultureInfo.InvariantCulture);
-                int actual = int.Parse(f[14], CultureInfo.InvariantCulture);
-                if (actual == 0 && band != (kind < 2 ? 0 : kind == 4 ? 2 : 1) && f[11] == "0") continue;
-                string source = f[6] == "instance" ? "基础面板" : f[6].StartsWith("attachment_override:")
-                    ? "附件覆盖第 " + f[6].Substring("attachment_override:".Length) + " 条"
-                    : f[6].StartsWith("parcel:") ? "地块覆盖第 " + f[6].Substring(7) + " 条" : f[6];
-                string reason = f[15].TrimEnd(',').Replace("attachments_disabled", "附件关闭")
-                    .Replace("probability_zero", "概率为零").Replace("maximum_zero", "上限为零")
-                    .Replace("no_material", "缺少素材").Replace("material_scope", "无适用素材（楼层／立面范围）")
-                    .Replace("scope_restricted", "楼层／立面限制").Replace("rear_facade_condition", "后立面条件未满足（须为消防梯模式）")
-                    .Replace("floor_condition", "至少需要三层").Replace("no_eligible_host", "无合格挂点")
-                    .Replace("random_miss", "随机未命中").Replace("budget_truncated", "预算截断")
-                    .Replace("maximum_truncated", "数量上限截断").Replace("none", "无阻止原因");
-                text.AppendLine($"{names[kind]} [{(band == 0 ? "首层" : band == 1 ? "标准层" : "屋顶")}] 实际 {actual}；基础概率 {f[2]}／上限 {f[3]}；生效概率 {f[4]}／上限 {f[5]}；来源：{source}；楼层 {f[8]}～{f[9]}，立面掩码 {f[7]}；素材 {f[10]}／适用 {f[11]}；挂点 {f[12]}，命中 {f[13]}；{reason}");
-            }
-            return text.ToString().TrimEnd();
-        }
+        internal static string FormatAttachments(string report) => StreetBuildingAttachmentDiagnostics.Parse(report).Format();
         internal static string FormatCookState(string history, bool validSession, bool cooking, bool failed)
         {
             string state = !validSession ? "会话无效：结果未更新。" : cooking ? "正在生成：结果未更新。"

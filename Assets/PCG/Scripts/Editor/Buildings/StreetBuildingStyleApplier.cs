@@ -48,6 +48,8 @@ namespace PCGBike.Editor.Buildings
             bool oldDoorMigration = authoring.GroundDoorMigrationComplete;
             string oldTag = root.gameObject.tag;
             int oldRuleSchema = authoring.InstanceRuleSchema;
+            string oldPanelResult = authoring.PanelSuccessfulResultJson;
+            using var retainedOutput = StreetBuildingOutputRetention.Capture(asset);
             try
             {
                 Write(asset, style, compiled.Payload);
@@ -55,6 +57,8 @@ namespace PCGBike.Editor.Buildings
                 if (!RequestCook(asset))
                     throw new InvalidOperationException("StyleConfig cook failed: " + asset.LastCookResult
                         + ReadCookFailure(asset));
+                var panelState = StreetBuildingPanelState.Get(authoring);
+                if (!string.IsNullOrEmpty(panelState.Error)) throw new InvalidOperationException(panelState.Error);
 
                 // Rebuild/domain reload can replace UnityEvent instances. Attach
                 // synchronously before exposing freshly generated outputs to Bake.
@@ -81,19 +85,22 @@ namespace PCGBike.Editor.Buildings
                 try
                 {
                     snapshot.Restore(asset);
-                    authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
-                    authoring.SetEditorInstanceRuleSchema(oldRuleSchema);
-                    authoring.SetEditorCookDiagnostic("Cook FAIL：本次应用失败，结果未更新。\n上次成功 Cook／历史诊断：\n" + oldDiagnostic);
-                    authoring.SetEditorMissingModuleSummary(oldMissingSummary);
-                    authoring.SetEditorLayout(oldLayoutSeed, oldEntranceCell);
-                    authoring.SetEditorGroundDoorMigrationComplete(oldDoorMigration);
-                    root.gameObject.tag = oldTag;
-                    EditorUtility.SetDirty(authoring);
-                    using (StreetBuildingRecook.Suppress())
-                        if (!RequestCook(asset))
-                            throw new InvalidOperationException("rollback cook failed: " + asset.LastCookResult);
                 }
                 catch (Exception exception) { rollbackFailure = exception; }
+                authoring.SetEditorAppliedPayloadSha256(oldPayloadSha);
+                authoring.SetEditorInstanceRuleSchema(oldRuleSchema);
+                authoring.SetEditorCookDiagnostic("Cook FAIL：本次应用失败，结果未更新。\n上次成功 Cook／历史诊断：\n" + oldDiagnostic);
+                authoring.SetEditorMissingModuleSummary(oldMissingSummary);
+                authoring.SetEditorLayout(oldLayoutSeed, oldEntranceCell);
+                authoring.SetEditorGroundDoorMigrationComplete(oldDoorMigration);
+                root.gameObject.tag = oldTag;
+                EditorUtility.SetDirty(authoring);
+                StreetBuildingPanelState.Fail(authoring, failure.Message);
+                var failedState = StreetBuildingPanelState.Get(authoring);
+                try { failedState.Retained = retainedOutput.Restore(); }
+                catch (Exception exception) { failedState.Retained = false; rollbackFailure = exception; }
+                authoring.SetEditorPanelSuccessfulResult(oldPanelResult);
+                failedState.Result = string.IsNullOrEmpty(oldPanelResult) ? null : UnityEngine.JsonUtility.FromJson<StreetBuildingPanelResult>(oldPanelResult);
                 throw new InvalidOperationException(failure.Message + (rollbackFailure == null
                     ? " Style parameters were restored; Scene was not saved."
                     : " Rollback also failed: " + rollbackFailure.Message), failure);
@@ -155,8 +162,25 @@ namespace PCGBike.Editor.Buildings
             }
             public void Restore(HEU_HoudiniAsset a)
             {
-                foreach (var pair in _ints) StreetBuildingInstanceParameters.SetInt(a, pair.Key, pair.Value);
-                foreach (var pair in _strings) StreetBuildingInstanceParameters.SetString(a, pair.Key, pair.Value);
+                Exception failure = null;
+                foreach (var pair in _ints)
+                {
+                    try { StreetBuildingInstanceParameters.SetInt(a, pair.Key, pair.Value); }
+                    catch (Exception e)
+                    {
+                        failure = e;
+                        var p = a.Parameters.GetParameter(pair.Key);
+                        if (p?._intValues?.Length > 0) p._intValues[0] = pair.Value;
+                        if (p != null) { p._toggle = pair.Value != 0; p._choiceValue = p._choiceIntValues == null ? pair.Value : Array.IndexOf(p._choiceIntValues, pair.Value); }
+                    }
+                }
+                foreach (var pair in _strings)
+                {
+                    try { StreetBuildingInstanceParameters.SetString(a, pair.Key, pair.Value); }
+                    catch (Exception e) { failure = e; var p = a.Parameters.GetParameter(pair.Key); if (p?._stringValues?.Length > 0) p._stringValues[0] = pair.Value; }
+                }
+                EditorUtility.SetDirty(a.Parameters);
+                if (failure != null) throw new InvalidOperationException("会话不可写；技术参数缓存已恢复，原生同步待恢复连接。", failure);
             }
         }
     }

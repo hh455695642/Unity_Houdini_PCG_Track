@@ -1052,7 +1052,9 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
     if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('style_rule_source') is not None:
         # Preserve canonical existing definition folders. Unlocked instances
         # synthesize folder ids; promoting those would rename the public API.
-        promoted_templates = original_templates
+        # Keep the preservation snapshot independent: promotion replaces fields
+        # (including conditionals) before preserve_public_interface is applied.
+        promoted_templates = hou.ParmTemplateGroup(original_templates.entries())
         layer = next(t for t in asset.parmTemplateGroup().entries()
                      if isinstance(t, hou.FolderParmTemplate)
                      and any(p.name() == 'style_rule_source' for p in t.parmTemplates()))
@@ -1101,6 +1103,12 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         if notch_tools not in sys.path: sys.path.insert(0, notch_tools)
         from streetbuilding_notch_interface import promote
         promoted_templates = promote(hou, promoted_templates, asset)
+        # Interface compiler files may change while the GUI/RPC process stays
+        # alive. Use current disk code exactly as the fresh candidate process
+        # does; never persist a previously imported template implementation.
+        import importlib
+        import streetbuilding_instance_interface
+        importlib.reload(streetbuilding_instance_interface)
     removing_heights = (expected_type == 'pcgbike::StreetBuilding::1.0'
         and 'STREETBUILDING_STYLE_HEIGHT_SINGLE_SOURCE_20260914' in asset.node('StreetBuildingCore/PARSE_UNITY_INSTANCE_CATALOG').evalParm('snippet'))
     if removing_heights:

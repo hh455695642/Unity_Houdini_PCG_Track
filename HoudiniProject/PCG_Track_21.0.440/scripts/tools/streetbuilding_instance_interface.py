@@ -109,4 +109,25 @@ def promote(templates, asset, hou_module=None):
         ('sb_random','随机与预览',random),('sb_output','输出与诊断',output),('sb_inputs','高级输入',inputs)]:
         result.append(group(name,label,items))
     hidden=group('sb_internal','内部兼容数据（不参与生成规则）',internal);hidden.hide(True);result.append(hidden)
+    # STREETBUILDING_PANEL_METADATA_20261014: 仅展示；候选与正式保存共用。
+    # 继承参数的条件不能在实例上可靠替换，必须经此 canonical promotion 验证后保存。
+    if 'STREETBUILDING_PANEL_METADATA_20261014' in asset.node('StreetBuildingCore/BUILD_METADATA').evalParm('snippet'):
+        updates = {
+            'entrance_count_max': ('商业门数量上限（固定模式使用此数量；整栋首层）', None),
+            'window_count_min': ('窗模块数量下限（固定模式使用此数量；每层每物理立面）', None),
+            'parapet_height': (None, '{ parapet_enabled == 0 }'),
+            'facade_override_layout_mode#': ('数量模式', None),
+            'facade_override_shopfront_min#': ('橱窗模块数量下限（固定模式使用此数量）', '{ facade_override_floor_start# > 1 } { facade_override_floor_end# < 1 } { ground_floor_use == residential }'),
+            'facade_override_shopfront_max#': ('橱窗随机最大模块数', '{ facade_override_layout_mode# != random_range } { facade_override_floor_start# > 1 } { facade_override_floor_end# < 1 } { ground_floor_use == residential }'),
+            'facade_override_window_min#': ('窗模块数量下限（固定模式使用此数量）', '{ facade_override_floor_end# < 2 }'),
+            'facade_override_window_max#': ('窗随机最大模块数', '{ facade_override_layout_mode# != random_range } { facade_override_floor_end# < 2 }'),
+        }
+        for key in ('awning', 'sign', 'fire_escape', 'wall_ac', 'roof_props'):
+            updates['sb_attachments_' + key] = (None, '{ attachments_enabled == 0 }')
+        for name, (label, condition) in updates.items():
+            template = result.find(name)
+            if template is None: raise RuntimeError('Panel template is missing: ' + name)
+            if label is not None: template.setLabel(label)
+            if condition is not None: template.setConditional(hou.parmCondType.HideWhen, condition)
+            result.replace(name, template)
     return result

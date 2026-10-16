@@ -1673,7 +1673,7 @@ def assert_roof_trim(asset: hou.Node) -> dict[str, Any]:
     trim_roles = {'Cornice', 'FloorBand', 'FacadeColumn'}
     try:
         require(test.parm('parapet_enabled') is not None, 'Independent parapet toggle is missing')
-        require(not test.parmTemplateGroup().find('parapet_height').conditionals(),
+        require('roof_enabled' not in str(test.parmTemplateGroup().find('parapet_height').conditionals()),
                 'Parapet height must remain accessible when the roof is disabled')
         for shape in (0, 1):
             for catalog in (STYLE_CATALOG, 'STYLE|2|4|3'):
@@ -1906,6 +1906,10 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     instance_rules = validate_instance_rules(fresh)
     from validate_streetbuilding_doors import validate_doors
     door_weight_placement = validate_doors(fresh)
+    from validate_streetbuilding_panel import validate_panel
+    panel = validate_panel(fresh)
+    from validate_streetbuilding_active_fields import validate_active_fields
+    panel['active_fields'] = validate_active_fields(fresh)
     from validate_streetbuilding_trim_endpoints import validate_trim_endpoints
     trim_endpoints = validate_trim_endpoints(fresh)
     from validate_streetbuilding_single_ground_trim import validate_single_ground_trim
@@ -1941,6 +1945,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "ac_solid_walls": assert_ac_solid_walls(fresh), "ac_notches": ac_notches, "arrangement": arrangement,
             "ground_use_v2": assert_ground_use_v2(fresh),
             "door_weight_placement": door_weight_placement,
+            "parameter_panel": panel,
             "ground_use_seed_isolation": assert_ground_use_seed_isolation(fresh),
             "side_door_seed_diversity": assert_side_door_seed_diversity(fresh)}
 

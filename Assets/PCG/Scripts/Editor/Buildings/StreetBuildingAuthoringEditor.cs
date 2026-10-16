@@ -10,6 +10,9 @@ namespace PCGBike.Editor.Buildings
     [CustomEditor(typeof(StreetBuildingAuthoring))]
     public sealed class StreetBuildingAuthoringEditor : UnityEditor.Editor
     {
+        private readonly StreetBuildingParameterPanel panel = new();
+        private void OnEnable() { if (target is StreetBuildingAuthoring a) StreetBuildingPanelState.Observe(a); }
+        public override bool RequiresConstantRepaint() => true;
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -21,6 +24,7 @@ namespace PCGBike.Editor.Buildings
             serializedObject.ApplyModifiedProperties();
 
             StreetBuildingAuthoring authoring = (StreetBuildingAuthoring)target;
+            panel.Draw(authoring);
             if (!string.IsNullOrEmpty(authoring.MissingModuleSummary))
                 EditorGUILayout.HelpBox("自动缺项占位（上次成功应用）：\n" + authoring.MissingModuleSummary, MessageType.Info);
             StreetBuildingStyleConfig style = authoring.ResolveStyle();
@@ -69,14 +73,8 @@ namespace PCGBike.Editor.Buildings
                 EditorGUILayout.HelpBox("地块来源：自动 → " + resolvedSite, MessageType.Info);
             if (style != null)
             {
-                var complete = StreetBuildingStyleValidator.Validate(style, true);
-                var preview = StreetBuildingStyleValidator.Validate(style);
-                if (!preview.IsValid)
-                    EditorGUILayout.HelpBox("配置数据无效：\n" + string.Join("\n", preview.Errors), MessageType.Error);
-                else if (!complete.IsValid)
-                    EditorGUILayout.HelpBox("部分模块预览可用；正式 Bake 需要补齐：\n" + string.Join("\n", complete.Errors), MessageType.Info);
                 if (GUILayout.Button("完整建筑检查"))
-                    EditorUtility.DisplayDialog("完整建筑检查", complete.ToString(), "确定");
+                    EditorUtility.DisplayDialog("完整建筑检查", StreetBuildingStyleValidator.Validate(style, true).ToString(), "确定");
             }
             EditorGUILayout.HelpBox(style == null
                     ? "必须为当前 HDA 显式指定 StyleConfig。"
