@@ -473,6 +473,11 @@ def assert_interface(asset: hou.Node, contract: dict[str, Any]) -> None:
             "Catalog transport parameter is missing")
     require(isinstance(group.find("unity_bridge_end_marker"), hou.StringParmTemplate),
             "Unity bridge HAPI end marker is missing")
+    require(isinstance(group.find("unity_generation_policy"), hou.StringParmTemplate)
+            and group.find("unity_generation_policy").isHidden()
+            and isinstance(group.find("generation_sequence"), hou.IntParmTemplate)
+            and group.find("generation_sequence").isHidden(),
+            "Hidden instance generation policy interface is missing")
     require(group.find("unity_generation_rules") is None
             and group.find("style_id") is None
             and group.find("unity_bridge_revision") is None,
@@ -1839,6 +1844,29 @@ def assert_attachment_diagnostics(parent: hou.Node) -> dict[str, Any]:
     return dict(status='PASS', cases=cases)
 
 
+def assert_generation_policy(asset: hou.Node) -> dict[str, Any]:
+    """Real output contract: advancing generations affects ranged counts, not fixed counts."""
+    configure(asset, STYLE_CATALOG)
+    asset.parm('ground_rule_schema_version').set(2)
+    asset.parm('layout_seed').set(23)
+    asset.parm('variation_seed').set(7)
+    asset.parm('facade_layout_mode').set(1)
+    asset.parm('window_count_min').set(2)
+    asset.parm('window_count_max').set(2)
+    fixed_reports = []
+    for sequence in range(4):
+        asset.parm('generation_sequence').set(sequence)
+        fixed_reports.append(geometry(asset, 'OUT_BUILDING_METADATA').stringAttribValue('upper_window_report'))
+    require(len(set(fixed_reports)) == 1, 'Equal window endpoints changed with generation sequence')
+    asset.parm('window_count_max').set(4)
+    random_reports = []
+    for sequence in range(16):
+        asset.parm('generation_sequence').set(sequence)
+        random_reports.append(geometry(asset, 'OUT_BUILDING_METADATA').stringAttribValue('upper_window_report'))
+    require(len(set(random_reports)) > 1, 'Window range did not redraw across explicit generations')
+    return {'fixed_reports': len(set(fixed_reports)), 'ranged_reports': len(set(random_reports))}
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -1882,7 +1910,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.V12.StyleBridgeHapiVisible",
                 "StreetBuilding.V13.PrefabFilenameVariant",
                 "StreetBuilding.Layers.StyleDefaultsAndOverrides", "StreetBuilding.Layers.FloorOwnership",
-                "StreetBuilding.Layers.IndependentSelection", "StreetBuilding.Layers.MigrationAndTransactions"}
+                "StreetBuilding.Layers.IndependentSelection", "StreetBuilding.Layers.MigrationAndTransactions",
+                "StreetBuilding.Panel.GenerationPolicy"}
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
@@ -1908,6 +1937,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     door_weight_placement = validate_doors(fresh)
     from validate_streetbuilding_panel import validate_panel
     panel = validate_panel(fresh)
+    panel['generation_policy'] = assert_generation_policy(fresh)
     from validate_streetbuilding_active_fields import validate_active_fields
     panel['active_fields'] = validate_active_fields(fresh)
     from validate_streetbuilding_trim_endpoints import validate_trim_endpoints
@@ -2012,7 +2042,8 @@ def _sb_export_candidate(path):
             templates.insertBefore('parapet_height', parapet)
         else:
             templates.replace('parapet_enabled', parapet)
-    for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
+    for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell',
+                 'unity_generation_policy', 'generation_sequence'):
         template = asset.parmTemplateGroup().find(name)
         require(template is not None, 'Unified ground interface is missing: ' + name)
         if templates.find(name) is None:

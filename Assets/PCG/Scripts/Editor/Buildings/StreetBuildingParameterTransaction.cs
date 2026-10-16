@@ -68,7 +68,8 @@ namespace PCGBike.Editor.Buildings
         internal static bool IsStructure(string name) => name == "facade_overrides" || name == "attachment_overrides";
         private static void Write(HEU_HoudiniAsset asset, StreetBuildingPanelInput row)
         {
-            if (row.floating) StreetBuildingInstanceParameters.SetFloat(asset, row.name, float.Parse(row.value, CultureInfo.InvariantCulture));
+            if (row.textual) StreetBuildingInstanceParameters.SetString(asset, row.name, row.value);
+            else if (row.floating) StreetBuildingInstanceParameters.SetFloat(asset, row.name, float.Parse(row.value, CultureInfo.InvariantCulture));
             else StreetBuildingInstanceParameters.SetInt(asset, row.name, int.Parse(row.value, CultureInfo.InvariantCulture));
         }
         private static void SyncUndo()

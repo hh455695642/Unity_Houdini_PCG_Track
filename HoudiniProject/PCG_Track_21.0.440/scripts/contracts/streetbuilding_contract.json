@@ -380,7 +380,8 @@
     "StreetBuilding.Panel.OverrideNavigation",
     "StreetBuilding.Panel.AttachmentZeroDiagnostics",
     "StreetBuilding.Panel.RuleRevision",
-    "StreetBuilding.Panel.ActiveFieldPersistence"
+    "StreetBuilding.Panel.ActiveFieldPersistence",
+    "StreetBuilding.Panel.GenerationPolicy"
   ],
   "three_layer_rules": {
     "version": 1,

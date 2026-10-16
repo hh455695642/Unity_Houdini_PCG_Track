@@ -1089,7 +1089,8 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             height.setHelp(old_height.help())
             height.setTags(old_height.tags())
             promoted_templates.replace('parapet_height', height)
-        for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell'):
+        for name in ('unified_ground_walls', 'layout_seed', 'previous_entrance_cell',
+                     'unity_generation_policy', 'generation_sequence'):
             template = asset.parmTemplateGroup().find(name)
             if template is not None:
                 if promoted_templates.find(name) is None:

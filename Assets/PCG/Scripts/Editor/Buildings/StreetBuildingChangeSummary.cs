@@ -33,6 +33,7 @@ namespace PCGBike.Editor.Buildings
             ["corner_building"]="街角建筑", ["corner_street_side"]="首层临街侧面", ["attachments_enabled"]="附件开关",
             ["attachment_global_density"]="附件全局密度", ["ground_attachment_placement"]="雨棚／招牌挂点模式",
             ["variation_seed"]="用途与素材种子", ["layout_seed"]="门位与布局种子", ["site_source_auto"]="地块来源自动判断",
+            ["unity_generation_policy"]="区间与候选配置", ["generation_sequence"]="生成序号",
             ["site_source"]="地块来源", ["facade_overrides"]="立面覆盖条数", ["attachment_overrides"]="附件覆盖条数",
             ["__material"]="素材规格与候选约束", ["__input0"]="地块输入", ["__input1"]="引导输入"
         };
@@ -99,6 +100,7 @@ namespace PCGBike.Editor.Buildings
         private static string Value(Dictionary<string,string> d,string name,float cellWidth)
         {
             if(!d.TryGetValue(name,out var v))return "未设置／已移除";
+            if(name=="unity_generation_policy")return "配置已记录";
             if(name.StartsWith("__"))return "输入已记录";
             if(name is "building_width" or "building_depth")
             {

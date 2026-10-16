@@ -16,6 +16,7 @@ namespace PCGBike.Editor.Buildings
     {
         public string name, value;
         public bool floating;
+        public bool textual;
     }
 
     [Serializable] public sealed class StreetBuildingPanelResult
@@ -38,6 +39,7 @@ namespace PCGBike.Editor.Buildings
             public List<StreetBuildingPanelInput> Current = new(), Submitted;
             public readonly Dictionary<string, string> DuringCook = new();
             public readonly HashSet<string> DuringCookFloats = new();
+            public readonly HashSet<string> DuringCookStrings = new();
             public string CurrentHash, Error;
             public bool Cooking, Requested, Valid, Retained, ConnectionAvailable, NeedsResultValidation;
             public StreetBuildingOutputRetention Backup;
@@ -119,8 +121,10 @@ namespace PCGBike.Editor.Buildings
             .Where(p => IsInput(p._name)).Select(p => new StreetBuildingPanelInput
             {
                 name = p._name, floating = p._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT,
+                textual = p._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_STRING,
                 value = p._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_MULTIPARMLIST ? p._parmInfo.instanceCount.ToString(CultureInfo.InvariantCulture)
                     : p._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_TOGGLE ? (p._toggle ? "1" : "0")
+                    : p._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_STRING ? p._stringValues?.FirstOrDefault()
                     : p._floatValues?.Length > 0 ? p._floatValues[0].ToString("R", CultureInfo.InvariantCulture)
                     : p._intValues?.Length > 0 ? p._intValues[0].ToString(CultureInfo.InvariantCulture) : null
             }).Where(r => r.value != null).ToList();
@@ -131,11 +135,12 @@ namespace PCGBike.Editor.Buildings
             foreach (var row in rows)
             {
                 if (submitted.TryGetValue(row.name, out string value) && value == row.value)
-                { state.DuringCook.Remove(row.name); state.DuringCookFloats.Remove(row.name); }
+                { state.DuringCook.Remove(row.name); state.DuringCookFloats.Remove(row.name); state.DuringCookStrings.Remove(row.name); }
                 else
                 {
                     state.DuringCook[row.name] = row.value;
                     if (row.floating) state.DuringCookFloats.Add(row.name); else state.DuringCookFloats.Remove(row.name);
+                    if (row.textual) state.DuringCookStrings.Add(row.name); else state.DuringCookStrings.Remove(row.name);
                 }
             }
         }
@@ -168,6 +173,7 @@ namespace PCGBike.Editor.Buildings
             "attachment_global_density", "ground_attachment_placement", "awning_density", "awning_max_count", "sign_density",
             "sign_max_count", "fire_escape_density", "fire_escape_max_count", "wall_ac_density", "wall_ac_max_count",
             "roof_props_density", "roof_props_max_count", "variation_seed", "layout_seed", "site_source_auto", "site_source"
+            , StreetBuildingGenerationPolicy.Parameter, StreetBuildingGenerationPolicy.SequenceParameter
         };
 
         internal static List<StreetBuildingPanelInput> CaptureInputs(HEU_HoudiniAsset asset, StreetBuildingAuthoring author)
@@ -197,8 +203,11 @@ namespace PCGBike.Editor.Buildings
                     value = (p.type == HAPI_ParmType.HAPI_PARMTYPE_MULTIPARMLIST && cached != null ? cached._parmInfo.instanceCount
                         : p.type == HAPI_ParmType.HAPI_PARMTYPE_TOGGLE && cached != null ? (cached._toggle ? 1 : 0)
                         : cached?._intValues?.Length > 0 ? cached._intValues[0] : ints[p.intValuesIndex]).ToString(CultureInfo.InvariantCulture);
+                else if (p.type == HAPI_ParmType.HAPI_PARMTYPE_STRING && p.size > 0)
+                    value = StreetBuildingInstanceParameters.String(asset, name);
                 else continue;
-                rows.Add(new StreetBuildingPanelInput { name = name, value = value, floating = p.type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT });
+                rows.Add(new StreetBuildingPanelInput { name = name, value = value, floating = p.type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT,
+                    textual = p.type == HAPI_ParmType.HAPI_PARMTYPE_STRING });
             }
             var style = author.ResolveStyle();
             rows.Add(new StreetBuildingPanelInput { name = "__material", value = style == null ? "missing" : MaterialFingerprint(style) });
@@ -249,6 +258,7 @@ namespace PCGBike.Editor.Buildings
             state.Submitted = CaptureInputs(asset, author);
             state.DuringCook.Clear();
             state.DuringCookFloats.Clear();
+            state.DuringCookStrings.Clear();
             state.Requested = false;
             state.Backup?.Dispose();
             state.Backup = StreetBuildingOutputRetention.Capture(asset);
@@ -280,10 +290,10 @@ namespace PCGBike.Editor.Buildings
         private static void RestoreDuringCookInputs(HEU_HoudiniAsset asset, State state)
         {
             // HEU 下载完成时可能重建参数缓存；保留已经观察到的 Native 后续编辑。
-            var rows = state.DuringCook.Select(p => new StreetBuildingPanelInput { name = p.Key, value = p.Value, floating = state.DuringCookFloats.Contains(p.Key) }).ToArray();
+            var rows = state.DuringCook.Select(p => new StreetBuildingPanelInput { name = p.Key, value = p.Value, floating = state.DuringCookFloats.Contains(p.Key), textual = state.DuringCookStrings.Contains(p.Key) }).ToArray();
             StreetBuildingParameterTransaction.Apply(asset, rows, rows.Any(r => StreetBuildingParameterTransaction.IsStructure(r.name)));
             StreetBuildingInstanceParameters.SavePreset(asset);
-            state.DuringCook.Clear(); state.DuringCookFloats.Clear();
+            state.DuringCook.Clear(); state.DuringCookFloats.Clear(); state.DuringCookStrings.Clear();
         }
 
         internal static void Fail(StreetBuildingAuthoring author, string error)
@@ -305,7 +315,8 @@ namespace PCGBike.Editor.Buildings
                     foreach (var pair in state.DuringCook)
                     {
                         var p = asset.Parameters.GetParameter(pair.Key); if (p == null) continue;
-                        if (state.DuringCookFloats.Contains(pair.Key) && p._floatValues?.Length > 0) p._floatValues[0] = float.Parse(pair.Value, CultureInfo.InvariantCulture);
+                        if (state.DuringCookStrings.Contains(pair.Key) && p._stringValues?.Length > 0) p._stringValues[0] = pair.Value;
+                        else if (state.DuringCookFloats.Contains(pair.Key) && p._floatValues?.Length > 0) p._floatValues[0] = float.Parse(pair.Value, CultureInfo.InvariantCulture);
                         else if (StreetBuildingParameterTransaction.IsStructure(pair.Key)) p._parmInfo.instanceCount = int.Parse(pair.Value, CultureInfo.InvariantCulture);
                         else { int value = int.Parse(pair.Value, CultureInfo.InvariantCulture); if (p._intValues?.Length > 0) p._intValues[0] = value; p._toggle = value != 0; }
                     }

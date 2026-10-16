@@ -21,11 +21,15 @@ namespace PCGBike.Editor.Buildings
             public StreetBuildingCompiledStyle Compiled;
             public StreetBuildingAuthoring Authoring;
             public int Seed, SchemaBefore;
+            public byte[] GenerationPreset;
         }
         private static readonly Dictionary<HEU_HoudiniAsset, Pending> PendingCooks = new();
+        private static readonly HashSet<HEU_HoudiniAsset> ArmedGeneration = new();
         private static readonly Dictionary<HEU_HoudiniAsset, (int Min, int Max)> ObservedDoors = new();
         private static readonly Dictionary<HEU_HoudiniAsset, Dictionary<string, int>> RebuildInts = new();
         private static int suppress;
+        internal static void ArmGeneration(HEU_HoudiniAsset asset) => ArmedGeneration.Add(asset);
+        internal static void DisarmGeneration(HEU_HoudiniAsset asset) => ArmedGeneration.Remove(asset);
         public static IDisposable Suppress() { suppress++; return new Scope(); }
         private sealed class Scope : IDisposable { public void Dispose() { suppress--; } }
         static StreetBuildingRecook()
@@ -86,6 +90,7 @@ namespace PCGBike.Editor.Buildings
             }
             if (data.AssetType != HEU_AssetEventType.COOK) return;
             var asset=data.Asset;
+            bool explicitGeneration = ArmedGeneration.Remove(asset);
             var author=asset.GetComponentInParent<StreetBuildingAuthoring>();
             if (author?.ResolveStyle() == null) return;
             // An old loaded definition must be rebuilt before the new bridge can migrate it.
@@ -95,16 +100,29 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingCompiledStyle compiled;
             try { compiled = StreetBuildingStyleCompiler.Compile(author.ResolveStyle()); }
             catch (Exception failure) { StreetBuildingPanelState.Fail(author, failure.Message); throw; }
-            var current=DoorValues(asset);
-            bool observed=ObservedDoors.TryGetValue(asset,out var previous);
             int seed=StreetBuildingInstanceParameters.Int(asset,"layout_seed",author.LayoutSeed);
             if (seed < 0 && author.InstanceRuleSchema == 0 && author.LayoutSeed >= 0) seed = author.LayoutSeed;
-            if (ShouldRerollLayoutSeed(seed,author.RandomizeOnRecook,observed,previous.Min,previous.Max,current.Min,current.Max))
-                seed=DrawDistinctLayoutSeed(seed);
+            if (seed < 0)
+                seed=author.LayoutSeed >= 0 ? author.LayoutSeed : 0;
             var pending=new Pending { Snapshot=StreetBuildingStyleApplier.ParameterSnapshot.Capture(asset),
                 Compiled=compiled,Authoring=author,Seed=seed,SchemaBefore=author.InstanceRuleSchema };
             try
             {
+                if (explicitGeneration)
+                {
+                    if (!asset.GetAssetSession(false).GetPreset(asset.AssetID, out pending.GenerationPreset))
+                        throw new InvalidOperationException("生成前实例参数预设不可读。");
+                    var policy = StreetBuildingGenerationPolicy.WithDefaults(asset);
+                    int previousSequence = StreetBuildingInstanceParameters.Int(asset, StreetBuildingGenerationPolicy.SequenceParameter);
+                    if (previousSequence == int.MaxValue) throw new InvalidOperationException("生成序号已达上限，请先保存新的实例版本。");
+                    int sequence = previousSequence + 1;
+                    StreetBuildingGenerationPolicy.SampleInto(asset, policy, sequence);
+                    // Generation may sample layout_seed; the submitted cook and diagnostics
+                    // must use that resolved instance value rather than the previous one.
+                    seed = StreetBuildingInstanceParameters.Int(asset, "layout_seed", seed);
+                    pending.Seed = seed;
+                    StreetBuildingInstanceParameters.SavePreset(asset);
+                }
                 // One-time migration copies only the instance's previous public mode, never style rules.
                 if (author.InstanceRuleSchema==0 && !string.IsNullOrEmpty(author.LastAppliedPayloadSha256))
                 {
@@ -165,6 +183,17 @@ namespace PCGBike.Editor.Buildings
         private static void RollbackFailure(HEU_HoudiniAsset asset, Pending pending, string reason)
         {
             var author = pending.Authoring;
+            if (pending.GenerationPreset != null)
+            {
+                try
+                {
+                    if (!asset.GetAssetSession(false).SetPreset(asset.AssetID, pending.GenerationPreset))
+                        throw new InvalidOperationException("HAPI preset restore failed");
+                    StreetBuildingInstanceParameters.RefreshCache(asset);
+                    StreetBuildingInstanceParameters.SavePreset(asset);
+                }
+                catch (Exception e) { reason += "\n生成采样参数恢复失败：" + e.Message; }
+            }
             try { pending.Snapshot.Restore(asset); }
             catch (Exception e) { reason += "\n技术参数恢复失败：" + e.Message; }
             author.SetEditorInstanceRuleSchema(pending.SchemaBefore);

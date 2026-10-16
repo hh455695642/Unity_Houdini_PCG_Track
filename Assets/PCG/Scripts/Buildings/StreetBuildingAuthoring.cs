@@ -14,7 +14,7 @@ namespace PCGBike.Buildings
         [SerializeField, HideInInspector] private MissingModuleDisplay _missingModuleDisplay;
         public MissingModuleDisplay MissingDisplay => _missingModuleDisplay;
         [SerializeField] private StreetBuildingStyleConfig _fixedStyleConfig;
-        [SerializeField] private bool _randomizeOnRecook = true;
+        [SerializeField, HideInInspector] private bool _randomizeOnRecook = true; // Legacy scene data; no generation semantics.
         [SerializeField, HideInInspector] private bool _groundDoorMigrationComplete;
         [SerializeField, HideInInspector] private int _layoutSeed = -1;
         [SerializeField, HideInInspector] private int _entranceCell = -1;
