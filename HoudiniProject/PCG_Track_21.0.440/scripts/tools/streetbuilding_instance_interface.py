@@ -95,7 +95,9 @@ def promote(templates, asset, hou_module=None):
         children.append(p)
     mp.setParmTemplates(children)
     random=[take('variation_seed','变化种子（用途与素材）'),take('layout_seed','布局种子（门位与门窗布局）')]
+    lod_hidden=entries['lod_outputs_enabled'].isHidden()
     output=[take('lod_outputs_enabled'),take('debug_metadata_enabled')]
+    output[0].hide(lod_hidden)  # 保留现有接口状态；随机任务不展开 LOD 控件。
     inputs=[take('site_source_auto','自动选择地块来源'),take('site_source'),take('module_source')]
     for n in ('proxy_bay_width_target','proxy_bay_width_min','proxy_bay_width_max','proxy_wall_material','proxy_trim_material','proxy_window_material'):
         inputs.append(take(n,hide='{ module_source == unity_asset_instances }'))
@@ -130,4 +132,10 @@ def promote(templates, asset, hou_module=None):
             if label is not None: template.setLabel(label)
             if condition is not None: template.setConditional(hou.parmCondType.HideWhen, condition)
             result.replace(name, template)
-    return result
+    # 两个既有技术字段当前定义位于根级，保留其公共路径，避免升级时无关移动。
+    for name in ('unity_generation_policy','generation_sequence'):
+        if result.find(name) is not None:
+            result.remove(name)
+            result.append(entries[name])
+    from streetbuilding_random_interface import promote as promote_random
+    return promote_random(result, asset, hou)

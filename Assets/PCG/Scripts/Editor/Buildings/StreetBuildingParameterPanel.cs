@@ -98,7 +98,15 @@ namespace PCGBike.Editor.Buildings
                 if (Fold("attachments", "附件", false)) DrawAttachments(state);
                 if (Fold("local", "局部覆盖")) DrawOverrides(state);
                 if (Fold("seed", "种子与调试", false))
-                { Int("variation_seed", "变化种子（用途与素材）"); Int("layout_seed", "布局种子（门位与布局）"); Toggle("debug_metadata_enabled", "调试元数据"); }
+                {
+                    DrawRandom();
+                    ScopeInt("variation_seed", "变化种子（用途与素材）");
+                    ScopeInt("layout_seed", "布局种子（门位与布局）");
+                    bool debug = I("debug_metadata_enabled") != 0;
+                    bool nextDebug = EditorGUILayout.Toggle("调试元数据", debug);
+                    if (debug != nextDebug) Edit(asset, "debug_metadata_enabled", nextDebug ? 1 : 0);
+                    EditorGUILayout.LabelField("种子用于复现素材与布局；区间和多选候选仍在生成时重新抽样。", EditorStyles.wordWrappedMiniLabel);
+                }
             }
             if (state.Result != null && Fold("diagnostics", "上次成功生成诊断", false))
                 EditorGUILayout.HelpBox(state.Result.summary, MessageType.Info);
@@ -121,6 +129,47 @@ namespace PCGBike.Editor.Buildings
             if (!accepted) StreetBuildingRecook.DisarmGeneration(a);
             if (accepted) state.Requested = true;
             if (!accepted) StreetBuildingPanelState.Fail(owner, "生成请求未被接受");
+            return accepted;
+        }
+
+        private void DrawRandom()
+        {
+            if (!StreetBuildingInstanceParameters.Exists(asset, "random_algorithm")) return;
+            if (!StreetBuildingRandom.Enabled(asset))
+            {
+                EditorGUILayout.HelpBox("当前使用原采样算法。启用 V2 后，下一次主动生成将使用独立随机流；已有结果保留。", MessageType.None);
+                if (GUILayout.Button("启用随机算法 V2")) { StreetBuildingRandom.Upgrade(asset); policyHash = null; }
+                return;
+            }
+            int seed = I("random_seed");
+            int next = EditorGUILayout.IntField("主随机种子", seed);
+            if (next != seed) Edit(asset, "random_seed", next);
+            int strategy = I("random_feasible");
+            int selected = EditorGUILayout.Popup("随机采样策略", strategy, new[] { "按请求抽样", "可行组合优先" });
+            if (selected != strategy) Edit(asset, "random_feasible", selected);
+            EditorGUILayout.LabelField("当前方案", string.Join(" / ", StreetBuildingRandom.Groups.Select(g => I("random_seq_" + g).ToString())));
+            EditorGUILayout.LabelField("整数候选等概率；可行优先按依赖顺序条件抽样。修改体块会使门窗与附件重新求解。", EditorStyles.wordWrappedMiniLabel);
+            using (new EditorGUILayout.HorizontalScope())
+                for (int i = 0; i < 4; i++)
+                    if (GUILayout.Button(new[] { "重抽体块", "重抽首层", "重抽标准层", "重抽附件" }[i])) GenerateGroup(asset, (StreetBuildingRandom.Group)i);
+            if (GUILayout.Button("复现当前方案（不推进序号）")) GenerateGroup(asset, StreetBuildingRandom.Group.Replay);
+            var copyState = StreetBuildingPanelState.Get(author);
+            using (new EditorGUI.DisabledScope(copyState.NeedsResultValidation || copyState.Result == null || copyState.Result.inputHash != copyState.CurrentHash))
+                if (GUILayout.Button(new GUIContent("复制为独立建筑", "先成功生成当前参数；副本保留配置与外观，新随机身份在下一次主动生成时生效。"))) StreetBuildingRandom.Duplicate(author);
+        }
+
+        internal static bool GenerateGroup(HEU_HoudiniAsset a, StreetBuildingRandom.Group group)
+        {
+            var state = StreetBuildingPanelState.Get(a.GetComponentInParent<StreetBuildingAuthoring>());
+            if (state.Cooking || state.Requested) return false;
+            if (!StreetBuildingRandom.Enabled(a)) throw new InvalidOperationException("请先显式启用随机算法 V2。");
+            a.AutoCookOnParameterChange = false; a.SessionSyncAutoCook = false;
+            StreetBuildingRecook.Attach(); StreetBuildingRecook.ArmRandomGroup(a, group);
+            bool accepted;
+            try { accepted = a.RequestCook(true, true, true, true); }
+            catch { StreetBuildingRecook.DisarmGeneration(a); throw; }
+            if (accepted) state.Requested = true;
+            else { StreetBuildingRecook.DisarmGeneration(a); StreetBuildingPanelState.Fail(a.GetComponentInParent<StreetBuildingAuthoring>(), "生成请求未被接受"); }
             return accepted;
         }
 

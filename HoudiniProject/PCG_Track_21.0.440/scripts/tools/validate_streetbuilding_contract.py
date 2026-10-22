@@ -1920,6 +1920,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
+    from validate_streetbuilding_random import validate_random
+    random_v2 = validate_random(fresh)
     from validate_streetbuilding_core_cleanup import validate_core_cleanup
     core_cleanup = validate_core_cleanup(fresh)
     from validate_streetbuilding_maintenance import validate_maintenance
@@ -1955,7 +1957,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     attachment_diagnostics = assert_attachment_diagnostics(fresh)
     from validate_streetbuilding_ac_notches import validate_ac_notches
     ac_notches = validate_ac_notches(fresh)
-    return {"attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    return {"random_v2": random_v2, "attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('CityRoad', 'Track', 'Terrain', 'StreetBuilding', 'Rendering')]
     [string]$Module,
@@ -83,12 +83,28 @@ function Invoke-Hython {
     }
 }
 
+function Resolve-PcgUnityCommand {
+    param([string]$LegacyName)
+    if (-not $script:PcgCommandNames) {
+        $catalog = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot --json | Out-String | ConvertFrom-Json)
+        if ($LASTEXITCODE -ne 0 -or -not $catalog.success) { throw 'Unity typed command discovery failed.' }
+        $script:PcgCommandNames = @($catalog.data.commands | ForEach-Object { if ($_.command) { $_.command } else { $_.name } })
+    }
+    if ($script:PcgCommandNames -contains $LegacyName) { return $LegacyName }
+    $grouped = @{
+        editor_status='editor status'; list_open_scenes='scene list_open'; find_assets='asset find'; console='console get'
+        save_scene='scene save'; list_tests='test list'; run_tests='test run'; test_status='test status'; cancel_tests='test cancel'
+    }[$LegacyName]
+    if ($grouped -and $script:PcgCommandNames -contains $grouped) { return $grouped }
+    throw "Required typed Pipeline command is unavailable: $LegacyName"
+}
+
 function Invoke-UnityTool {
     param([string]$Tool, [hashtable]$InputObject)
     if ($Tool -eq 'assets-refresh') {
         # Pipeline's typed recompile command calls AssetDatabase.Refresh even when
         # no scripts changed. The old MCP server is not part of this project link.
-        $reply = (& unity command recompile --project-path $projectRoot --json |
+        $reply = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot recompile --json |
             Out-String | ConvertFrom-Json)
         if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
             throw 'Pipeline AssetDatabase refresh failed.'
@@ -102,7 +118,7 @@ function Invoke-UnityTool {
             'assets-find' { 'find_assets' }
             'console-get-logs' { 'console' }
         }
-        $cliArgs = @('command', $cliName, '--project-path', $projectRoot, '--json')
+        $cliArgs = @('command', '--caller', 'plugin', '--skill', 'unity-cli', '--project-path', $projectRoot, (Resolve-PcgUnityCommand $cliName), '--json')
         if ($Tool -eq 'assets-find') {
             # Keep the requested HDA-folder scope: unrelated Engine caches can
             # otherwise fill the result limit before the production HDA appears.
@@ -347,7 +363,7 @@ function Invoke-StreetBuildingPipelineTests {
     $literalPath = $CandidateHda.Replace('\','/') | ConvertTo-Json -Compress
     $contextCode = "UnityEditor.SessionState.SetString(`"PCG.StreetBuilding.ContractHda`", $literalPath); return true;"
     if ($PSVersionTable.PSVersion.Major -lt 7) { $contextCode = $contextCode.Replace('"','\"') }
-    $context = (& unity command eval --project-path $projectRoot --code $contextCode --json | Out-String | ConvertFrom-Json)
+    $context = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot eval --code $contextCode --json | Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $context.success) { throw ("Could not select test HDA definition: " + ($context.errors | ConvertTo-Json -Compress)) }
     $assembly = 'PCGBike.StreetBuilding.Tests.Editor'
     # Material-only styles: tests must not stage a rule source or rewrite HEU presets.
@@ -355,7 +371,7 @@ function Invoke-StreetBuildingPipelineTests {
     # The Test Runner switches scenes. Houdini auto-Cook marks PCG_Building
     # dirty, which otherwise opens a blocking Save/Don't Save dialog. Preserve
     # the on-disk scene, then save the live scene through Pipeline before tests.
-    $open = (& unity command list_open_scenes --project-path $projectRoot --json |
+    $open = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'list_open_scenes') --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $open.success) {
         throw 'Cannot inspect open Unity scenes before StreetBuilding tests.'
@@ -373,20 +389,20 @@ function Invoke-StreetBuildingPipelineTests {
         $backup = Join-Path $backups ("PCG_Building-{0}-{1}.unity" -f
             (Get-Date -Format 'yyyyMMdd-HHmmss'), [guid]::NewGuid().ToString('N').Substring(0, 8))
         Copy-Item -LiteralPath $source -Destination $backup
-        $saved = (& unity command save_scene --project-path $projectRoot --path $scene.path --json |
+        $saved = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'save_scene') --path $scene.path --json |
             Out-String | ConvertFrom-Json)
         if ($LASTEXITCODE -ne 0 -or -not $saved.success) {
             throw "Failed to save dirty Unity scene before tests; disk backup: $backup"
         }
         Write-Step 'INFO' "Saved dirty PCG_Building before tests; previous disk state: $backup"
     }
-    $clean = (& unity command list_open_scenes --project-path $projectRoot --json |
+    $clean = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'list_open_scenes') --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $clean.success -or
         @($clean.data.result.scenes | Where-Object { $_.isDirty }).Count -gt 0) {
         throw 'Unity scene remains dirty; refusing to start tests and open a save dialog.'
     }
-    $discovery = (& unity command list_tests --project-path $projectRoot --mode editor --json |
+    $discovery = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'list_tests') --mode editor --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $discovery.success) {
         throw 'StreetBuilding EditMode test discovery failed.'
@@ -398,7 +414,7 @@ function Invoke-StreetBuildingPipelineTests {
     # The Pipeline's synchronous Test Runner can hold the command endpoint
     # across a domain reload. Start its typed asynchronous job and poll status.
     $runStartedAt = [DateTime]::UtcNow
-    $reply = (& unity command run_tests --project-path $projectRoot --mode editor `
+    $reply = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'run_tests') --mode editor `
         --filter_type assembly --filter $assembly --async_tests true --timeout 300 --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
@@ -408,7 +424,7 @@ function Invoke-StreetBuildingPipelineTests {
     $status = $null
     do {
         Start-Sleep -Seconds 1
-        $poll = (& unity command test_status --project-path $projectRoot --json |
+        $poll = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'test_status') --json |
             Out-String | ConvertFrom-Json)
         if ($LASTEXITCODE -ne 0 -or -not $poll.success) {
             throw 'StreetBuilding Pipeline EditMode test status failed.'
@@ -449,7 +465,7 @@ function Invoke-StreetBuildingPipelineTests {
                         @($cases | Where-Object { $_.GetAttribute('result') -ne 'Passed' }).Count -eq 0 -and
                         (($actual -join '|') -eq ($expected -join '|'))
                     if ($allPassed) {
-                        $cancelled = (& unity command cancel_tests --project-path $projectRoot --json |
+                        $cancelled = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'cancel_tests') --json |
                             Out-String | ConvertFrom-Json)
                         if ($LASTEXITCODE -ne 0 -or -not $cancelled.success) {
                             throw 'Pipeline result collector remained running and could not be reset.'

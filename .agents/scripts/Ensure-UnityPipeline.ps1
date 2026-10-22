@@ -142,7 +142,12 @@ if (-not $versionLine -or $versionLine -notmatch '^m_EditorVersion:\s*(.+)$') {
 $expectedUnityVersion = $Matches[1].Trim()
 
 $script:UnityCli = Get-Command unity -All -CommandType Application -ErrorAction SilentlyContinue |
-    Sort-Object { $_.Source -like '*\WindowsApps\*' } |
+    Sort-Object @{ Expression = {
+        try {
+            $candidateVersion = (& $_.Source --version 2>$null | Out-String).Trim()
+            if ($candidateVersion -match '^\d+\.\d+\.\d+') { [version]$Matches[0] } else { [version]'0.0.0' }
+        } catch { [version]'0.0.0' }
+    }; Descending = $true } |
     Select-Object -First 1
 if (-not $script:UnityCli) {
     throw "Unity CLI ('unity') was not found on PATH. Install the Unity CLI before running Unity tasks."
@@ -184,6 +189,7 @@ $lastPipelineSummary = $null
 $lastEditorStatus = $null
 $assetRefreshAttempted = $false
 $menuStartAttempted = $false
+$editorStatusCommand = $null
 
 while ([DateTime]::UtcNow -lt $deadline) {
     $pipelineList = Invoke-UnityJson -Arguments @(
@@ -197,10 +203,19 @@ while ([DateTime]::UtcNow -lt $deadline) {
         }
 
         if ($instance -and $instance.isRunning -and $instance.hasPipelinePackage -and $instance.pipelineServer.isReachable) {
+            if (-not $editorStatusCommand) {
+                # Pipeline 0.9 groups typed commands; 0.8 used editor_status.
+                $catalog = Invoke-UnityJson -Arguments @('command', '--project-path', $resolvedProjectPath,
+                    '--caller', 'plugin', '--skill', 'unity-cli', '--format', 'json') -Operation 'Unity command discovery' -AllowFailure
+                $commandNames = @($catalog.data.commands | ForEach-Object { if ($_.command) { $_.command } else { $_.name } })
+                if ($commandNames -contains 'editor status') { $editorStatusCommand = 'editor status' }
+                elseif ($commandNames -contains 'editor_status') { $editorStatusCommand = 'editor_status' }
+            }
             $lastEditorStatus = Invoke-UnityJson -Arguments @(
                 'command',
                 '--project-path', $resolvedProjectPath,
-                'editor_status',
+                $(if ($editorStatusCommand) { $editorStatusCommand } else { 'editor_status' }),
+                '--caller', 'plugin', '--skill', 'unity-cli',
                 '--format', 'json',
                 '--non-interactive'
             ) -Operation 'unity command editor_status' -AllowFailure

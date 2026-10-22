@@ -102,6 +102,18 @@ namespace PCGBike.Editor.Buildings
             return s.GetParamFloatValues(a.AssetID, values, info.floatValuesIndex, 1) ? values[0] : fallback;
         }
 
+        internal static HAPI_ParmInfo Info(HEU_HoudiniAsset a, string name)
+        {
+            var cached = a.Parameters.GetParameter(name);
+            if (cached != null) return cached._parmInfo;
+            var session = a.GetAssetSession(false);
+            if (session == null || !session.GetParmIDFromName(a.AssetID, name, out int id))
+                throw new InvalidOperationException("Missing HDA parameter: " + name);
+            // Hidden conditional fields have no HEU Inspector cache; their type
+            // still comes from HAPI. Only queried during explicit generation.
+            return FindInfo(a, id);
+        }
+
         internal static void SetFloat(HEU_HoudiniAsset a, string name, float value)
         {
             var s = a.GetAssetSession(false);

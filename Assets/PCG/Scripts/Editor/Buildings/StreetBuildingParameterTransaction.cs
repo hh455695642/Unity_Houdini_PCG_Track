@@ -62,7 +62,10 @@ namespace PCGBike.Editor.Buildings
             var rows = input.Where(r => !r.name.StartsWith("__", StringComparison.Ordinal)).ToArray();
             foreach (var row in rows.Where(r => IsStructure(r.name))) Write(asset, row);
             if (refresh) StreetBuildingInstanceParameters.RefreshCache(asset);
-            foreach (var row in rows.Where(r => !IsStructure(r.name)))
+            foreach (var row in rows.Where(r => !IsStructure(r.name) && r.name != "l_notch_units"))
+                if (StreetBuildingInstanceParameters.Exists(asset, row.name)) Write(asset, row);
+            // 格数字段的 HDA 回调会切换单位。最后恢复显式单位选择，防止批量上传把旧米制请求改成格制。
+            foreach (var row in rows.Where(r => r.name == "l_notch_units"))
                 if (StreetBuildingInstanceParameters.Exists(asset, row.name)) Write(asset, row);
         }
         internal static bool IsStructure(string name) => name == "facade_overrides" || name == "attachment_overrides";

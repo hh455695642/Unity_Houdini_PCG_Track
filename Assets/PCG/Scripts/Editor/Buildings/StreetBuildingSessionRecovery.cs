@@ -52,6 +52,12 @@ namespace PCGBike.Editor.Buildings
                     || !HEU_HAPIUtility.ProcessHoudiniCookStatus(session, asset.AssetName))
                     throw new InvalidOperationException("无法创建 HAPI 实例。");
                 if (!session.SetPreset(created, preset)) throw new InvalidOperationException("无法载入已保存实例参数。");
+                bool hasNotchUnits = session.GetParmIDFromName(created, "l_notch_units", out _);
+                int notchUnits = 1;
+                if (hasNotchUnits && !session.GetParamIntValue(created, "l_notch_units", 0, out notchUnits))
+                    throw new InvalidOperationException("无法保全已保存的缺口单位。");
+                var pendingUnits = rows.LastOrDefault(r => r.name == "l_notch_units");
+                if (pendingUnits != null) notchUnits = int.Parse(pendingUnits.value);
                 typeof(HEU_HoudiniAsset).GetMethod("InternalSetAssetID", PrivateInstance).Invoke(asset, new object[] { created });
                 var info = new HAPI_NodeInfo(); var assetInfo = new HAPI_AssetInfo();
                 if (!session.GetNodeInfo(created, ref info, false) || !session.GetAssetInfo(created, ref assetInfo))
@@ -69,6 +75,9 @@ namespace PCGBike.Editor.Buildings
                         : session.SetParamIntValue(created, row.name, 0, int.Parse(row.value));
                     if (!written) throw new InvalidOperationException("无法恢复参数：" + row.name);
                 }
+                // 恢复可见格数字段后，显式单位必须最后提交；隐藏单位不一定出现在 HEU 缓存里。
+                if (hasNotchUnits && !session.SetParamIntValue(created, "l_notch_units", 0, notchUnits))
+                    throw new InvalidOperationException("无法恢复已保存的缺口单位。");
                 typeof(HEU_HoudiniAsset).GetMethod("UpdateInputsOnAssetRecreation", PrivateInstance).Invoke(asset, new object[] { session });
                 StreetBuildingInstanceParameters.RefreshCache(asset);
                 StreetBuildingInstanceParameters.SavePreset(asset);

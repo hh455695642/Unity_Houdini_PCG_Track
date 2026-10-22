@@ -81,7 +81,71 @@ def validate_arrangement(parent):
                 require(sum(r['span'] for r in front if r['role']=='MiddleWindow')==windows,'Boundary quantity changed')
                 geometry(a);cases+=1
         upper = validate_upper_uniform(parent)
-        return {'status':'PASS','cases':cases,'sequences':sequences,'alignment':True,'coverage':True,'entrance_fixed':True,'upper_uniform':upper}
+        symmetric = validate_upper_symmetry(parent)
+        return {'status':'PASS','cases':cases,'sequences':sequences,'alignment':True,'coverage':True,'entrance_fixed':True,'upper_uniform':upper,'upper_symmetry':symmetric}
+    finally:a.destroy()
+
+
+def validate_upper_symmetry(parent):
+    """Check actual mirrored intervals and styles, including the screenshot's mixed spans."""
+    from validate_streetbuilding_contract import configure, geometry, require, signature, STYLE_CATALOG, style_row, SOURCE_PREFIX
+    a=parent.parent().createNode(parent.type().name(),'VERIFY_UPPER_SYMMETRY')
+    cases=0
+    try:
+        def setup(count,algorithm=1,shape=0,corner=0,catalog=STYLE_CATALOG,width=16):
+            configure(a,catalog,width=width,depth=16,floors=3,attachments=0,roof=0,shape=shape,notch_side=corner,rhythm=3)
+            a.setParms(dict(ground_rule_schema_version=2,ground_floor_use=1,residential_door_enabled=0,
+                           facade_layout_mode=0,window_count_min=count,window_count_max=count,facade_overrides=0,
+                           random_algorithm=algorithm,random_instance_id='symmetry-fixture',random_seed=71,
+                           random_seq_upper=0))
+        def verify(count):
+            g=geometry(a,'SELECT_FACADE_MODULES').freeze()
+            groups=defaultdict(list);counts=Counter()
+            for p in g.points():
+                floor=p.intAttribValue('floor_index');role=p.stringAttribValue('module_role')
+                if floor<=0 or role not in ('MiddleWindow','MiddleBlank','SideWall','RearWall'):continue
+                face=p.intAttribValue('face_index');origin=tuple(p.attribValue('arrangement_origin'));right=tuple(p.attribValue('arrangement_right'))
+                groups[floor,face,origin,right].append((p.floatAttribValue('arrangement_u'),p.intAttribValue('module_span'),role,p.stringAttribValue('unity_instance')))
+                if role=='MiddleWindow':counts[floor,face]+=1
+            require(groups,'Symmetry fixture emitted no actual upper modules')
+            for key,items in groups.items():
+                items.sort();length=sum(row[1]*2 for row in items);cursor=0
+                for x,y in zip(items,reversed(items)):
+                    require(x[1:]==y[1:],'Mixed-span symmetric module pair mismatch '+str((key,x,y)))
+                    require(abs(x[0]+y[0]-length)<.001,'Mixed-span symmetric module centers mismatch')
+                    require(abs(x[0]-x[1]-cursor)<.001,'Symmetric output gap/overlap')
+                    cursor+=x[1]*2
+            require(all(n==count for n in counts.values()),'Symmetry changed physical-face window quantity')
+            require(len(counts)==8 if count else not counts,'L split received duplicate/missing physical-face quotas')
+            require('symmetry=paired_exact' in g.stringAttribValue('upper_window_report'),'No exact symmetry decision metadata')
+            require(signature(g)==signature(geometry(a,'SELECT_FACADE_MODULES')),'Symmetry repeat cook changed output')
+            geometry(a,'OUT_BUILDING_LOD0')
+        # 4/6/5 are the screenshot's per-floor counts; other parities exercise the center module.
+        for algorithm in (1,2):
+            for count in (4,6,5,2,3,7,8,0):
+                setup(count,algorithm);verify(count);cases+=1
+            for corner in range(4):
+                setup(5,algorithm,1,corner);verify(5);cases+=1
+        # Strict symmetry is impossible: 8 cells, three single-width windows, five single-width walls.
+        # There would be two odd categories. Preserve the quota and expose the concrete limitation.
+        single='\n'.join(row for row in STYLE_CATALOG.splitlines() if not row.startswith('M|') or int(row.split('|')[5])==1)
+        setup(3,catalog=single)
+        g=geometry(a,'SELECT_FACADE_MODULES')
+        report=g.stringAttribValue('upper_window_report')
+        require('symmetry=unavailable_preserved_quantity' in report,'Impossible symmetry was silently reported complete')
+        counts=Counter((p.intAttribValue('floor_index'),p.intAttribValue('face_index')) for p in g.points()
+                       if p.intAttribValue('floor_index')>0 and p.stringAttribValue('module_role')=='MiddleWindow')
+        require(counts and all(n==3 for n in counts.values()),'Impossible symmetry rewrote a fixed quantity')
+        cases+=1
+        # Non-symmetric selection retains its exact frozen result when switching back.
+        setup(4);a.parm('facade_rhythm').set(0);before=signature(geometry(a,'SELECT_FACADE_MODULES'))
+        a.parm('facade_rhythm').set(3);verify(4)
+        a.parm('facade_rhythm').set(0)
+        require(before==signature(geometry(a,'SELECT_FACADE_MODULES')),'Symmetry mutated non-symmetric inputs or RNG')
+        cases+=1
+        node=a.node('StreetBuildingCore/ALLOCATE_FACADE_CAPACITY')
+        require(not node.errors() and not node.warnings() and all(not n.errors() and not n.warnings() for n in node.allSubChildren()),'Symmetry allocator compiler diagnostics')
+        return dict(status='PASS',cases=cases,quota_preserved=True,mixed_spans=True,L_physical_face_shared=True)
     finally:a.destroy()
 
 

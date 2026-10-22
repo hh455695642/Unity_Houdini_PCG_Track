@@ -38,7 +38,7 @@ namespace PCGBike.Editor.Buildings
             try
             {
                 var data = JsonUtility.FromJson<Data>(json);
-                if (data?.version != 1 || data.rules == null) throw new FormatException("Unsupported policy schema.");
+                if (data == null || (data.version != 1 && data.version != 2) || data.rules == null) throw new FormatException("Unsupported policy schema.");
                 return data;
             }
             catch (Exception e) { throw new InvalidOperationException("StreetBuilding 实例随机配置不可读；已保留原始内容。", e); }
@@ -62,6 +62,8 @@ namespace PCGBike.Editor.Buildings
                 data.rules.Add(rule);
                 data.rules.Sort((a, b) => StringComparer.Ordinal.Compare(a.name, b.name));
                 StreetBuildingInstanceParameters.SetString(asset, Parameter, JsonUtility.ToJson(data));
+                if (StreetBuildingRandom.Enabled(asset) && (rule.name == "l_notch_width_cells" || rule.name == "l_notch_depth_cells"))
+                    StreetBuildingInstanceParameters.SetInt(asset, "l_notch_units", 1);
             });
         }
 
@@ -135,11 +137,6 @@ namespace PCGBike.Editor.Buildings
         {
             if (!StreetBuildingInstanceParameters.Exists(asset, name)) return;
             float current = floating ? Float(asset, name) : Int(asset, name);
-            if (name == "layout_seed" && current < 0)
-            {
-                int remembered = asset.GetComponentInParent<PCGBike.Buildings.StreetBuildingAuthoring>()?.LayoutSeed ?? -1;
-                current = remembered >= 0 ? remembered : 0;
-            }
             if (name == "building_width" || name == "building_depth")
             {
                 float cellWidth = asset.GetComponentInParent<PCGBike.Buildings.StreetBuildingAuthoring>()?.ResolveStyle()?.CellWidth ?? 0;
@@ -170,7 +167,8 @@ namespace PCGBike.Editor.Buildings
         internal static Data WithDefaults(HEU_HoudiniAsset asset)
         {
             var data = Load(asset);
-            foreach (string name in new[] { "l_notch_width_cells", "l_notch_depth_cells", "floor_count", "variation_seed", "layout_seed",
+            RemoveTechnicalRules(data);
+            foreach (string name in new[] { "l_notch_width_cells", "l_notch_depth_cells", "floor_count",
                      "awning_max_count", "sign_max_count", "fire_escape_max_count", "wall_ac_max_count", "roof_props_max_count" }) AddNumber(data, asset, name, false);
             foreach (string name in new[] { "building_width", "building_depth", "shopfront_ratio", "parapet_height", "attachment_global_density",
                      "awning_density", "sign_density", "fire_escape_density", "wall_ac_density", "roof_props_density" }) AddNumber(data, asset, name, true);
@@ -210,15 +208,27 @@ namespace PCGBike.Editor.Buildings
             return data;
         }
 
+        private static void RemoveTechnicalRules(Data data)
+        {
+            // Seeds and diagnostics read their direct instance controls. Retired range
+            // entries must never overwrite them; persist this cleanup only on Generate.
+            data.rules.RemoveAll(r => r.name == "variation_seed" || r.name == "layout_seed" || r.name == "debug_metadata_enabled");
+        }
+
         internal static void SampleInto(HEU_HoudiniAsset asset, Data data, int sequence)
         {
+            RemoveTechnicalRules(data);
+            if (StreetBuildingRandom.Enabled(asset))
+            {
+                SampleV2Into(asset, data, sequence);
+                return;
+            }
             foreach (var rule in data.rules)
             {
                 if (rule.kind == "number")
                 {
                     if (!StreetBuildingInstanceParameters.Exists(asset, rule.name)) continue;
-                    var parameter = asset.Parameters.GetParameter(rule.name);
-                    bool floating = parameter?._parmInfo.type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT;
+                    bool floating = StreetBuildingInstanceParameters.Info(asset, rule.name).type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT;
                     if (floating)
                     {
                         float value = DrawFraction(rule.min, rule.max, sequence, rule.name);
@@ -269,6 +279,121 @@ namespace PCGBike.Editor.Buildings
             }
             StreetBuildingInstanceParameters.SetInt(asset, SequenceParameter, sequence);
             StreetBuildingInstanceParameters.SetString(asset, Parameter, JsonUtility.ToJson(data));
+        }
+
+        // 扩展点：语义类型决定抽样，HAPI FLOAT 只是米制传输类型，不代表宽深允许小数格。
+        private static void SampleV2Into(HEU_HoudiniAsset asset, Data data, int sequence)
+        {
+            var context = StreetBuildingRandom.Capture(asset);
+            var ordered = data.rules.OrderBy(r => r.name, StringComparer.Ordinal).ToArray();
+            if (ordered.Select(r => r.name).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
+                throw new InvalidOperationException("随机配置存在重复字段，请先修复请求。");
+            foreach (var r in ordered.Where(r => r.kind == "choice"))
+            {
+                var values = Values(r.name);
+                if (values == null || !StreetBuildingInstanceParameters.Exists(asset, r.name)) continue;
+                StreetBuildingInstanceParameters.SetInt(asset, r.name, values[StreetBuildingRandom.Pick(context, r.name, r.mask, values.Length)]);
+            }
+            float cellWidth = asset.GetComponentInParent<PCGBike.Buildings.StreetBuildingAuthoring>()?.ResolveStyle()?.CellWidth ?? 0;
+            if (!float.IsFinite(cellWidth) || cellWidth <= 0) throw new InvalidOperationException("素材格宽不可用。");
+            bool external = Int(asset, "site_source_auto", 1) != 0
+                ? asset.GetInputNodeByIndex(0)?.GetConnectedInputCount() > 0 : Int(asset, "site_source") == 1;
+            if (!external)
+            {
+                DimensionV2(asset, data, "building_width", "l_notch_width_cells", cellWidth, context);
+                DimensionV2(asset, data, "building_depth", "l_notch_depth_cells", cellWidth, context);
+            }
+            foreach (var r in ordered.Where(r => r.kind == "number"))
+            {
+                if (r.name == "building_width" || r.name == "building_depth" || !StreetBuildingInstanceParameters.Exists(asset, r.name)) continue;
+                bool notch = r.name == "l_notch_width_cells" || r.name == "l_notch_depth_cells";
+                if (notch && (Int(asset, "massing_shape") == 0 || Int(asset, "l_notch_units") != 1)) continue;
+                if ((r.name.StartsWith("roof_props_", StringComparison.Ordinal) && Int(asset, "roof_enabled") == 0)
+                    || (StreetBuildingRandom.ForField(r.name) == StreetBuildingRandom.Group.Attachments && Int(asset, "attachments_enabled") == 0)) continue;
+                int key = context.Key( StreetBuildingRandom.ForField(r.name), r.name);
+                bool floating = StreetBuildingInstanceParameters.Info(asset, r.name).type == HAPI_ParmType.HAPI_PARMTYPE_FLOAT;
+                if (floating) StreetBuildingInstanceParameters.SetFloat(asset, r.name, StreetBuildingRandom.Fraction(r.min, r.max, key));
+                else
+                {
+                    int lo = StreetBuildingRandom.Integral(r.min, r.name), hi = StreetBuildingRandom.Integral(r.max, r.name);
+                    if (notch && !external)
+                    {
+                        string dimension = r.name == "l_notch_width_cells" ? "building_width" : "building_depth";
+                        int bound = Mathf.RoundToInt(Float(asset, dimension) / cellWidth) - 1;
+                        // 请求端点保留在 policy，只有本次采用值受几何约束。
+                        if (lo < 1 || lo > bound || lo == hi && hi > bound)
+                            throw new InvalidOperationException($"{r.name} 请求 {lo}～{hi} 格与当前尺寸冲突（最大 {bound} 格）。");
+                        hi = Math.Min(hi, bound);
+                    }
+                    StreetBuildingInstanceParameters.SetInt(asset, r.name, StreetBuildingRandom.Integer(lo, hi, key));
+                }
+            }
+            foreach (var r in ordered.Where(r => r.kind == "quantity"))
+            {
+                if (r.name == "entrance_count" && Int(asset, "ground_floor_use") != 2
+                    || r.name == "shopfront_count" && (Int(asset, "ground_floor_use") != 2 || Int(asset, "shopfront_control") != 0)
+                    || r.name == "window_count" && Int(asset, "floor_count") < 2) continue;
+                int low = StreetBuildingRandom.Integral(r.min, r.name), high = StreetBuildingRandom.Integral(r.max, r.name);
+                int minimum = r.name == "entrance_count" ? 1 : 0, maximum = r.name == "entrance_count" ? 4 : 64;
+                if (low < minimum || high > maximum || low > high) throw new InvalidOperationException("数量请求范围无效：" + r.name);
+                WriteQuantity(asset, r); // 各楼层／物理立面的实际抽样继续由 HDA 执行。
+            }
+            var faces = Find(data, FacesKey);
+            if (faces != null && Int(asset, "ground_floor_use") == 2)
+            {
+                int mask = faces.mask;
+                if (Int(asset, "rear_facade_mode") == 0) mask &= 7;
+                if (mask == 0) throw new InvalidOperationException("橱窗候选与当前启用立面的交集为空；请调整候选或启用对应立面。");
+                if ((mask & ~15) != 0) throw new InvalidOperationException("橱窗候选包含无效立面。");
+                var subsets = new List<int>();
+                for (int s = mask; s != 0; s = (s - 1) & mask) subsets.Add(s);
+                int selected = subsets[StreetBuildingRandom.Integer(0, subsets.Count - 1, context.Key( StreetBuildingRandom.Group.Ground, FacesKey))];
+                for (int i = 0; i < 4; i++) StreetBuildingInstanceParameters.SetInt(asset, "shopfront_face_" + i, (selected >> i) & 1);
+            }
+            ReconcileOverrides(asset, data);
+            data.version = 2;
+            StreetBuildingInstanceParameters.SetInt(asset, SequenceParameter, sequence);
+            StreetBuildingInstanceParameters.SetString(asset, Parameter, JsonUtility.ToJson(data));
+        }
+
+        private static void DimensionV2(HEU_HoudiniAsset asset, Data data, string name, string notchName, float cellWidth, StreetBuildingRandom.Context context)
+        {
+            var r = Find(data, name);
+            if (r == null) return;
+            int lo = StreetBuildingRandom.Integral(r.min, name), hi = StreetBuildingRandom.Integral(r.max, name);
+            if (lo < 2 || hi < lo || hi > 100000) throw new InvalidOperationException("无效建筑格数范围：" + name);
+            if (Int(asset, "massing_shape") == 1 && Int(asset, "random_feasible") != 0)
+            {
+                var notch = Find(data, notchName);
+                int needed;
+                if (Int(asset, "l_notch_units") == 1)
+                    needed = notch == null ? Int(asset, notchName) : StreetBuildingRandom.Integral(notch.min, notchName);
+                else
+                {
+                    // 保留旧米制缺口；只筛选能容纳它的尺寸，不把米制值强制取整回写。
+                    float notchMetres = Float(asset, notchName.Replace("_cells", ""));
+                    if (!float.IsFinite(notchMetres) || notchMetres <= 0) throw new InvalidOperationException("无效米制缺口：" + notchName);
+                    needed = Mathf.CeilToInt(notchMetres / cellWidth - .00001f);
+                }
+                lo = Math.Max(lo, needed + 1); // 可行前缀筛选，避免第一次尺寸抽小即误报全范围无解。
+                if (lo > hi) throw new InvalidOperationException($"{name} 与 {notchName} 在请求范围内不存在合法组合。");
+            }
+            int cells = StreetBuildingRandom.Integer(lo, hi, context.Key( StreetBuildingRandom.Group.Massing, name));
+            float metres = cells * cellWidth;
+            if (!float.IsFinite(metres)) throw new InvalidOperationException("建筑尺寸换算溢出：" + name);
+            StreetBuildingInstanceParameters.SetFloat(asset, name, metres);
+        }
+
+        private static void ReconcileOverrides(HEU_HoudiniAsset asset, Data data)
+        {
+            for (int row = 1; row <= Int(asset, "facade_overrides"); row++)
+            {
+                string mode = "facade_override_layout_mode" + row;
+                if (Int(asset, mode) == 0) continue;
+                var shop = Find(data, "facade_override_shopfront_" + row); var window = Find(data, "facade_override_window_" + row);
+                bool random = shop != null && shop.min != shop.max || window != null && window.min != window.max;
+                StreetBuildingInstanceParameters.SetInt(asset, mode, random ? 1 : 2);
+            }
         }
 
         private static void WriteQuantity(HEU_HoudiniAsset asset, Rule rule)

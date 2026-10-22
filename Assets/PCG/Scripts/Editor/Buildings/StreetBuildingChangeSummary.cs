@@ -34,6 +34,10 @@ namespace PCGBike.Editor.Buildings
             ["attachment_global_density"]="附件全局密度", ["ground_attachment_placement"]="雨棚／招牌挂点模式",
             ["variation_seed"]="用途与素材种子", ["layout_seed"]="门位与布局种子", ["site_source_auto"]="地块来源自动判断",
             ["unity_generation_policy"]="区间与候选配置", ["generation_sequence"]="生成序号",
+            ["random_algorithm"]="采样算法版本", ["random_seed"]="主随机种子", ["random_feasible"]="采样策略",
+            ["random_instance_id"]="实例随机身份", ["random_seq_massing"]="体块方案序号", ["random_seq_ground"]="首层方案序号",
+            ["random_seq_upper"]="标准层方案序号", ["random_seq_attachments"]="附件方案序号",
+            ["__random_dependencies"]="素材依赖内容", ["__random_generator"]="生成器版本",
             ["site_source"]="地块来源", ["facade_overrides"]="立面覆盖条数", ["attachment_overrides"]="附件覆盖条数",
             ["__material"]="素材规格与候选约束", ["__input0"]="地块输入", ["__input1"]="引导输入"
         };
@@ -175,7 +179,7 @@ namespace PCGBike.Editor.Buildings
             : name.StartsWith("window_") || name.StartsWith("facade_") ? "标准层门窗"
             : name.StartsWith("roof_props") || name.Contains("density") || name.Contains("max_count") || name.StartsWith("attachment") ? "附件"
             : name.StartsWith("roof") || name.StartsWith("parapet") || name.Contains("trim") ? "屋顶与线脚"
-            : name.Contains("seed") ? "种子" : "首层门窗";
+            : name.Contains("seed") || name.StartsWith("random_") || name.StartsWith("__random_") ? "随机与复现" : "首层门窗";
     }
 }
 #endif

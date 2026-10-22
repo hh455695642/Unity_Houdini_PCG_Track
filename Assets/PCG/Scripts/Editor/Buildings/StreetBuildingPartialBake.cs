@@ -43,6 +43,13 @@ namespace PCGBike.Editor.Buildings
             var asset = authoring.GetComponent<HEU_HoudiniAssetRoot>()?.HoudiniAsset;
             if (asset == null || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
                 throw new InvalidOperationException("请先成功应用风格并 Cook，再执行 Bake。");
+            if (StreetBuildingRandom.Enabled(asset))
+            {
+                StreetBuildingPanelState.Observe(authoring);
+                var state = StreetBuildingPanelState.Get(authoring);
+                if (state.Cooking || state.Requested || state.NeedsResultValidation || state.Result == null || state.Result.inputHash != state.CurrentHash)
+                    throw new InvalidOperationException("当前随机配置尚未成功生成验证，请更新结果后 Bake。");
+            }
             var compiled = StreetBuildingStyleCompiler.Compile(authoring.ResolveStyle());
             if (compiled.Sha256 != authoring.LastAppliedPayloadSha256)
                 throw new InvalidOperationException("风格已变化，请重新应用后 Bake。");

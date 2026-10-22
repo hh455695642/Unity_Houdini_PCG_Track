@@ -381,7 +381,19 @@
     "StreetBuilding.Panel.AttachmentZeroDiagnostics",
     "StreetBuilding.Panel.RuleRevision",
     "StreetBuilding.Panel.ActiveFieldPersistence",
-    "StreetBuilding.Panel.GenerationPolicy"
+    "StreetBuilding.Panel.GenerationPolicy",
+    "StreetBuilding.Random.IntegerSemantics",
+    "StreetBuilding.Random.StableContext",
+    "StreetBuilding.Random.GroupIsolation",
+    "StreetBuilding.Random.FeasibleMassing",
+    "StreetBuilding.Random.FeasibleQuotas",
+    "StreetBuilding.Random.LegacyCompatibility",
+    "StreetBuilding.Random.IdentityLifecycle",
+    "StreetBuilding.Random.TransactionalReplay",
+    "StreetBuilding.Random.NoCompilerWarnings",
+    "StreetBuilding.Arrangement.UpperSymmetricFeasibility",
+    "StreetBuilding.Arrangement.SymmetricPhysicalFaceQuota",
+    "StreetBuilding.Arrangement.SymmetricDiagnostic"
   ],
   "three_layer_rules": {
     "version": 1,

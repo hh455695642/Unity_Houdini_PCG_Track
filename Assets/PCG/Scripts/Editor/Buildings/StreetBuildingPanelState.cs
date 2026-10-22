@@ -160,6 +160,7 @@ namespace PCGBike.Editor.Buildings
 
         internal static bool IsInput(string name) => name.StartsWith("facade_override", StringComparison.Ordinal)
             || name.StartsWith("attachment_override", StringComparison.Ordinal)
+            || name.StartsWith("random_", StringComparison.Ordinal)
             || InputNames.Contains(name);
         private static readonly HashSet<string> InputNames = new(StringComparer.Ordinal)
         {
@@ -211,6 +212,13 @@ namespace PCGBike.Editor.Buildings
             }
             var style = author.ResolveStyle();
             rows.Add(new StreetBuildingPanelInput { name = "__material", value = style == null ? "missing" : MaterialFingerprint(style) });
+            if (StreetBuildingRandom.Enabled(asset))
+            {
+                // 方案复现依赖内容版本，不只依赖 Prefab 引用身份；修改网格/材质也会使结果过期。
+                rows.Add(new StreetBuildingPanelInput { name = "__random_dependencies", value = style == null ? "missing"
+                    : AssetDatabase.GetAssetDependencyHash(AssetDatabase.GetAssetPath(style)).ToString() });
+                rows.Add(new StreetBuildingPanelInput { name = "__random_generator", value = AssetDatabase.GetAssetDependencyHash(asset.AssetPath).ToString() });
+            }
             for (int i = 0; i < 2; i++)
             {
                 var input = asset.GetInputNodeByIndex(i);

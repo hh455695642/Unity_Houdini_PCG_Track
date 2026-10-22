@@ -24,11 +24,12 @@ namespace PCGBike.Editor.Buildings
             public byte[] GenerationPreset;
         }
         private static readonly Dictionary<HEU_HoudiniAsset, Pending> PendingCooks = new();
-        private static readonly HashSet<HEU_HoudiniAsset> ArmedGeneration = new();
+        private static readonly Dictionary<HEU_HoudiniAsset, StreetBuildingRandom.Group> ArmedGeneration = new();
         private static readonly Dictionary<HEU_HoudiniAsset, (int Min, int Max)> ObservedDoors = new();
         private static readonly Dictionary<HEU_HoudiniAsset, Dictionary<string, int>> RebuildInts = new();
         private static int suppress;
-        internal static void ArmGeneration(HEU_HoudiniAsset asset) => ArmedGeneration.Add(asset);
+        internal static void ArmGeneration(HEU_HoudiniAsset asset) => ArmedGeneration[asset] = StreetBuildingRandom.Group.All;
+        internal static void ArmRandomGroup(HEU_HoudiniAsset asset, StreetBuildingRandom.Group group) => ArmedGeneration[asset] = group;
         internal static void DisarmGeneration(HEU_HoudiniAsset asset) => ArmedGeneration.Remove(asset);
         public static IDisposable Suppress() { suppress++; return new Scope(); }
         private sealed class Scope : IDisposable { public void Dispose() { suppress--; } }
@@ -90,7 +91,7 @@ namespace PCGBike.Editor.Buildings
             }
             if (data.AssetType != HEU_AssetEventType.COOK) return;
             var asset=data.Asset;
-            bool explicitGeneration = ArmedGeneration.Remove(asset);
+            bool explicitGeneration = ArmedGeneration.Remove(asset, out var randomGroup);
             var author=asset.GetComponentInParent<StreetBuildingAuthoring>();
             if (author?.ResolveStyle() == null) return;
             // An old loaded definition must be rebuilt before the new bridge can migrate it.
@@ -112,16 +113,21 @@ namespace PCGBike.Editor.Buildings
                 {
                     if (!asset.GetAssetSession(false).GetPreset(asset.AssetID, out pending.GenerationPreset))
                         throw new InvalidOperationException("生成前实例参数预设不可读。");
+                    if (StreetBuildingRandom.Enabled(asset))
+                    {
+                        Undo.IncrementCurrentGroup();
+                        // 只记录参数/preset；生成网格由结果保全管理，不把输出对象引用纳入此 Undo。
+                        Undo.RegisterCompleteObjectUndo(asset.Parameters, "StreetBuilding 随机方案");
+                    }
                     var policy = StreetBuildingGenerationPolicy.WithDefaults(asset);
                     int previousSequence = StreetBuildingInstanceParameters.Int(asset, StreetBuildingGenerationPolicy.SequenceParameter);
-                    if (previousSequence == int.MaxValue) throw new InvalidOperationException("生成序号已达上限，请先保存新的实例版本。");
-                    int sequence = previousSequence + 1;
+                    if (previousSequence == int.MaxValue && randomGroup != StreetBuildingRandom.Group.Replay) throw new InvalidOperationException("生成序号已达上限，请先保存新的实例版本。");
+                    int sequence = randomGroup == StreetBuildingRandom.Group.Replay ? previousSequence : previousSequence + 1;
+                    if (StreetBuildingRandom.Enabled(asset)) StreetBuildingRandom.Advance(asset, randomGroup);
+                    else if (randomGroup != StreetBuildingRandom.Group.All) throw new InvalidOperationException("分组重抽与复现需要显式启用随机算法 V2。");
                     StreetBuildingGenerationPolicy.SampleInto(asset, policy, sequence);
-                    // Generation may sample layout_seed; the submitted cook and diagnostics
-                    // must use that resolved instance value rather than the previous one.
-                    seed = StreetBuildingInstanceParameters.Int(asset, "layout_seed", seed);
-                    pending.Seed = seed;
                     StreetBuildingInstanceParameters.SavePreset(asset);
+                    if (StreetBuildingRandom.Enabled(asset)) Undo.FlushUndoRecordObjects();
                 }
                 // One-time migration copies only the instance's previous public mode, never style rules.
                 if (author.InstanceRuleSchema==0 && !string.IsNullOrEmpty(author.LastAppliedPayloadSha256))
@@ -229,18 +235,22 @@ namespace PCGBike.Editor.Buildings
             if (core == null || session == null) return "输出元数据不可读；布局种子 " + seed;
             int use = 0, commercialDoors = 0, shops = 0, eligible = 0;
             float ratio = 0;
-            string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty, attachments = string.Empty;
+            string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty, attachments = string.Empty, randomContext = string.Empty;
             bool hasUse = false, hasRatio = false;
-            int? outputLayoutSeed = null;
+            int? outputLayoutSeed = null, sampledDoorRequest = null;
             foreach (var geo in core.GeoNodes)
             foreach (var part in geo.GetParts())
             {
                 if (ReadDetailString(session, geo.GeoID, part.PartID, "attachment_diagnostics", out string a) && !string.IsNullOrEmpty(a))
                     attachments = a;
+                if (ReadDetailString(session, geo.GeoID, part.PartID, "random_context", out string context) && !string.IsNullOrEmpty(context))
+                    randomContext = context;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "effective_ground_use", out int u))
                 { use = u; hasUse = true; }
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "commercial_door_count", out int d))
                     commercialDoors = d;
+                if (ReadDetailInt(session, geo.GeoID, part.PartID, "random_door_sampled_request", out int sampled))
+                    sampledDoorRequest = sampled;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "shopfront_count", out int c))
                     shops = c;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "eligible_shopfront_count", out int e))
@@ -265,6 +275,10 @@ namespace PCGBike.Editor.Buildings
                         ? "；面板比例 " + (hasRatio ? ratio.ToString("0.###", CultureInfo.InvariantCulture) : "未知") : "；按模块数量")
                 : $"实际首层：住宅；入户门 {(entranceCell >= 0 ? 1 : 0)}";
             summary += "；布局种子 " + seed;
+            if (!string.IsNullOrEmpty(randomContext)) summary += "\n随机方案：" + randomContext;
+            if (StreetBuildingRandom.Enabled(asset) && StreetBuildingInstanceParameters.Int(asset, "random_feasible") == 0
+                && use == 2 && sampledDoorRequest.HasValue && sampledDoorRequest.Value > commercialDoors)
+                summary += $"\n商业门抽样请求 {sampledDoorRequest.Value} 个；实际 {commercialDoors} 个；原因：兼容物理立面与完整铺排容量不足。";
             if (!string.IsNullOrWhiteSpace(fallback) && fallback != "none")
                 summary += "；回退原因 " + fallback;
             if (!string.IsNullOrWhiteSpace(shopReport)) summary += "\n首层橱窗：\n" + FormatQuantityReport(shopReport);
@@ -283,7 +297,10 @@ namespace PCGBike.Editor.Buildings
                 .Replace("mode=precise", "模式=固定数量").Replace("mode=random", "模式=随机范围").Replace("mode=ratio", "模式=占格比例")
                 .Replace("requested=", "请求=").Replace("actual=", "实际模块=").Replace("occupied=", "占格=")
                 .Replace("eligible=", "可用格=").Replace("resolved_metric=", "实际指标=").Replace("reason=", "原因=")
-                .Replace("none", "无阻止原因").Replace("no_candidate", "无适用素材").Replace("span_infeasible", "连续空间不足");
+                .Replace("none", "无阻止原因").Replace("no_candidate", "无适用素材").Replace("span_infeasible", "连续空间不足")
+                .Replace("symmetry=paired_exact", "对称配对完成")
+                .Replace("symmetry=unavailable_preserved_quantity", "对称无解（保留数量；资源宽度或中央模块约束）")
+                .Replace("request_range=", "原请求范围=").Replace("feasible_counts=", "已检查可行数量=").Replace("used_request=", "本次采用数量=");
             return result;
         }
         // Only format metadata from the completed Cook. Do not duplicate HDA
