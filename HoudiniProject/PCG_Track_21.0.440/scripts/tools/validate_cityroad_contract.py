@@ -133,6 +133,15 @@ def public_interface_schema(asset: hou.Node) -> dict[str, Any]:
             template_type = _safe(lambda: template.type(), None)
             kind = (_safe(lambda: template_type.name(), str(template_type))
                     if template_type is not None else "unknown")
+            if kind == 'Folder':
+                canonical={'Transform':'stdswitcher9','Subnet':'stdswitcher9_1',
+                    'City Road / 城市道路':'stdswitcher9_2','Unity Inputs / Unity 输入':'stdswitcher9_3',
+                    'Street Furniture / 街道设施':'street_furniture_folder5',
+                    'Street Buildings / 沿街建筑':'street_buildings_folder',
+                    'Debug / 调试':'debug_folder6','Graph / 道路图':'graph_folder6',
+                    'Intersection / 路口':'intersection_folder6','Road Marking / 道路标线':'marking_folder6',
+                    'Material / 材质':'material_folder6','Road / 道路':'road_folder6','Sidewalk / 人行道':'sidewalk_folder6'}
+                name=canonical.get(label,name)
             key = "/".join(folder + [name or ("@" + label)])
             result[key] = {
                 "name": name,
@@ -161,7 +170,11 @@ def public_interface_schema(asset: hou.Node) -> dict[str, Any]:
 
 
 def public_interface_hash(asset: hou.Node) -> str:
-    payload = json.dumps(public_interface_schema(asset), ensure_ascii=False,
+    # Freeze every pre-V53 public field. The additive building folder has its own
+    # strict V53 contract (including live expressions and behavioral checks).
+    schema = {k:v for k,v in public_interface_schema(asset).items()
+              if k != 'street_buildings_folder' and not k.startswith('street_buildings_folder/')}
+    payload = json.dumps(schema, ensure_ascii=False,
                          sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -305,7 +318,16 @@ def _validate_three_level_layout(core: hou.Node, contract: dict[str, Any]) -> di
     require(main is not None and main.type().name() == "subnet",
             "Missing V46 CR_MAIN_PIPELINE")
 
-    direct = list(core.children())
+    # V52 adds a separately validated building branch beside the unchanged V46 road overview.
+    # Keep the original membership/connection/box checks exact for every original road node.
+    direct_all = list(core.children())
+    extension = {"CR_BUILDINGS": "subnet", "OUT_STREET_BUILDINGS": "output"}
+    for name, node_type in extension.items():
+        node = core.node(name)
+        require(node is not None and node.type().name() == node_type and node.comment().strip(),
+                f"CityRoad V52 extension missing/type/documentation changed: {name}")
+    require(not _positions_overlap(direct_all), "V52 branch overlaps the existing road overview")
+    direct = [node for node in direct_all if node.name() not in extension]
     expected_direct = set(contract["preserved_top_level"])
     require(len(direct) == contract["top_level_node_count"],
             f"CityRoadCore direct node count changed: {len(direct)}")
@@ -803,6 +825,9 @@ def bounds_by_piece(geometry: hou.Geometry, kind: str):
 
 
 def validate_network(asset: hou.Node, core: hou.Node, contract: dict[str, Any]) -> dict[str, Any]:
+    if contract.get('categorized_panel'):
+        from cityroad_parameter_layout import validate as validate_panel
+        validate_panel(asset.parmTemplateGroup())
     actual_hash = public_interface_hash(asset)
     expected_hash = (
         contract["public_interface_sha256"]
@@ -2352,6 +2377,7 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
                              if has_input else skipped),
         "city_park_decoupled": validate_citypark_decoupled(asset, core),
         "v51_restore_generation": validate_v51_restore_generation(asset, core),
+        "v52_streetbuilding_placement": importlib.reload(__import__('validate_cityroad_frontage')).validate(asset),
         "v7_v8_v9": validate_v7_v8_v9(asset, core) if has_input else skipped,
         "v10": validate_v10(core) if has_input else skipped,
         "v11_v12_v13": validate_v11_v12_v13(core) if has_input else skipped,

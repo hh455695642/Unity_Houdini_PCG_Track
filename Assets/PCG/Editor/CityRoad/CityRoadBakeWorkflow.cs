@@ -914,6 +914,13 @@ namespace PCG.CityRoad.Editor
             return s_StreetFurnitureOutputs.Any(output => IsUnderNamedOutput(transform, output));
         }
 
+        // CityRoad emits these transforms through unity_instance. Keep building materials
+        // and meshes intact when previewing or cloning through the existing Bake workflow.
+        internal static bool IsBuildingOutput(Transform transform)
+        {
+            return IsUnderNamedOutput(transform, "OUT_STREET_BUILDINGS");
+        }
+
         private static string GetHierarchyPath(Transform transform)
         {
             var names = new Stack<string>();

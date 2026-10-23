@@ -631,6 +631,20 @@ try {
         "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#85C1E2><b>BufferedFileLogStorage</b></color> Flush called but already disposed, ignored."
         "Warning|<color=#ffaa00>warn:</color> [time] <color=#B4FF32>[AI]</color> <color=#48C9B0><b>McpManagerClientHub</b></color> ConnectionManager[<dynamic>] EnsureConnection Connection not available and auto-reconnect disabled for endpoint: /hub/mcp-server"
     ) } else { @() }
+    if ($Module -eq 'CityRoad') {
+        # Historical empty helper during HEU reload, recorded before the direct
+        # Prefab task: .codex_tmp/cityroad-building-controls/console-audit.json.
+        # Exact signature after the existing HAPI-ID normalization; no pattern
+        # filtering and no exemption for output nodes or other Cook warnings.
+        $allowedUnityDiagnostics += (@(
+            'Warning|Houdini Engine: Cooking finished with some warnings for asset: CityRoad<dynamic>'
+            '    Object (ID:<dynamic>): /obj/CityRoad<dynamic>'
+            ''
+            '        Geo (ID:<dynamic>): /obj/CityRoad<dynamic>/CityRoadCore/CR_MAIN_PIPELINE'
+            '        No geometry generated!'
+            ''
+        ) -join "`n")
+    }
     $newDiagnostics = @($currentDiagnostics | Where-Object {
         $_ -notin $baselineDiagnostics -and $_ -notin $allowedUnityDiagnostics
     })

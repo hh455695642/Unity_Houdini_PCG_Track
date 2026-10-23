@@ -390,6 +390,18 @@ def _pcg_public_interface(asset):
         for template in templates:
             name = _pcg_safe(lambda: template.name(), "")
             label = _pcg_safe(lambda: template.label(), "")
+            if asset.type().name() == 'pcgbike::CityRoad::1.0':
+                # Houdini increments synthetic folder IDs on every spare-group edit.
+                # Canonicalize only these identities; compare every child field as before.
+                folders = {'Transform':'stdswitcher9','Subnet':'stdswitcher9_1',
+                    'City Road / 城市道路':'stdswitcher9_2','Unity Inputs / Unity 输入':'stdswitcher9_3',
+                    'Street Furniture / 街道设施':'street_furniture_folder5',
+                    'Street Buildings / 沿街建筑':'street_buildings_folder'}
+                folders.update({'Debug / 调试':'debug_folder6','Graph / 道路图':'graph_folder6',
+                    'Intersection / 路口':'intersection_folder6','Road Marking / 道路标线':'marking_folder6',
+                    'Material / 材质':'material_folder6','Road / 道路':'road_folder6','Sidewalk / 人行道':'sidewalk_folder6'})
+                if _pcg_template_type(template) == 'Folder':
+                    name = folders.get(label,name)
             kind = _pcg_template_type(template)
             key = ("/".join(folder + [name])) if name else ("/".join(folder + ["@" + label]))
             entry = {
@@ -1049,6 +1061,34 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         raise RuntimeError('Definition changed before persistence: {} != {}'.format(actual_definition, expected_definition))
     original_templates = definition.parmTemplateGroup()
     promoted_templates = asset.parmTemplateGroup()
+    if expected_type == 'pcgbike::CityRoad::1.0' and asset.parm('building_enabled') is not None:
+        # Preserve legacy definition folder identities when adding the building UI.
+        addition = next(t for t in promoted_templates.entries() if t.label() == 'Street Buildings / 沿街建筑')
+        addition.setName('street_buildings_folder')
+        if asset.parm('building_prefabs') is not None:
+            # Node-level inherited fields keep old labels until definition promotion.
+            # Keep the native Prefab list canonical; discard no artist slot values.
+            fields = list(addition.parmTemplates())
+            for field in fields:
+                if field.name() in ('building_width','building_depth'):
+                    field.setLabel('Footprint Width / 最大占地宽度（米）' if field.name() == 'building_width' else 'Footprint Depth / 最大占地进深（米）')
+                    field.hide(False)
+                    field.setHelp('手动填写所有 Prefab 的最大占地范围。Prefab 原点在占地中心，基座 y=0，正面朝本地 +Z。')
+                elif field.name() == 'building_spacing':
+                    field.setLabel('Minimum Gap / 最小建筑净间距（米）')
+                elif field.name() == 'building_prefabs':
+                    slots = [t for t in field.parmTemplates() if t.name() == 'building_prefab#']
+                    if len(slots) != 1: raise RuntimeError('Direct Prefab template is ambiguous')
+                    field.setParmTemplates(slots)
+            addition.setParmTemplates(fields)
+        promoted_templates = hou.ParmTemplateGroup(original_templates.entries())
+        existing_buildings = next((t for t in promoted_templates.entries()
+            if t.label() == 'Street Buildings / 沿街建筑'), None)
+        if existing_buildings is None:
+            promoted_templates.append(addition)
+        else:
+            addition.setName(existing_buildings.name())
+            promoted_templates.replace(existing_buildings.name(),addition)
     if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('style_rule_source') is not None:
         # Preserve canonical existing definition folders. Unlocked instances
         # synthesize folder ids; promoting those would rename the public API.
@@ -1126,6 +1166,13 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         # Core cleanup hides this compatibility field without changing its value
         # or the canonical output-folder identity. Preserve the verified Live flag.
         promoted_templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
+    if expected_type == 'pcgbike::CityRoad::1.0' and not preserve_public_interface:
+        # Preserve canonical definition identities while promoting the categorized UI.
+        if len(asset.parmTemplateGroup().findIndices('road_network_source')) > 1:
+            import importlib, cityroad_parameter_layout
+            layout = importlib.reload(cityroad_parameter_layout)
+            promoted_templates = layout.organize(promoted_templates)
+            layout.validate(promoted_templates)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only
@@ -1153,6 +1200,22 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             if live_templates.find(name) is not None:
                 live_templates.remove(name); changed = True
         if changed: asset.setParmTemplateGroup(live_templates)
+    if expected_type == 'pcgbike::CityRoad::1.0' and asset.parm('building_prefabs') is not None:
+        # Promoting a formerly spare multiparm can synthesize an untagged #_2
+        # child on the unlocked instance. Keep the HIP as clean as a fresh HDA.
+        count = asset.parm('building_prefabs').evalAsInt()
+        assigned = [asset.parm('building_prefab%d' % i).evalAsString() for i in range(1,count+1)]
+        live_templates = asset.parmTemplateGroup()
+        slots = live_templates.find('building_prefabs')
+        stale = [t.name() for t in slots.parmTemplates() if t.name().startswith('building_prefab#_')]
+        for name in stale + ['building_library','building_variants']:
+            if live_templates.find(name) is not None: live_templates.remove(name)
+        asset.setParmTemplateGroup(live_templates)
+        if assigned != [asset.parm('building_prefab%d' % i).evalAsString() for i in range(1,count+1)]:
+            raise RuntimeError('Prefab slot assignments changed during spare-template cleanup')
+        import importlib, sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(expected_hip),'scripts','tools'))
+        importlib.reload(__import__('validate_cityroad_frontage')).validate(asset)
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),

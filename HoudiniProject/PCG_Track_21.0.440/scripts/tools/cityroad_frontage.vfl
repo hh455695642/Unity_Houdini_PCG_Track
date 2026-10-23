@@ -1,0 +1,139 @@
+// CityRoad owns placement. Editor cook only; Unity consumes these instance points.
+// Input 1: unpacked/fused road triangles. Input 2: original centerline graph.
+int intersects(vector ca; vector xa; vector za; float wa; float da;
+               vector cb; vector xb; vector zb; float wb; float db; float gap)
+{
+    vector axes[]=array(xa,za,xb,zb);
+    foreach(vector axis;axes) {
+        float ra=abs(dot(xa,axis))*wa+abs(dot(za,axis))*da;
+        float rb=abs(dot(xb,axis))*wb+abs(dot(zb,axis))*db;
+        if(abs(dot(cb-ca,axis))>=ra+rb+gap-0.001)return 0;
+    }
+    return 1;
+}
+int hitsroad(vector c; vector x; vector z; float w; float d; float gap)
+{
+    for(int pr=0;pr<nprimitives(1);pr++) {
+        int pts[]=primpoints(1,pr);if(len(pts)<3)continue;
+        vector a=point(1,"P",pts[0]), b=point(1,"P",pts[1]), cc=point(1,"P",pts[2]);
+        vector axes[]=array(x,z,normalize(set(-(b-a).z,0,(b-a).x)),
+            normalize(set(-(cc-b).z,0,(cc-b).x)),normalize(set(-(a-cc).z,0,(a-cc).x)));
+        int separated=0;
+        foreach(vector axis;axes) {
+            if(length2(axis)<0.5)continue;
+            float r=abs(dot(x,axis))*w+abs(dot(z,axis))*d;
+            float v=dot(c,axis), lo=min(dot(a,axis),dot(b,axis),dot(cc,axis)), hi=max(dot(a,axis),dot(b,axis),dot(cc,axis));
+            if(v+r+gap<=lo+0.001||hi+gap<=v-r+0.001){separated=1;break;}
+        }
+        if(!separated)return 1;
+    }
+    return 0;
+}
+// Explicit seed input permits a Cook even when the source graph is empty.
+for(int p=npoints(0)-1;p>=0;p--)removepoint(0,p);
+// No source primitives are copied to output; this is a dedicated point contract.
+if(!chi("enabled")){setdetailattrib(0,"building_count",0);return;}
+// Prefab slots are authored directly on the CityRoad HDA. Empty slots are ignored.
+string prefabs[];
+for(int i=1;i<=chi("variants");i++){
+    string path=strip(chs(sprintf("../../../building_prefab%d",i)));
+    if(strlen(path)>0)append(prefabs,path);
+}
+if(len(prefabs)==0){setdetailattrib(0,"building_count",0);return;}
+vector ea[],eb[],inside[];
+for(int pr=0;pr<nprimitives(1);pr++) {
+    int h=primhedge(1,pr), first=h;
+    if(h<0)continue;
+    do {
+        if(hedge_equivcount(1,h)==1) {
+            vector a=point(1,"P",hedge_srcpoint(1,h)),b=point(1,"P",hedge_dstpoint(1,h));
+            vector witness=0;int pp[]=primpoints(1,pr);foreach(int p;pp)witness+=point(1,"P",p);witness/=max(1,len(pp));
+            if(distance(a,b)>0.02){append(ea,a);append(eb,b);append(inside,witness);}
+        }
+        h=hedge_next(1,h);
+    }while(h!=first&&h>=0);
+}
+// Merge collinear tessellation pieces. Keep the source triangle's interior witness.
+int again=1;
+while(again){again=0;for(int i=0;i<len(ea)&&!again;i++)for(int j=i+1;j<len(ea);j++){
+    vector p,q,r;int join=1;
+    if(distance(eb[i],ea[j])<.01){p=ea[i];q=eb[i];r=eb[j];}
+    else if(distance(eb[i],eb[j])<.01){p=ea[i];q=eb[i];r=ea[j];}
+    else if(distance(ea[i],ea[j])<.01){p=eb[i];q=ea[i];r=eb[j];}
+    else if(distance(ea[i],eb[j])<.01){p=eb[i];q=ea[i];r=ea[j];}else join=0;
+    if(join&&dot(normalize(q-p),normalize(r-q))>.9995){ea[i]=p;eb[i]=r;removeindex(ea,j);removeindex(eb,j);removeindex(inside,j);again=1;break;}
+}}
+// True terminals only. Coincident endpoints of adjacent graph primitives cancel.
+vector ep[],ed[];int ec[];
+for(int pr=0;pr<nprimitives(2);pr++) {
+    int pp[]=primpoints(2,pr);if(len(pp)<2||primintrinsic(2,"closed",pr))continue;
+    for(int side=0;side<2;side++){
+        int idx=side?len(pp)-1:0, other=side?len(pp)-2:1;
+        vector p=point(2,"P",pp[idx]),d=normalize(p-point(2,"P",pp[other]));
+        int found=-1;for(int j=0;j<len(ep);j++)if(distance(ep[j],p)<.1){found=j;break;}
+        if(found<0){append(ep,p);append(ed,d);append(ec,1);}else ec[found]++;
+    }
+}
+float width=max(.1,chf("width")),depth=max(.1,chf("depth")),clearance=chf("sidewalk")+max(0,chf("setback"));
+float spacing=max(0,chf("spacing")),margin=max(0,chf("junction_margin"));
+// P1 layout extension: disabled by default, preserving the captured legacy output.
+// Group and slot random streams are independent of Prefab selection.
+int varied=chi("layout_enabled");
+float setback_max=max(0,chf("setback_max")),gap_max=max(0,chf("gap_max"));
+float empty_ratio=clamp(chf("empty_ratio"),0,1);
+float group_length=max(4,chf("group_length"));
+float within_group_jitter=max(0,chf("within_group_jitter"));
+int layout_seed=chi("seed")+chi("layout_seed_offset");
+vector centers[],xs[],zs[];float ws[],ds[];
+int skipped=0,empty_by_rule=0,requested_slots=0;
+for(int e=0;e<len(ea);e++){
+    vector a=ea[e],b=eb[e],t=normalize(b-a),out=set(-t.z,0,t.x);float len=distance(a,b);
+    if(dot(out,inside[e]-(a+b)*.5)>0)out=-out;
+    // 4m trials fill short segments; the reservation enforces the final spacing.
+    for(float s=min(2.0,len*.5);s<len;s+=4){
+        if(s<margin || len-s<margin)continue;
+        requested_slots++;
+        int slot=int(floor(s/4.0));
+        string edgekey=sprintf("%d_%d_%d_%d",int(rint(a.x*100)),int(rint(a.z*100)),int(rint(b.x*100)),int(rint(b.z*100)));
+        string slotkey=sprintf("%s_%d_%d",edgekey,slot,layout_seed);
+        if(varied && rand(random_shash(concat(slotkey,"_empty")))<empty_ratio){empty_by_rule++;continue;}
+        int groupid=int(floor(s/group_length));
+        string groupkey=sprintf("%s_%d_%d_group",edgekey,groupid,layout_seed);
+        float extra_setback=0,extra_gap=0;
+        if(varied){
+            float group_setback=setback_max*rand(random_shash(groupkey));
+            float local_delta=within_group_jitter*(2*rand(random_shash(concat(slotkey,"_depth")))-1);
+            extra_setback=clamp(group_setback+local_delta,0,setback_max);
+            extra_gap=gap_max*rand(random_shash(concat(slotkey,"_gap")));
+        }
+        vector front=a+t*s+out*(clearance+extra_setback),center=front+out*depth*.5;
+        int terminal=0;
+        for(int j=0;j<len(ep);j++)if(ec[j]==1&&dot(out,ed[j])>.98&&dot(center-ep[j],ed[j])>0&&length(cross(center-ep[j],ed[j]))<width+clearance){terminal=1;break;}
+        if(terminal)continue;
+        // Full rectangle test, including side and rear reserve. No junction corner intrusion.
+        vector reserve=front+out*(depth+5)*.5;
+        float reserve_w=(width+spacing+extra_gap)*.5;
+        float reserve_d=(depth+5)*.5;
+        if(hitsroad(reserve,t,out,reserve_w,reserve_d,clearance+extra_setback-1.0)){skipped++;continue;}
+        int bad=0;
+        for(int j=0;j<len(centers);j++)if(intersects(reserve,t,out,reserve_w,reserve_d,centers[j],xs[j],zs[j],ws[j],ds[j],0)){bad=1;break;}
+        if(bad)continue;
+        append(centers,reserve);append(xs,t);append(zs,out);append(ws,reserve_w);append(ds,reserve_d);
+        string id=varied?sprintf("frontage_%s_%d",edgekey,slot):sprintf("frontage_%d_%d_%d",int(rint(front.x*100)),int(rint(front.z*100)),chi("seed"));
+        int variant=int(floor(rand(random_shash(varied?concat(id,sprintf("_%d_variant",chi("seed"))):id))*len(prefabs)));
+        int pt=addpoint(0,center+set(0,chf("ground_height"),0));
+        vector facing=-out;
+        setpointattrib(0,"orient",pt,quaternion(maketransform(facing,{0,1,0})));
+        setpointattrib(0,"N",pt,facing);setpointattrib(0,"up",pt,{0,1,0});
+        setpointattrib(0,"unity_instance",pt,prefabs[variant]);
+        setpointattrib(0,"building_id",pt,id);setpointattrib(0,"building_variant",pt,variant);
+        setpointattrib(0,"frontage_width",pt,width);setpointattrib(0,"frontage_depth",pt,depth);
+        setpointattrib(0,"frontage_front",pt,front);setpointattrib(0,"road_edge",pt,a+t*s);
+        if(varied){setpointattrib(0,"setback_applied",pt,chf("setback")+extra_setback);setpointattrib(0,"gap_applied",pt,spacing+extra_gap);}
+    }
+}
+setdetailattrib(0,"building_count",len(centers));
+setdetailattrib(0,"placement_owner","CityRoad/CR_BUILDINGS");
+setdetailattrib(0,"boundary_runs",len(ea));
+setdetailattrib(0,"rejected_road",skipped);
+if(varied){setdetailattrib(0,"requested_slots",requested_slots);setdetailattrib(0,"empty_by_rule",empty_by_rule);}

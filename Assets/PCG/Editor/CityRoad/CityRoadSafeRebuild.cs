@@ -118,6 +118,62 @@ namespace PCG.CityRoad.Editor
             return false;
         }
 
+        // Editor-only authoring action. The HDA owns the generation rule;
+        // this menu changes only the selected instance's public toggle.
+        [MenuItem("PCG/CityRoad/Enable Varied Layout Selected", priority = 2101)]
+        private static void EnableVariedLayoutSelected()
+        {
+            foreach (GameObject selected in Selection.gameObjects)
+            {
+                if (selected == null)
+                    continue;
+                HEU_HoudiniAssetRoot root =
+                    selected.GetComponentInParent<HEU_HoudiniAssetRoot>();
+                if (root == null)
+                    root = selected.GetComponentInChildren<HEU_HoudiniAssetRoot>(true);
+                if (!IsCityRoad(root) || root.HoudiniAsset == null
+                    || root.HoudiniAsset.Parameters == null)
+                    continue;
+
+                HEU_HoudiniAsset asset = root.HoudiniAsset;
+                bool previous;
+                if (!asset.Parameters.GetBoolParameterValue(
+                        "building_layout_enabled", out previous))
+                {
+                    Debug.LogError("CityRoad: reload the updated HDA before enabling varied layout.", root);
+                    continue;
+                }
+                if (previous)
+                    continue;
+
+                Undo.RecordObject(asset.Parameters, "Enable CityRoad Varied Layout");
+                if (!asset.Parameters.SetBoolParameterValue(
+                        "building_layout_enabled", true, bRecookAsset: false))
+                    throw new InvalidOperationException("CityRoad varied layout parameter write failed.");
+                bool requested = asset.RequestCook(
+                    bCheckParametersChanged: true,
+                    bAsync: false,
+                    bSkipCookCheck: false,
+                    bUploadParameters: true);
+                if (!requested || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
+                {
+                    asset.Parameters.SetBoolParameterValue(
+                        "building_layout_enabled", previous, bRecookAsset: false);
+                    throw new InvalidOperationException("CityRoad varied layout cook failed; parameter restored.");
+                }
+                EditorUtility.SetDirty(asset.Parameters);
+                EditorUtility.SetDirty(asset);
+                EditorSceneManager.MarkSceneDirty(root.gameObject.scene);
+                Debug.Log("CityRoad: varied layout enabled and cooked for " + root.name, root);
+            }
+        }
+
+        [MenuItem("PCG/CityRoad/Enable Varied Layout Selected", true)]
+        private static bool ValidateEnableVariedLayoutSelected()
+        {
+            return ValidateRebuildSelected();
+        }
+
         internal static void QueueImportedAssetReload()
         {
             if (s_RebuildQueued)

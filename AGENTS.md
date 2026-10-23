@@ -126,11 +126,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .agents\scripts\Ensure-Houdi
 - 独立 Python 包 `houdini_mcp` 提供 MCP 转接服务；当前 HTTP 配置监听 3055，`/mcp` 接收 MCP 请求，`/health` 仅检查转接服务存活。转接服务再连接 Houdini 的 18811。
 - 当前链路为 `Codex -> HTTP MCP :3055 -> hrpyc RPC :18811 -> Houdini Live Scene`。不要将 Codex MCP URL 改成 18811，也不要把 3055 当作 Houdini 内部服务。
 
-Preflight 必须分别确认 18811 RPC 与当前 HIP、3055 health、转接服务协议工具发现和 Codex 配置解析。脚本的 `tools/list` 成功只证明服务端可发现工具，不证明当前 Codex 会话已加载工具；后者必须由当前会话工具列表及实际调用另行验证。连接层正常但当前会话工具未加载或握手失败时，明确报告该层故障并要求重启 Codex，不能把服务端预检成功报告成当前会话 MCP 操作成功。
+Preflight 必须分别确认 18811 RPC 与当前 HIP、3055 health、转接服务协议工具发现和 Codex 配置解析。脚本的 `tools/list` 成功只证明服务端可发现工具，不证明当前 Codex 会话已加载工具；后者必须由当前会话工具列表及实际调用另行验证。当前会话原生 Houdini 工具未加载时，明确报告该层状态；在 Preflight 通过后，可使用标准 MCP 客户端连接同一个 `http://127.0.0.1:3055/mcp`，按协议调用服务端工具继续当前任务，不必仅因会话目录缺少原生工具而停工或要求重启 Codex。若实际 MCP 握手或工具调用失败，报告具体失败层，不得把服务端预检成功报告成 Live 操作成功。
 
 Houdini 修改后必须验证目标节点 Cook、error/warning、输出统计与关键 metadata；Unity 修改后必须验证 Editor 状态、Console、场景对象和资产引用。涉及 HDA 时两侧验证都必须完成。
 
-本次 StreetBuilding 三层配置任务已获用户明确授权：当前会话原生 Houdini 工具不可调用时，允许使用标准 MCP 客户端连接现有 `http://127.0.0.1:3055/mcp`，通过协议工具读取和修改现场后继续开发，无需等待会话工具重载。必须报告实际使用的客户端路径，不得声称原生工具已恢复；不得绕过服务端策略。Capture、白名单、累计回归、保存与失败恢复门禁全部保留。
+标准 MCP 客户端回退适用于本项目 Houdini 任务，连接的是上述同一个转接服务，不是新的 Houdini 服务或对 18811 的直接绕行。必须报告实际使用的客户端路径，不得声称原生工具已恢复；不得绕过服务端策略。Capture、白名单、累计回归、保存与失败恢复门禁全部保留。
 
 ## 作用域规则
 

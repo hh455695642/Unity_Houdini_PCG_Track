@@ -53,7 +53,8 @@ namespace PCG.CityRoad.Editor
             EditorApplication.hierarchyChanged += QueueRefresh;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
             AssemblyReloadEvents.beforeAssemblyReload += UnsubscribeAll;
-            EditorSceneManager.sceneSaving += OnSceneSaving;
+            // 编辑场景允许保存 Live Preview；仅在 CityRoadBuildGuard 中校验发布条件。
+            // 保存不能要求 Bake，否则正常编辑和自动保存都会产生误报。
             EditorApplication.delayCall += RefreshSubscriptions;
         }
 
@@ -167,6 +168,7 @@ namespace PCG.CityRoad.Editor
                 && (CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_SURFACE")
                      || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_SIDEWALK_CURB")
                      || CityRoadBakeWorkflow.IsUnderNamedOutput(renderer.transform, "OUT_ROAD_MARKINGS")
+                     || CityRoadBakeWorkflow.IsBuildingOutput(renderer.transform)
                      || CityRoadBakeWorkflow.IsStreetFurnitureOutput(renderer.transform)));
             return sourceVisible || !hasActiveBake;
         }
@@ -380,17 +382,6 @@ namespace PCG.CityRoad.Editor
                 RemoveSubscription(id);
         }
 
-        private static void OnSceneSaving(Scene scene, string path)
-        {
-            if (!ValidateBakedScene(scene, out string report))
-            {
-                Debug.LogError(
-                    "CityRoad scene save validation: Live Preview is editor-only. "
-                    + "Run Cook + Validate + Update Bake before building.\n"
-                    + report);
-            }
-        }
-
         private static Transform FindSibling(HEU_HoudiniAssetRoot source, string name)
         {
             Transform parent = source.transform.parent;
@@ -425,11 +416,12 @@ namespace PCG.CityRoad.Editor
             Transform transform = renderer.transform;
             bool streetFurniture =
                 CityRoadBakeWorkflow.IsStreetFurnitureOutput(transform);
+            bool building = CityRoadBakeWorkflow.IsBuildingOutput(transform);
             bool visibleRole =
                 CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_SURFACE")
                 || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_SIDEWALK_CURB")
                 || CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_MARKINGS")
-                || streetFurniture;
+                || streetFurniture || building;
             bool collisionRole =
                 CityRoadBakeWorkflow.IsUnderNamedOutput(transform, "OUT_ROAD_COLLISION");
 
@@ -438,7 +430,7 @@ namespace PCG.CityRoad.Editor
             // presentation-piece marker.
             bool roadPresentationPiece = HasTopologyPieceName(transform);
             return visibleRole
-                && (roadPresentationPiece || streetFurniture)
+                && (roadPresentationPiece || streetFurniture || building)
                 && !collisionRole;
         }
 

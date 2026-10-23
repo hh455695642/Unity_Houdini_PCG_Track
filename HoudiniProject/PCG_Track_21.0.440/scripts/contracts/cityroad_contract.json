@@ -2,8 +2,8 @@
   "schema_version": 1,
   "asset_type": "pcgbike::CityRoad::1.0",
   "max_inputs": 0,
-  "public_interface_sha256": "326b3b34356b6b17b6fd3b98d7ef9d77adecebeb236c7a8f25daee04c1b8f660",
-  "live_public_interface_sha256": "326b3b34356b6b17b6fd3b98d7ef9d77adecebeb236c7a8f25daee04c1b8f660",
+  "public_interface_sha256": "2aa9825db3343084df0e575483c15afedf7fde97233fe7de7a48b08dbf4dc55e",
+  "live_public_interface_sha256": "2aa9825db3343084df0e575483c15afedf7fde97233fe7de7a48b08dbf4dc55e",
   "required_nodes": {
     "CITYROAD_SHADING_VERTEX_CONTRACT": "attribwrangle",
     "CITYROAD_ROAD_MATERIAL_ASSIGN": "attribwrangle",
@@ -387,6 +387,11 @@
     "CityRoad.V48.DeadNodeCleanup",
     "CityRoad.V49.RemoveDeadCollisionAndShellBranches",
     "CityRoad.V50.CityParkDecoupled",
-    "CityRoad.V51.RestoreGeneration"
-  ]
+    "CityRoad.V51.RestoreGeneration",
+    "CityRoad.V52.StreetBuildingPlacement",
+    "CityRoad.V53.BuildingControls",
+    "CityRoad.V54.DirectPrefabAssignment",
+    "CityRoad.V55.BuildingLayout"
+  ],
+  "categorized_panel": true
 }
