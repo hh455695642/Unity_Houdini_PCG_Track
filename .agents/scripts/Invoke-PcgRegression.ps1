@@ -415,12 +415,14 @@ function Invoke-StreetBuildingPipelineTests {
     # across a domain reload. Start its typed asynchronous job and poll status.
     $runStartedAt = [DateTime]::UtcNow
     $reply = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'run_tests') --mode editor `
-        --filter_type assembly --filter $assembly --async_tests true --timeout 300 --json |
+        --filter_type assembly --filter $assembly --async_tests true --timeout 900 --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
         throw 'StreetBuilding Pipeline EditMode test invocation failed.'
     }
-    $deadline = [DateTime]::UtcNow.AddSeconds(300)
+    # Each integration case owns a native HARS process; allow startup/teardown
+    # time without dropping any existing behavior assertions.
+    $deadline = [DateTime]::UtcNow.AddSeconds(900)
     $status = $null
     do {
         Start-Sleep -Seconds 1

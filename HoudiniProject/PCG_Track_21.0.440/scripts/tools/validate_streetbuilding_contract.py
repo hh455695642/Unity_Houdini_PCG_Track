@@ -1870,6 +1870,12 @@ def assert_generation_policy(asset: hou.Node) -> dict[str, Any]:
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    # The integration runner executes the isolation assertion for every case;
+    # keep its registered contract visible to cumulative validation too.
+    require("StreetBuilding.Tests.PerCaseHapiIsolation" in contract["contract_ids"],
+            "Per-case HAPI isolation contract is missing")
+    require("StreetBuilding.Tests.NativeCookThreadIsolation" in contract["contract_ids"],
+            "Owned HARS native threading isolation contract is missing")
     require(contract["revision"] == REVISION and contract["contract_version"] == CONTRACT_VERSION,
             "Contract revision/version mismatch")
     expected = {"StreetBuilding.V5.WeightedDeterminism",
