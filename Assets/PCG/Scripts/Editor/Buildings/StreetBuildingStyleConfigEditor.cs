@@ -147,10 +147,32 @@ namespace PCGBike.Editor.Buildings
                     Popup(role, "模块用途", roles, StreetBuildingModuleAuthoring.RoleName);
                     EditorGUILayout.PropertyField(width, new GUIContent("横向占用格数", "模块在立面横向占用的网格数量；实际宽度 = 格数 × 单元宽度。"));
                     EditorGUILayout.PropertyField(weight, new GUIContent("随机选中权重", "同层、同用途且满足尺寸与立面条件的候选项之间的相对权重。不是生成数量或百分比。"));
+                    if (role.intValue is 16 or 18 or 23)
+                    {
+                        EditorGUILayout.PropertyField(e.FindPropertyRelative("_attachmentSubtype"),
+                            new GUIContent("附件素材子类型", "显式素材语义；Generic 保持旧生成行为。水塔/烟囱/梯段/管件不得按文件名猜测。"));
+                        EditorGUILayout.PropertyField(e.FindPropertyRelative("_connectionHeight"),
+                            new GUIContent("竖向连接高度 (m)", "源件连接基准的高度差；梯段或直管必须大于零。不是层高覆盖；仅显式管道长度规范允许直段轴向适配。"));
+                    }
                     string key = e.propertyPath;
                     bool expanded = EditorGUILayout.Foldout(_advanced.Contains(key), "高级约束", true);
                     if (expanded) _advanced.Add(key); else _advanced.Remove(key);
                     if (!expanded) continue;
+                    if (role.intValue is 0 or 1 or 3 or 14 or 15)
+                    {
+                        var useMount = e.FindPropertyRelative("_hasAttachmentMount");
+                        EditorGUILayout.PropertyField(useMount, new GUIContent("显式局部挂点", "素材连接规格；未设置时使用实际包围盒推导。"));
+                        if (useMount.boolValue)
+                            EditorGUILayout.PropertyField(e.FindPropertyRelative("_attachmentMount"), new GUIContent("局部挂点 (m)"));
+                    }
+                    if (role.intValue == 23)
+                    {
+                        var useConnections = e.FindPropertyRelative("_hasConnectionPoints");
+                        EditorGUILayout.PropertyField(useConnections, new GUIContent("显式管道端点"));
+                        if (useConnections.boolValue)
+                            foreach (string field in new[] { "_connectionStart", "_connectionEnd", "_connectionRadius", "_connectionLengthRange" })
+                                EditorGUILayout.PropertyField(e.FindPropertyRelative(field));
+                    }
                     var height = e.FindPropertyRelative("_heightType");
                     string[] heights = { "跟随首层高度", "跟随标准层高度", "固定高度", "使用 Prefab 包围盒" };
                     Popup(height, "高度适配方式", StreetBuildingModuleAuthoring.Heights(layer, role.intValue),

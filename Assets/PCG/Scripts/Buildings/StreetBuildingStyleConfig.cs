@@ -237,6 +237,16 @@ namespace PCGBike.Buildings
         [SerializeField] private bool _enabled = true;
         [SerializeField] private StreetBuildingFacadeMask _allowedFacades = StreetBuildingFacadeMask.All;
         [SerializeField, HideInInspector] private StreetBuildingFloorMask _allowedFloors = StreetBuildingFloorMask.All;
+        [SerializeField] private StreetBuildingAttachmentSubtype _attachmentSubtype;
+        [SerializeField, Min(0f)] private float _connectionHeight;
+        // 素材局部挂点与连接规格；不包含生成数量、密度或实例布局规则。
+        [SerializeField] private bool _hasAttachmentMount;
+        [SerializeField] private Vector3 _attachmentMount;
+        [SerializeField] private bool _hasConnectionPoints;
+        [SerializeField] private Vector3 _connectionStart;
+        [SerializeField] private Vector3 _connectionEnd;
+        [SerializeField, Min(0f)] private float _connectionRadius;
+        [SerializeField] private Vector2 _connectionLengthRange;
 
         public GameObject Prefab => _prefab;
         public StreetBuildingModuleRole ModuleRole => _moduleRole;
@@ -248,6 +258,15 @@ namespace PCGBike.Buildings
         public bool Enabled => _enabled;
         public StreetBuildingFacadeMask AllowedFacades => _allowedFacades;
         public StreetBuildingFloorMask AllowedFloors => _allowedFloors;
+        public StreetBuildingAttachmentSubtype AttachmentSubtype => _attachmentSubtype;
+        public float ConnectionHeight => _connectionHeight;
+        public bool HasAttachmentMount => _hasAttachmentMount;
+        public Vector3 AttachmentMount => _attachmentMount;
+        public bool HasConnectionPoints => _hasConnectionPoints;
+        public Vector3 ConnectionStart => _connectionStart;
+        public Vector3 ConnectionEnd => _connectionEnd;
+        public float ConnectionRadius => _connectionRadius;
+        public Vector2 ConnectionLengthRange => _connectionLengthRange;
 
         public float ResolveHeight(StreetBuildingStyleConfig style) => _heightType switch
         {
@@ -259,14 +278,36 @@ namespace PCGBike.Buildings
 
 #if UNITY_EDITOR
         internal void SetWallRole(StreetBuildingModuleRole role) => _moduleRole = role;
-        internal StreetBuildingModuleDefinition CopyForFloor(StreetBuildingFloorMask floor) =>
-            new(_prefab, _moduleRole, _widthSpan, _depthSpan, _heightType, _absoluteHeight,
-                _weight, _enabled, _allowedFacades, floor);
+        internal StreetBuildingModuleDefinition CopyForFloor(StreetBuildingFloorMask floor)
+        {
+            var copy = new StreetBuildingModuleDefinition(_prefab, _moduleRole, _widthSpan, _depthSpan,
+                _heightType, _absoluteHeight, _weight, _enabled, _allowedFacades, floor,
+                _attachmentSubtype, _connectionHeight);
+            copy._hasAttachmentMount = _hasAttachmentMount;
+            copy._attachmentMount = _attachmentMount;
+            copy._hasConnectionPoints = _hasConnectionPoints;
+            copy._connectionStart = _connectionStart;
+            copy._connectionEnd = _connectionEnd;
+            copy._connectionRadius = _connectionRadius;
+            copy._connectionLengthRange = _connectionLengthRange;
+            return copy;
+        }
+        public void SetAttachmentMount(Vector3 mount)
+        { _hasAttachmentMount = true; _attachmentMount = mount; }
+
+        public void SetConnectionGeometry(Vector3 start, Vector3 end, float radius, Vector2 lengthRange)
+        {
+            _hasConnectionPoints = true;
+            _connectionStart = start; _connectionEnd = end;
+            _connectionRadius = radius; _connectionLengthRange = lengthRange;
+        }
         public StreetBuildingModuleDefinition(GameObject prefab, StreetBuildingModuleRole moduleRole,
             int widthSpan, int depthSpan,
             StreetBuildingModuleHeightType heightType, float absoluteHeight, float weight,
             bool enabled, StreetBuildingFacadeMask allowedFacades,
-            StreetBuildingFloorMask allowedFloors)
+            StreetBuildingFloorMask allowedFloors,
+            StreetBuildingAttachmentSubtype attachmentSubtype = StreetBuildingAttachmentSubtype.Generic,
+            float connectionHeight = 0f)
         {
             _prefab = prefab;
             _moduleRole = moduleRole;
@@ -278,6 +319,8 @@ namespace PCGBike.Buildings
             _enabled = enabled;
             _allowedFacades = allowedFacades;
             _allowedFloors = allowedFloors;
+            _attachmentSubtype = attachmentSubtype;
+            _connectionHeight = connectionHeight;
         }
 
 #endif

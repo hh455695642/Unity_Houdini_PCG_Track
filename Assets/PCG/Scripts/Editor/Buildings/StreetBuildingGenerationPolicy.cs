@@ -15,6 +15,45 @@ namespace PCGBike.Editor.Buildings
         internal const string SequenceParameter = "generation_sequence";
         internal const string FacesKey = "@shopfront_faces";
 
+        // 固定附件只读写 HDA 原生字段；禁止区间配置成为第二套数量／立面事实源。
+        internal static readonly HashSet<string> ReferenceFields = new(StringComparer.Ordinal)
+        {
+            "roof_props_layout_mode", "water_tower_count", "chimney_count",
+            "fire_escape_layout_mode", "fire_escape_group_count", "fire_escape_face_mask",
+            "fire_escape_floor_start", "fire_escape_floor_end", "fire_escape_roof_access",
+            "drainpipe_enabled", "drainpipe_count", "drainpipe_face_mask",
+            "water_tower_count_mode", "water_tower_count_min", "water_tower_count_max",
+            "chimney_count_mode", "chimney_count_min", "chimney_count_max", "roof_prop_position_mode"
+        };
+
+        internal static bool ReferenceFieldActive(string name, Func<string, int> read)
+        {
+            if (name == "attachments_enabled") return true;
+            if (read("attachments_enabled") == 0) return false;
+            if (name == "roof_props_layout_mode") return read("roof_enabled") != 0;
+            bool typedRoof = read("roof_enabled") != 0 && read("roof_props_layout_mode") == 1;
+            if (name == "roof_prop_position_mode" || name == "water_tower_count_mode" || name == "chimney_count_mode")
+                return typedRoof;
+            if (name == "water_tower_count" || name == "chimney_count")
+                return typedRoof && read(name + "_mode") == 0;
+            if (name == "water_tower_count_min" || name == "water_tower_count_max")
+                return typedRoof && read("water_tower_count_mode") == 1;
+            if (name == "chimney_count_min" || name == "chimney_count_max")
+                return typedRoof && read("chimney_count_mode") == 1;
+            if (name == "roof_props_density" || name == "roof_props_max_count")
+                return read("roof_enabled") != 0 && read("roof_props_layout_mode") == 0;
+            if (name == "fire_escape_density" || name == "fire_escape_max_count") return read("fire_escape_layout_mode") == 0;
+            if (name.StartsWith("fire_escape_", StringComparison.Ordinal) && name != "fire_escape_layout_mode")
+                return read("fire_escape_layout_mode") == 1;
+            if (name.StartsWith("drainpipe_", StringComparison.Ordinal) && name != "drainpipe_enabled") return read("drainpipe_enabled") != 0;
+            return true;
+        }
+
+        internal static bool CanSampleField(string name, Func<string, int> read)
+            => !ReferenceFields.Contains(name)
+                && (!(name == "roof_props_density" || name == "roof_props_max_count") || read("roof_props_layout_mode") == 0)
+                && (!(name == "fire_escape_density" || name == "fire_escape_max_count") || read("fire_escape_layout_mode") == 0);
+
         [Serializable]
         internal sealed class Rule
         {
@@ -225,6 +264,7 @@ namespace PCGBike.Editor.Buildings
             }
             foreach (var rule in data.rules)
             {
+                if (!CanSampleField(rule.name, name => Int(asset, name))) continue;
                 if (rule.kind == "number")
                 {
                     if (!StreetBuildingInstanceParameters.Exists(asset, rule.name)) continue;
@@ -285,7 +325,8 @@ namespace PCGBike.Editor.Buildings
         private static void SampleV2Into(HEU_HoudiniAsset asset, Data data, int sequence)
         {
             var context = StreetBuildingRandom.Capture(asset);
-            var ordered = data.rules.OrderBy(r => r.name, StringComparer.Ordinal).ToArray();
+            var ordered = data.rules.Where(r => CanSampleField(r.name, name => Int(asset, name)))
+                .OrderBy(r => r.name, StringComparer.Ordinal).ToArray();
             if (ordered.Select(r => r.name).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
                 throw new InvalidOperationException("随机配置存在重复字段，请先修复请求。");
             foreach (var r in ordered.Where(r => r.kind == "choice"))

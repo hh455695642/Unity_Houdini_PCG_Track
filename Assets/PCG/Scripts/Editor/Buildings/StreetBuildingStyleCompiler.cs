@@ -67,6 +67,7 @@ namespace PCGBike.Editor.Buildings
                 string key = floor + "|" + module.ModuleRole + "|" + prefabName + "|" + module.AllowedFacades;
                 if (!keys.Add(key)) report.Error("Duplicate Role/Prefab.name: " + key);
                 if (module.Weight <= 0) report.Error(key + " weight must be positive.");
+                ValidateAttachmentMetadata(report, module, key);
                 if (module.AllowedFacades == StreetBuildingFacadeMask.None)
                     report.Error(key + " has no allowed facade.");
                 if (!RoleMatchesGroup(module.ModuleRole, group))
@@ -117,6 +118,43 @@ namespace PCGBike.Editor.Buildings
         internal static bool ValidWindowModuleRange(int mode, int minimum, int maximum)
             => minimum >= 0 && minimum <= 64 && (mode != 1 || (maximum >= minimum && maximum <= 64));
 
+        private static void ValidateAttachmentMetadata(StreetBuildingStyleValidationReport report,
+            StreetBuildingModuleDefinition module, string key)
+        {
+            var subtype = module.AttachmentSubtype;
+            if (!Enum.IsDefined(typeof(StreetBuildingAttachmentSubtype), subtype))
+                report.Error(key + " has an unknown attachment subtype.");
+            if (float.IsNaN(module.ConnectionHeight) || float.IsInfinity(module.ConnectionHeight)
+                || module.ConnectionHeight < 0) report.Error(key + " connection height must be finite and nonnegative.");
+            bool Finite(float v) => !float.IsNaN(v) && !float.IsInfinity(v);
+            bool FiniteVector(Vector3 v) => Finite(v.x) && Finite(v.y) && Finite(v.z);
+            if (module.HasAttachmentMount && !FiniteVector(module.AttachmentMount))
+                report.Error(key + " attachment mount must be finite.");
+            if (module.HasConnectionPoints && (!FiniteVector(module.ConnectionStart)
+                || !FiniteVector(module.ConnectionEnd) || !Finite(module.ConnectionRadius)
+                || module.ConnectionRadius <= 0 || !Finite(module.ConnectionLengthRange.x)
+                || !Finite(module.ConnectionLengthRange.y) || module.ConnectionLengthRange.x <= 0
+                || module.ConnectionLengthRange.y < module.ConnectionLengthRange.x))
+                report.Error(key + " connection endpoints/radius/length range are invalid.");
+            bool compatible = subtype switch
+            {
+                StreetBuildingAttachmentSubtype.Generic => true,
+                StreetBuildingAttachmentSubtype.WaterTower or StreetBuildingAttachmentSubtype.Chimney
+                    => module.ModuleRole == StreetBuildingModuleRole.RoofProp,
+                >= StreetBuildingAttachmentSubtype.FireEscapeStoreyLeft and <= StreetBuildingAttachmentSubtype.RoofAccess
+                    => module.ModuleRole == StreetBuildingModuleRole.FireEscape,
+                >= StreetBuildingAttachmentSubtype.DrainStraight and <= StreetBuildingAttachmentSubtype.DrainOffset
+                    => module.ModuleRole == StreetBuildingModuleRole.DrainPipe,
+                >= StreetBuildingAttachmentSubtype.FireEscapePlatform and <= StreetBuildingAttachmentSubtype.FireEscapeFlightRight
+                    => module.ModuleRole == StreetBuildingModuleRole.FireEscape,
+                _ => false,
+            };
+            if (!compatible) report.Error(key + " attachment subtype does not match its module role.");
+            if ((subtype is StreetBuildingAttachmentSubtype.FireEscapeStoreyLeft
+                or StreetBuildingAttachmentSubtype.FireEscapeStoreyRight or StreetBuildingAttachmentSubtype.DrainStraight)
+                && !(module.ConnectionHeight > 0)) report.Error(key + " connecting segment requires a positive connection height.");
+        }
+
         public static bool TryGetLocalBounds(GameObject prefab, out Bounds bounds)
         {
             bounds = default;
@@ -162,7 +200,8 @@ namespace PCGBike.Editor.Buildings
                     or StreetBuildingModuleRole.ParapetConcaveCorner,
                 StreetBuildingModuleGroup.Attachments => role is StreetBuildingModuleRole.Awning
                     or StreetBuildingModuleRole.Sign or StreetBuildingModuleRole.FireEscape
-                    or StreetBuildingModuleRole.ACUnit or StreetBuildingModuleRole.RoofProp,
+                    or StreetBuildingModuleRole.ACUnit or StreetBuildingModuleRole.RoofProp
+                    or StreetBuildingModuleRole.DrainPipe,
                 _ => false,
             };
         }
@@ -228,6 +267,7 @@ namespace PCGBike.Editor.Buildings
                     F(style.GroundFloorHeight), F(style.TypicalFloorHeight))
             };
             var rows = new List<string>();
+            var metadata = new SortedDictionary<string, string>(StringComparer.Ordinal);
             foreach ((StreetBuildingFloorMask floor, StreetBuildingModuleGroup group, StreetBuildingModuleDefinition module) in style.EnumerateLayerModules())
             {
                 if (module == null || !module.Enabled) continue;
@@ -238,8 +278,39 @@ namespace PCGBike.Editor.Buildings
                     F(module.Weight), (int)module.AllowedFacades, (int)floor,
                     F(bounds.size.x), F(bounds.size.y), F(bounds.size.z),
                     F(bounds.min.x), F(bounds.min.y), F(bounds.min.z)));
+                // 扩展点：独立、带版本的素材规格行；旧 M 行和 Generic 目录保持字节兼容。
+                if (module.AttachmentSubtype != StreetBuildingAttachmentSubtype.Generic)
+                {
+                    string path = AssetDatabase.GetAssetPath(module.Prefab).Replace('\\', '/');
+                    string row = string.Join("|", "X", "1", path, (int)module.AttachmentSubtype, F(module.ConnectionHeight));
+                    if (metadata.TryGetValue(path, out string existing) && existing != row)
+                        throw new InvalidOperationException("Conflicting attachment metadata for Prefab: " + path);
+                    metadata[path] = row;
+                }
+                string geometryPath = AssetDatabase.GetAssetPath(module.Prefab).Replace('\\', '/');
+                if (module.HasAttachmentMount)
+                {
+                    Vector3 a = module.AttachmentMount;
+                    string row = string.Join("|", "A", "1", geometryPath, F(a.x), F(a.y), F(a.z));
+                    string key = "A|" + geometryPath;
+                    if (metadata.TryGetValue(key, out string existing) && existing != row)
+                        throw new InvalidOperationException("Conflicting attachment mount: " + geometryPath);
+                    metadata[key] = row;
+                }
+                if (module.HasConnectionPoints)
+                {
+                    Vector3 a = module.ConnectionStart, b = module.ConnectionEnd;
+                    string row = string.Join("|", "P", "1", geometryPath, F(a.x), F(a.y), F(a.z),
+                        F(b.x), F(b.y), F(b.z), F(module.ConnectionRadius),
+                        F(module.ConnectionLengthRange.x), F(module.ConnectionLengthRange.y));
+                    string key = "P|" + geometryPath;
+                    if (metadata.TryGetValue(key, out string existing) && existing != row)
+                        throw new InvalidOperationException("Conflicting connection geometry: " + geometryPath);
+                    metadata[key] = row;
+                }
             }
             lines.AddRange(rows.OrderBy(value => value, StringComparer.Ordinal));
+            lines.AddRange(metadata.Values);
             string payload = string.Join("\n", lines);
             using SHA256 sha = SHA256.Create();
             string digest = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))

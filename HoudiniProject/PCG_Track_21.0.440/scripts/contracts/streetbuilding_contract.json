@@ -154,9 +154,28 @@
     "parapet_enabled": true,
     "l_notch_width_cells": 2,
     "l_notch_depth_cells": 2,
-    "l_notch_units": 1
+    "l_notch_units": 1,
+    "water_tower_count_mode": 0,
+    "water_tower_count_min": 0,
+    "water_tower_count_max": 1,
+    "chimney_count_mode": 0,
+    "chimney_count_min": 0,
+    "chimney_count_max": 3,
+    "roof_prop_position_mode": 0
   },
   "menus": {
+    "water_tower_count_mode": [
+      "0",
+      "1"
+    ],
+    "chimney_count_mode": [
+      "0",
+      "1"
+    ],
+    "roof_prop_position_mode": [
+      "0",
+      "1"
+    ],
     "ground_attachment_placement": [
       "0",
       "1"
@@ -396,7 +415,44 @@
     "StreetBuilding.Random.NoCompilerWarnings",
     "StreetBuilding.Arrangement.UpperSymmetricFeasibility",
     "StreetBuilding.Arrangement.SymmetricPhysicalFaceQuota",
-    "StreetBuilding.Arrangement.SymmetricDiagnostic"
+    "StreetBuilding.Arrangement.SymmetricDiagnostic",
+    "StreetBuilding.Reference.TypedRoofCounts",
+    "StreetBuilding.Reference.RoofFootprint",
+    "StreetBuilding.Reference.ContinuousFireEscape",
+    "StreetBuilding.Reference.RoofAccessCompleteGroup",
+    "StreetBuilding.Reference.ContinuousDrainPipe",
+    "StreetBuilding.Reference.RequestDiagnostics",
+    "StreetBuilding.Reference.LegacyCompatibility",
+    "StreetBuilding.Reference.FixedModeDensityIndependence",
+    "StreetBuilding.Reference.MaterialSemantics",
+    "StreetBuilding.Reference.MaterialFloorScopes",
+    "StreetBuilding.Reference.HapiBakeOutput",
+    "StreetBuilding.Reference.MetadataSchemaIsolation",
+    "StreetBuilding.Reference.InterfacePromotion",
+    "StreetBuilding.Reference.InterfaceStorageTypes",
+    "StreetBuilding.Reference.RoofPropSeparation",
+    "StreetBuilding.Roof.CountModes",
+    "StreetBuilding.Roof.LegacyPlacement",
+    "StreetBuilding.Roof.SeededDeterminism",
+    "StreetBuilding.Roof.IndependentRandomDomains",
+    "StreetBuilding.Roof.CapacityRetainsRequest",
+    "StreetBuilding.Roof.SourceBoundsAndReservations",
+    "StreetBuilding.Roof.InstanceDefaults",
+    "StreetBuilding.Roof.GroupNamespace",
+    "StreetBuilding.Roof.V2AttachmentRedraw",
+    "StreetBuilding.Commercial.ActualHostMounts",
+    "StreetBuilding.Commercial.NoSolidWallAwning",
+    "StreetBuilding.Commercial.SourcePivotAndExplicitMount",
+    "StreetBuilding.Commercial.GeometryClearance",
+    "StreetBuilding.Commercial.ActualWidthFit",
+    "StreetBuilding.Pipe.ActualWallSurface",
+    "StreetBuilding.Pipe.LocalTrimOffsets",
+    "StreetBuilding.Pipe.ConnectionGeometry",
+    "StreetBuilding.Pipe.FractionalHeight",
+    "StreetBuilding.Pipe.CapacityRetainsRequest",
+    "StreetBuilding.Tests.ExactHdaAssetLookup",
+    "StreetBuilding.Validation.RetiredAssetsAbsent",
+    "StreetBuilding.Tests.PipelineStatusTransport"
   ],
   "three_layer_rules": {
     "version": 1,

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('CityRoad', 'Track', 'Terrain', 'StreetBuilding', 'Rendering')]
     [string]$Module,
@@ -120,10 +120,11 @@ function Invoke-UnityTool {
         }
         $cliArgs = @('command', '--caller', 'plugin', '--skill', 'unity-cli', '--project-path', $projectRoot, (Resolve-PcgUnityCommand $cliName), '--json')
         if ($Tool -eq 'assets-find') {
-            # Keep the requested HDA-folder scope: unrelated Engine caches can
-            # otherwise fill the result limit before the production HDA appears.
-            $cliArgs += @('--name', $moduleConfig[$Module].Search, '--search_in',
-                $InputObject.searchInFolders[0], '--limit', '1000')
+            # Exact path is essential: the same folder can contain thousands of
+            # historical HDA backups, which otherwise consume even a 1000-row cap.
+            $exactHdaFilter = 'glob:' + $moduleConfig[$Module].Hda.Replace('\', '/')
+            $cliArgs += @('--name', $exactHdaFilter, '--search_in',
+                $InputObject.searchInFolders[0], '--limit', '20')
         }
         if ($Tool -eq 'console-get-logs') {
             $level = if ($InputObject.logTypeFilter -eq 'Error') { 'error' } else { 'warn' }
@@ -148,6 +149,9 @@ function Invoke-UnityTool {
         }
         if ($null -eq $reply) { throw "Pipeline command failed: $cliName after $maxAttempts attempts" }
         $data = $reply.data.result
+        if ($Tool -eq 'assets-find' -and $data.truncated) {
+            throw 'Exact HDA AssetDatabase lookup was unexpectedly truncated.'
+        }
         $result = switch ($Tool) {
             'editor-application-get-state' { @{ IsPlaying = ($data.playMode -ne 'stopped'); IsPlayingOrWillChangePlaymode = ($data.playMode -ne 'stopped'); IsCompiling = $data.compiling; IsUpdating = $data.domainReloadInProgress } }
             'scene-list-opened' { @($data.scenes) }
@@ -424,18 +428,37 @@ function Invoke-StreetBuildingPipelineTests {
     # time without dropping any existing behavior assertions.
     $deadline = [DateTime]::UtcNow.AddSeconds(900)
     $status = $null
+    $transportFailures = 0
     do {
+        # XML guards below may continue for partial or stale files. Check here
+        # as well so those branches cannot bypass the transport retry bound.
+        if ($transportFailures -ge 3) {
+            throw "StreetBuilding Pipeline EditMode test status failed after 3 read-only attempts: $pollError"
+        }
         Start-Sleep -Seconds 1
-        $poll = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'test_status') --json |
-            Out-String | ConvertFrom-Json)
-        if ($LASTEXITCODE -ne 0 -or -not $poll.success) {
-            throw 'StreetBuilding Pipeline EditMode test status failed.'
+        $poll = $null
+        $pollError = $null
+        try {
+            $pollText = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'test_status') --timeout 90 --json | Out-String)
+            $pollExit = $LASTEXITCODE
+            $poll = $pollText | ConvertFrom-Json
+            if ($pollExit -ne 0 -or -not $poll.success -or $poll.data.success -eq $false) { $pollError = $pollText }
+        }
+        catch { $pollError = $_.Exception.Message }
+        if ($pollError) {
+            $transportFailures++
+            $status = [pscustomobject]@{ status = 'transport_unavailable' }
+            Write-Step 'INFO' "Read-only test status unavailable ($transportFailures/3); checking only this run's complete XML."
+        }
+        else {
+            $transportFailures = 0
+            # Normalize the transport without changing behavior acceptance.
+            $status = $poll.data.result
+            if ($status -is [string]) { $status = $status | ConvertFrom-Json }
         }
         # Pipeline 0.8 returns the typed result directly; older servers returned
         # JSON text. Normalize the transport without changing acceptance checks.
-        $status = $poll.data.result
-        if ($status -is [string]) { $status = $status | ConvertFrom-Json }
-        if ($status.status -eq 'running' -and
+        if ($status.status -in @('running', 'no_tests', 'transport_unavailable') -and
             [DateTime]::UtcNow -ge $runStartedAt.AddSeconds(20)) {
             # TestResults.xml is written after the four tests finish. On this
             # Editor, Pipeline can lose its completion callback across a
@@ -454,6 +477,13 @@ function Invoke-StreetBuildingPipelineTests {
                     catch { continue }
                     if ($null -eq $xml.DocumentElement -or
                         $xml.DocumentElement.Name -ne 'test-run') { continue }
+                    # A previous phase may have the same 90 passing cases.
+                    # Require the run's own start-time as well as its fresh file.
+                    $xmlStart = [DateTimeOffset]::MinValue
+                    if (-not [DateTimeOffset]::TryParse($xml.'test-run'.GetAttribute('start-time'),
+                        [System.Globalization.CultureInfo]::InvariantCulture,
+                        [System.Globalization.DateTimeStyles]::AssumeUniversal, [ref]$xmlStart) -or
+                        $xmlStart.UtcDateTime -lt $runStartedAt.AddSeconds(-2)) { continue }
                     $cases = @($xml.SelectNodes('//test-case'))
                     $actual = @($cases | ForEach-Object { $_.GetAttribute('fullname') } |
                         Sort-Object)
@@ -467,18 +497,23 @@ function Invoke-StreetBuildingPipelineTests {
                         @($cases | Where-Object { $_.GetAttribute('result') -ne 'Passed' }).Count -eq 0 -and
                         (($actual -join '|') -eq ($expected -join '|'))
                     if ($allPassed) {
-                        $cancelled = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'cancel_tests') --json |
-                            Out-String | ConvertFrom-Json)
-                        if ($LASTEXITCODE -ne 0 -or -not $cancelled.success) {
-                            throw 'Pipeline result collector remained running and could not be reset.'
+                        if ($status.status -eq 'running') {
+                            $cancelled = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'cancel_tests') --timeout 90 --json |
+                                Out-String | ConvertFrom-Json)
+                            if ($LASTEXITCODE -ne 0 -or -not $cancelled.success) {
+                                throw 'Pipeline result collector remained running and could not be reset.'
+                            }
                         }
-                        Write-Step 'PASS' "StreetBuilding EditMode XML contracts: $($cases.Count) passed; reset stale Pipeline collector"
+                        Write-Step 'PASS' "StreetBuilding EditMode XML contracts: $($cases.Count) passed; exact fresh run verified ($($status.status))"
                         return
                     }
                 }
             }
         }
-    } while ($status.status -eq 'running' -and [DateTime]::UtcNow -lt $deadline)
+        if ($transportFailures -ge 3) {
+            throw "StreetBuilding Pipeline EditMode test status failed after 3 read-only attempts: $pollError"
+        }
+    } while ($status.status -in @('running', 'no_tests', 'transport_unavailable') -and [DateTime]::UtcNow -lt $deadline)
     if ($status.status -ne 'completed') {
         throw "StreetBuilding Pipeline EditMode tests ended with status '$($status.status)'."
     }
@@ -547,6 +582,13 @@ if ($Stage -eq 'VerifyFast') {
 $persisted = $false
 try {
     if ($Module -eq 'StreetBuilding') {
+        # Execute the actual polling function against isolated transport/XML
+        # fault fixtures before trusting it for the cumulative Editor run.
+        $probeDirectory = Join-Path (Split-Path -Path $snapshotPath -Parent) (
+            'pipeline-status-recovery-{0}' -f [guid]::NewGuid().ToString('N').Substring(0, 8))
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (
+            Join-Path $PSScriptRoot 'Test-UnityPipelineStatusRecovery.ps1') -OutputDirectory $probeDirectory
+        if ($LASTEXITCODE -ne 0) { throw 'Pipeline status recovery cumulative contracts failed.' }
         # Export current Live edits and validate a disposable locked candidate
         # before any production definition/HIP save.
         Invoke-Hython -Arguments @(
@@ -564,12 +606,14 @@ try {
             $cityRoadValidator, '--source', 'live', '--host', $HoudiniHost,
             '--port', [string]$HoudiniPort)
     }
-    $persisted = $true
+    $houdiniFilePatterns = @($manifest.allowed_files | ForEach-Object { ([string]$_).Replace('\', '/') })
+    $definitionWriteAllowed = @($houdiniFilePatterns | Where-Object { $moduleConfig[$Module].Hda -clike $_ }).Count -gt 0
+    $hipWriteAllowed = @($houdiniFilePatterns | Where-Object { $moduleConfig[$Module].Hip -clike $_ }).Count -gt 0
+    $persisted = $Module -ne 'StreetBuilding' -or ($definitionWriteAllowed -and $hipWriteAllowed)
     Invoke-Hython -Arguments @(
         $gateScript, '--module', $Module, '--stage', 'persist',
         '--manifest', $manifestPath, '--project-root', $projectRoot,
         '--snapshot', $snapshotPath, '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
-    $persisted = $true
 
     if ($Module -eq 'CityRoad') {
         Invoke-Hython -Arguments @(
@@ -652,6 +696,17 @@ try {
     })
     if ($newDiagnostics.Count -gt 0) {
         throw "Unity produced new Console diagnostics:`n- $($newDiagnostics -join "`n- ")"
+    }
+    if ($Module -eq 'StreetBuilding' -and -not $persisted) {
+        # 美术验收末尾再次核对受保护字节和 Live 范围，不触发恢复/重载已有现场。
+        Invoke-Hython -Arguments @(
+            $gateScript, '--module', $Module, '--stage', 'verify-fast',
+            '--manifest', $manifestPath, '--project-root', $projectRoot,
+            '--snapshot', $snapshotPath, '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
+        Invoke-Hython -Arguments @(
+            $gateScript, '--module', $Module, '--stage', 'persist',
+            '--manifest', $manifestPath, '--project-root', $projectRoot,
+            '--snapshot', $snapshotPath, '--host', $HoudiniHost, '--port', [string]$HoudiniPort)
     }
     Write-Step 'PASS' "VerifyFull complete: $snapshotPath"
 }

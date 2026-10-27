@@ -386,6 +386,17 @@ def _pcg_template_type(template):
 
 def _pcg_public_interface(asset):
     result = {}
+    templates = asset.parmTemplateGroup()
+    if asset.type().name() == 'pcgbike::StreetBuilding::1.0' and asset.parm('roof_props_layout_mode') is not None:
+        # Only the new, definition-backed internal switcher identity is
+        # projected. Existing parent folders and all controls stay exact.
+        import importlib, sys
+        from pathlib import Path
+        tools = str(Path(hou.hipFile.path()).parent / 'scripts' / 'tools')
+        if tools not in sys.path: sys.path.insert(0, tools)
+        import streetbuilding_attachment_interface
+        interface = importlib.reload(streetbuilding_attachment_interface)
+        templates = interface.canonical_live_templates(asset)
     def visit(templates, folder):
         for template in templates:
             name = _pcg_safe(lambda: template.name(), "")
@@ -424,7 +435,7 @@ def _pcg_public_interface(asset):
             children = _pcg_safe(lambda: template.parmTemplates(), None)
             if children:
                 visit(children, folder + [name or ("@" + label)])
-    visit(asset.parmTemplateGroup().parmTemplates(), [])
+    visit(templates.parmTemplates(), [])
     return result
 
 def _pcg_parameter_state(node):
@@ -1028,6 +1039,27 @@ def persist_live(
     expected_manifest_hash = captured_manifest_hash(manifest)
     if baseline.get("manifest_sha256") != expected_manifest_hash:
         raise GateFailure("Change manifest differs from the one used by Capture")
+    definition_allowed = matches(config["definition"], manifest["allowed_files"])
+    hip_allowed = matches(config["hip"], manifest["allowed_files"])
+    if module == "StreetBuilding" and not definition_allowed and not hip_allowed:
+        # 美术任务仍运行完整累计验证；没有持久化权限时必须保留 HDA/HIP 原字节。
+        protected_files = (config["definition"], config["hip"], *config.get("restore_files", []))
+        states = file_state(project_root, protected_files)
+        changed = [
+            relative for relative, state in states.items()
+            if not state.get("exists") or state.get("sha256") != (
+                baseline.get("files", {}).get(relative, {}).get("sha256")
+                or baseline.get("backup_sha256", {}).get(relative))
+        ]
+        if changed:
+            raise GateFailure(
+                "Unity-only VerifyFull detected unauthorized Houdini file changes: "
+                + ", ".join(changed))
+        return {
+            "status": "PASS", "module": module, "stage": "Persist",
+            "persistence": "not-required", "snapshot": normalize_path(snapshot_path),
+            "files": states, "houdini": {"live_scene_untouched": True},
+        }
     for relative in (config["definition"], config["hip"], *config.get("restore_files", [])):
         if not matches(relative, manifest["allowed_files"]):
             raise GateFailure(
@@ -1166,6 +1198,15 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         # Core cleanup hides this compatibility field without changing its value
         # or the canonical output-folder identity. Preserve the verified Live flag.
         promoted_templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
+        if asset.parm('roof_props_layout_mode') is not None:
+            # Promote the verified instance-owned attachment controls while
+            # preserving the existing canonical folder identities. The same
+            # helper is used by the fresh candidate validator.
+            import importlib
+            import streetbuilding_attachment_interface
+            importlib.reload(streetbuilding_attachment_interface)
+            from streetbuilding_attachment_interface import promote as promote_attachments
+            promoted_templates = promote_attachments(promoted_templates, asset)
     if expected_type == 'pcgbike::CityRoad::1.0' and not preserve_public_interface:
         # Preserve canonical definition identities while promoting the categorized UI.
         if len(asset.parmTemplateGroup().findIndices('road_network_source')) > 1:
@@ -1216,6 +1257,13 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         import importlib, sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(expected_hip),'scripts','tools'))
         importlib.reload(__import__('validate_cityroad_frontage')).validate(asset)
+    if expected_type == 'pcgbike::StreetBuilding::1.0' and asset.parm('roof_props_layout_mode') is not None:
+        # A node-owned switcher alias is a HOM layout representation, not a
+        # second public field. Validate the same strict read-only projection
+        # used by Capture; never rename native/spare UI or alter instance values.
+        from streetbuilding_attachment_interface import canonical_live_templates, validate_reference_templates
+        validate_reference_templates(definition.parmTemplateGroup())
+        validate_reference_templates(canonical_live_templates(asset))
     hou.hipFile.save()
     return {
         'asset_path': asset.path(),
@@ -1379,7 +1427,10 @@ def main() -> int:
                 != baseline_files.get(path, {}).get("sha256")
                 for path in (config["definition"], config["hip"])
             )
-            if changed:
+            persistence_authorized = all(
+                matches(config[field], manifest["allowed_files"])
+                for field in ("definition", "hip"))
+            if changed and (args.module != "StreetBuilding" or persistence_authorized):
                 restore_baseline(
                     project_root, args.module, config,
                     snapshot_path, args.host, args.port)

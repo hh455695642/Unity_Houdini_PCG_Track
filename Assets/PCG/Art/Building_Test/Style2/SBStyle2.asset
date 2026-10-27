@@ -1,0 +1,769 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b89995859dd1049adca88ae92265a3, type: 3}
+  m_Name: SBStyle2
+  m_EditorClassIdentifier: 
+  _cellWidth: 2
+  _groundFloorHeight: 4
+  _typicalFloorHeight: 3
+  _layerSchema: 1
+  _ground:
+    _height: 3
+    _facade:
+    - _prefab: {fileID: 6717593922444449103, guid: c1df470879edf65449a1771830fe209b,
+        type: 3}
+      _moduleRole: 3
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 5463021423013316756, guid: 0bcfec297f7190a4d8d25ee7401cc1c4,
+        type: 3}
+      _moduleRole: 2
+      _widthSpan: 1
+      _depthSpan: 0
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 0.5
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 0
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 7169601612481079615, guid: a461932c37b37cd42a330219eaaaeb4c,
+        type: 3}
+      _moduleRole: 0
+      _widthSpan: 1
+      _depthSpan: 0
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 0
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    _sideRear: []
+    _corners: []
+    _trim:
+    - _prefab: {fileID: 3109198494319396663, guid: 5d12e4d116deb904ea3eb2a8ec0a2fe7,
+        type: 3}
+      _moduleRole: 12
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 0
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 19
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 3812161037864164244, guid: 82745cdc090d3024e815888abda913e7,
+        type: 3}
+      _moduleRole: 13
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 31
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 3812161037864164244, guid: 82745cdc090d3024e815888abda913e7,
+        type: 3}
+      _moduleRole: 8
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 1
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2550853259252286404, guid: 38d91478b7ad41b42a489759fe94ace8,
+        type: 3}
+      _moduleRole: 22
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 16
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    _roofSurface: []
+    _attachments:
+    - _prefab: {fileID: 519059050975182116, guid: 35de97bd4f3538e44b04948eb7ddde75,
+        type: 3}
+      _moduleRole: 14
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2042542091701538004, guid: cfc5e5171d7fa8b4990747ac98de6a1c,
+        type: 3}
+      _moduleRole: 15
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 6744047699037558627, guid: cd3132540ead18f40a16ec7c9f71044e,
+        type: 3}
+      _moduleRole: 15
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 17
+      _allowedFloors: 1
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 7283339831510073808, guid: 4092ee4d2db9c7f4882650fb66a95a4f,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 1
+      _attachmentSubtype: 10
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: -0.3, z: 0.4}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+    - _prefab: {fileID: 7291599808662899494, guid: 7aeea400dddeaff4785b0b418c4fb54c,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 1
+      _attachmentSubtype: 8
+      _connectionHeight: 1
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 1, z: 0.1}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 0.05, y: 1}
+    - _prefab: {fileID: 2243152135112685530, guid: aeff4771b2af68343a8b02351e5e41c3,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 1
+      _attachmentSubtype: 11
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 0.25, z: 0.35}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+    - _prefab: {fileID: 6324402261448649751, guid: 04782f5cf21c1a74bacf695fd53c9646,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 1
+      _attachmentSubtype: 12
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 0.5, z: 0.5}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+  _upper:
+    _height: 3
+    _facade:
+    - _prefab: {fileID: 6700926301987783637, guid: 6ef73f30c7f5d854eb0e2cb8b9a2b3a0,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 2
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 3
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 912537063030972668, guid: 101ea214de0dd844fbce77574624fd09,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 3764313431021278019, guid: 3bb33d6e5aa0b9c40beeecd77219e474,
+        type: 3}
+      _moduleRole: 4
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 7
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 5463021423013316756, guid: 0bcfec297f7190a4d8d25ee7401cc1c4,
+        type: 3}
+      _moduleRole: 5
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    _sideRear: []
+    _corners: []
+    _trim:
+    - _prefab: {fileID: 7362128426930046689, guid: 71f36311bf2ca49469fd0d7a0b83abc8,
+        type: 3}
+      _moduleRole: 12
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 1
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 3
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    _roofSurface: []
+    _attachments:
+    - _prefab: {fileID: 2014636654640155662, guid: 03521fa08557889458b1780a9e6c9b55,
+        type: 3}
+      _moduleRole: 17
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2179893148767821743, guid: 7a3725ebbca405a4093e0238b821399f,
+        type: 3}
+      _moduleRole: 16
+      _widthSpan: 2
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 3
+      _connectionHeight: 3
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 5980470941169694724, guid: 295a3824fc0e5744f826ad557668f341,
+        type: 3}
+      _moduleRole: 16
+      _widthSpan: 2
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 4
+      _connectionHeight: 3
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2043326918376876925, guid: 21ca776aa2a56b041acc3640792f6543,
+        type: 3}
+      _moduleRole: 16
+      _widthSpan: 2
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 5
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 9129223171691457221, guid: f57350fca1ce52440abb8293b271f3e9,
+        type: 3}
+      _moduleRole: 16
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 6
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 7291599808662899494, guid: 7aeea400dddeaff4785b0b418c4fb54c,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 8
+      _connectionHeight: 1
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 1, z: 0.1}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 0.05, y: 1}
+    - _prefab: {fileID: 2243152135112685530, guid: aeff4771b2af68343a8b02351e5e41c3,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 11
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 0.25, z: 0.35}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+    - _prefab: {fileID: 6324402261448649751, guid: 04782f5cf21c1a74bacf695fd53c9646,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 2
+      _attachmentSubtype: 12
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 0.5, z: 0.5}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+  _roof:
+    _height: 0
+    _facade: []
+    _sideRear: []
+    _corners: []
+    _trim: []
+    _roofSurface:
+    - _prefab: {fileID: 7247211682484930274, guid: ccad40c9ac2a14440a0d35d46d64d846,
+        type: 3}
+      _moduleRole: 19
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 1
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2909048818575473331, guid: cdb62cd39599bc44f810a8c8d6e8e580,
+        type: 3}
+      _moduleRole: 9
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 2578487924591670230, guid: 22539389cb993964289fb9d88745d041,
+        type: 3}
+      _moduleRole: 20
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 6065689317624231242, guid: 2a78c29eae0c5fb4fa751808923a3613,
+        type: 3}
+      _moduleRole: 21
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 2
+      _absoluteHeight: 0.6
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 0
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    _attachments:
+    - _prefab: {fileID: 4368552990346168961, guid: fb88a970d4a0f4648bdc2736d9edf253,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 2
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 289902882621180165, guid: f382f7a6e7e8083479eb8ddd9ca670aa,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 1
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 9140474546494788922, guid: 25f23407a70774a438170c5c9ef057e7,
+        type: 3}
+      _moduleRole: 18
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 2
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+    - _prefab: {fileID: 5511827174320764081, guid: 9236823335026554d93ab764f0bdeef4,
+        type: 3}
+      _moduleRole: 23
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 9
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 1
+      _connectionStart: {x: 0, y: 0, z: 0.1}
+      _connectionEnd: {x: 0, y: 0.3, z: 0.02}
+      _connectionRadius: 0.05
+      _connectionLengthRange: {x: 1, y: 1}
+    - _prefab: {fileID: 6338904240114417060, guid: 00522b1f5aa793343ba67c93cd788507,
+        type: 3}
+      _moduleRole: 16
+      _widthSpan: 1
+      _depthSpan: 1
+      _heightType: 3
+      _absoluteHeight: 0
+      _weight: 1
+      _enabled: 1
+      _allowedFacades: 15
+      _allowedFloors: 4
+      _attachmentSubtype: 7
+      _connectionHeight: 0
+      _hasAttachmentMount: 0
+      _attachmentMount: {x: 0, y: 0, z: 0}
+      _hasConnectionPoints: 0
+      _connectionStart: {x: 0, y: 0, z: 0}
+      _connectionEnd: {x: 0, y: 0, z: 0}
+      _connectionRadius: 0
+      _connectionLengthRange: {x: 0, y: 0}
+  _groundFacade: []
+  _upperFacade: []
+  _sideRear: []
+  _convexConcaveCorners: []
+  _columnTrimCornice: []
+  _roofParapet: []
+  _attachments: []

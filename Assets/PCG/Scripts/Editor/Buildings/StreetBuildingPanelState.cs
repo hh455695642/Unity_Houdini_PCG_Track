@@ -22,7 +22,7 @@ namespace PCGBike.Editor.Buildings
     [Serializable] public sealed class StreetBuildingPanelResult
     {
         public int version = 1, actualUse;
-        public string inputHash, completedUtc, facades, attachments, summary, ruleRevision;
+        public string inputHash, completedUtc, facades, attachments, referenceAttachments, summary, ruleRevision;
         public List<StreetBuildingPanelInput> inputs = new();
     }
 
@@ -40,7 +40,7 @@ namespace PCGBike.Editor.Buildings
             public readonly Dictionary<string, string> DuringCook = new();
             public readonly HashSet<string> DuringCookFloats = new();
             public readonly HashSet<string> DuringCookStrings = new();
-            public string CurrentHash, Error;
+            public string CurrentHash, Error, ReferenceDiagnosticText;
             public bool Cooking, Requested, Valid, Retained, ConnectionAvailable, NeedsResultValidation;
             public StreetBuildingOutputRetention Backup;
         }
@@ -75,7 +75,12 @@ namespace PCGBike.Editor.Buildings
             if (author.LastCookDiagnostic?.StartsWith("Cook FAIL", StringComparison.Ordinal) == true)
                 state.Error = "上次生成失败；结果保留状态需重新验证，上次成功记录见诊断。";
             state.NeedsResultValidation = state.Result != null && (author.PanelVerification != 3 || state.Result.ruleRevision != RuleRevision);
-            if (state.Result != null) state.AttachmentDiagnostics = StreetBuildingAttachmentDiagnostics.Parse(state.Result.attachments);
+            if (state.Result != null)
+            {
+                state.AttachmentDiagnostics = StreetBuildingAttachmentDiagnostics.Parse(state.Result.attachments);
+                state.ReferenceDiagnosticText = string.IsNullOrEmpty(state.Result.referenceAttachments) ? null
+                    : StreetBuildingAttachmentDiagnostics.FormatReference(state.Result.referenceAttachments);
+            }
             if (author.PanelVerification == 2) state.Error = "上次生成被会话或脚本重载中断；结果版本尚未验证，请重新生成。";
             States[author] = state;
             return state;
@@ -161,7 +166,7 @@ namespace PCGBike.Editor.Buildings
         internal static bool IsInput(string name) => name.StartsWith("facade_override", StringComparison.Ordinal)
             || name.StartsWith("attachment_override", StringComparison.Ordinal)
             || name.StartsWith("random_", StringComparison.Ordinal)
-            || InputNames.Contains(name);
+            || InputNames.Contains(name) || StreetBuildingGenerationPolicy.ReferenceFields.Contains(name);
         private static readonly HashSet<string> InputNames = new(StringComparer.Ordinal)
         {
             "building_width", "building_depth", "massing_shape", "l_notch_width_cells", "l_notch_depth_cells",
@@ -289,6 +294,8 @@ namespace PCGBike.Editor.Buildings
             RestoreDuringCookInputs(asset, state);
             author.SetEditorPanelSuccessfulResult(JsonUtility.ToJson(result));
             state.Result = result; state.AttachmentDiagnostics = StreetBuildingAttachmentDiagnostics.Parse(result.attachments);
+            state.ReferenceDiagnosticText = string.IsNullOrEmpty(result.referenceAttachments) ? null
+                : StreetBuildingAttachmentDiagnostics.FormatReference(result.referenceAttachments);
             state.Cooking = false; state.Requested = false; state.Error = null;
             state.NeedsResultValidation = false; SetAudit(author, 3);
             state.Backup?.Dispose(); state.Backup = null;
@@ -362,10 +369,20 @@ namespace PCGBike.Editor.Buildings
                 if (!mapping.StartsWith("v1\n", StringComparison.Ordinal)) throw new InvalidOperationException("墙段 metadata 不可读；请 Rebuild 新 definition。");
                 var segments = StreetBuildingFacadeDiagram.Parse(mapping);
                 if (segments.Count == 0) throw new InvalidOperationException("墙段 metadata 为空");
+                string reference = DetailString(session, geo.GeoID, part.PartID, "reference_attachment_diagnostics");
+                bool referenceMode = StreetBuildingInstanceParameters.Int(asset, "roof_props_layout_mode") != 0
+                    || StreetBuildingInstanceParameters.Int(asset, "fire_escape_layout_mode") != 0
+                    || StreetBuildingInstanceParameters.Int(asset, "drainpipe_enabled") != 0;
+                if (referenceMode || !string.IsNullOrEmpty(reference))
+                {
+                    var report = StreetBuildingAttachmentDiagnostics.ParseReference(reference);
+                    if (report.Error != null) throw new InvalidOperationException(report.Error);
+                }
                 return new StreetBuildingPanelResult
                 {
                     actualUse = DetailInt(session, geo.GeoID, part.PartID, "effective_ground_use"), facades = mapping, ruleRevision = revision,
                     attachments = DetailString(session, geo.GeoID, part.PartID, "attachment_diagnostics"),
+                    referenceAttachments = reference,
                     summary = StreetBuildingRecook.ReadGroundSummary(asset, StreetBuildingRecook.ReadEntranceCell(asset), StreetBuildingInstanceParameters.Int(asset, "layout_seed"))
                 };
             }

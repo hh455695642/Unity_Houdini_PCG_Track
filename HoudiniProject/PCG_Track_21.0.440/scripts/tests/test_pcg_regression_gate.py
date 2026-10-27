@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 
 TOOLS_DIR = Path(__file__).resolve().parents[1] / "tools"
@@ -104,16 +105,117 @@ class CompareSnapshotsTests(unittest.TestCase):
     def test_streetbuilding_verifyfull_runs_unity_contract_tests(self):
         entrypoint = (PROJECT_ROOT / ".agents" / "scripts"
                       / "Invoke-PcgRegression.ps1").read_text(encoding="utf-8")
-        self.assertIn("Invoke-StreetBuildingContractTests", entrypoint)
-        self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
-        self.assertIn("StreetBuildingPhase4ContractBridge", entrypoint)
-        self.assertIn("reflection-method-call", entrypoint)
+        self.assertIn("Invoke-StreetBuildingPipelineTests -CandidateHda $candidate.hda", entrypoint)
+        self.assertIn("        Invoke-StreetBuildingPipelineTests\n", entrypoint)
+        self.assertIn("$assembly = 'PCGBike.StreetBuilding.Tests.Editor'", entrypoint)
+        self.assertIn("--filter_type assembly --filter $assembly", entrypoint)
+        self.assertIn("$summary.passed -ne $tests.Count", entrypoint)
+        self.assertNotIn("StreetBuildingPhase4ContractBridge", entrypoint)
 
     def test_streetbuilding_persistence_requires_current_live(self):
         config = gate.MODULES['StreetBuilding']
         self.assertFalse(config.get('isolated'))
         self.assertNotIn('builder', config)
         self.assertEqual('/obj/StreetBuilding_DEV', config['asset_path'])
+
+    def test_unity_only_persistence_keeps_houdini_bytes_without_rpc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, config, change, baseline_path, original = self.persistence_fixture(directory)
+            with mock.patch.object(gate, "connect_live", side_effect=AssertionError("RPC must not run")):
+                result = gate.persist_live(root, "StreetBuilding", config, change, baseline_path, "localhost", 18811)
+            self.assertEqual("not-required", result["persistence"])
+            self.assertEqual(original, {relative: (root / relative).read_bytes() for relative in original})
+
+    def test_unity_only_persistence_rejects_changed_or_missing_houdini_files(self):
+        for relative_key in ("definition", "hip", "meta"):
+            for operation in ("change", "remove"):
+                with self.subTest(file=relative_key, operation=operation), tempfile.TemporaryDirectory() as directory:
+                    root, config, change, baseline_path, original = self.persistence_fixture(directory)
+                    relative = config["restore_files"][0] if relative_key == "meta" else config[relative_key]
+                    target = root / relative
+                    if operation == "remove":
+                        target.unlink()
+                    else:
+                        target.write_bytes(b"unauthorized-change")
+                    with mock.patch.object(gate, "connect_live", side_effect=AssertionError("RPC must not run")):
+                        with self.assertRaisesRegex(gate.GateFailure, "unauthorized Houdini file changes"):
+                            gate.persist_live(root, "StreetBuilding", config, change, baseline_path, "localhost", 18811)
+
+    def test_unity_only_persistence_requires_capture_hash_and_protected_file_baselines(self):
+        for invalid in ("manifest", "missing-meta-hash"):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as directory:
+                root, config, change, baseline_path, original = self.persistence_fixture(directory)
+                if invalid == "manifest":
+                    change["task"] = "different-task"
+                else:
+                    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+                    baseline["backup_sha256"].pop(config["restore_files"][0])
+                    baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+                with mock.patch.object(gate, "connect_live", side_effect=AssertionError("RPC must not run")):
+                    with self.assertRaises(gate.GateFailure):
+                        gate.persist_live(root, "StreetBuilding", config, change, baseline_path, "localhost", 18811)
+
+    def test_partial_houdini_write_permission_remains_blocked(self):
+        for allowed_key in ("definition", "hip"):
+            with self.subTest(file=allowed_key), tempfile.TemporaryDirectory() as directory:
+                root, config, change, baseline_path, original = self.persistence_fixture(directory)
+                change["allowed_files"].append(config[allowed_key])
+                baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+                baseline["manifest_sha256"] = gate.captured_manifest_hash(change)
+                baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+                with mock.patch.object(gate, "connect_live", side_effect=AssertionError("RPC must not run")):
+                    with self.assertRaisesRegex(gate.GateFailure, "persistence requires allowed_files"):
+                        gate.persist_live(root, "StreetBuilding", config, change, baseline_path, "localhost", 18811)
+
+    def test_authorized_houdini_persistence_still_requires_rpc(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, config, change, baseline_path, original = self.persistence_fixture(directory)
+            change["allowed_files"].extend(original)
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+            baseline["manifest_sha256"] = gate.captured_manifest_hash(change)
+            baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+            with mock.patch.object(gate, "connect_live", side_effect=RuntimeError("authorized RPC reached")):
+                with self.assertRaisesRegex(RuntimeError, "authorized RPC reached"):
+                    gate.persist_live(root, "StreetBuilding", config, change, baseline_path, "localhost", 18811)
+
+    def test_unity_only_failure_does_not_restore_or_reload_unowned_houdini_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, config, change, baseline_path, original = self.persistence_fixture(directory)
+            target = root / config["definition"]
+            target.write_bytes(b"external-change")
+            args = mock.Mock(module="StreetBuilding", project_root=root, manifest=root / "manifest.json",
+                             snapshot=baseline_path, stage="persist", host="localhost", port=18811)
+            with mock.patch.object(gate, "parse_args", return_value=args), \
+                    mock.patch.object(gate, "load_manifest", return_value=change), \
+                    mock.patch.object(gate, "restore_baseline") as restore, \
+                    mock.patch.object(gate, "connect_live", side_effect=AssertionError("RPC must not run")):
+                with self.assertRaisesRegex(gate.GateFailure, "unauthorized Houdini file changes"):
+                    gate.main()
+                restore.assert_not_called()
+            self.assertEqual(b"external-change", target.read_bytes())
+
+    @staticmethod
+    def persistence_fixture(directory):
+        root = Path(directory)
+        config = copy.deepcopy(gate.MODULES["StreetBuilding"])
+        change = manifest()
+        change["module"] = "StreetBuilding"
+        change["allowed_files"] = ["Assets/PCG/Art/Building_Test/Style1/SBStyle_Test.asset"]
+        protected = [config["definition"], config["hip"], *config["restore_files"]]
+        original = {}
+        for relative in protected:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            original[relative] = ("original:" + relative).encode("utf-8")
+            target.write_bytes(original[relative])
+        baseline = {
+            "manifest_sha256": gate.captured_manifest_hash(change),
+            "files": gate.file_state(root, [config["definition"], config["hip"]]),
+            "backup_sha256": {relative: gate.sha256_file(root / relative) for relative in protected},
+        }
+        baseline_path = root / "baseline.json"
+        baseline_path.write_text(json.dumps(baseline), encoding="utf-8")
+        return root, config, change, baseline_path, original
 
     def test_unchanged_snapshot_passes(self):
         before = snapshot()

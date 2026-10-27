@@ -237,12 +237,15 @@ namespace PCGBike.Editor.Buildings
             float ratio = 0;
             string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty, attachments = string.Empty, randomContext = string.Empty;
             bool hasUse = false, hasRatio = false;
+            string referenceAttachments = null;
             int? outputLayoutSeed = null, sampledDoorRequest = null;
             foreach (var geo in core.GeoNodes)
             foreach (var part in geo.GetParts())
             {
                 if (ReadDetailString(session, geo.GeoID, part.PartID, "attachment_diagnostics", out string a) && !string.IsNullOrEmpty(a))
                     attachments = a;
+                if (ReadDetailString(session, geo.GeoID, part.PartID, "reference_attachment_diagnostics", out string reference) && !string.IsNullOrEmpty(reference))
+                    referenceAttachments = reference;
                 if (ReadDetailString(session, geo.GeoID, part.PartID, "random_context", out string context) && !string.IsNullOrEmpty(context))
                     randomContext = context;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "effective_ground_use", out int u))
@@ -285,6 +288,8 @@ namespace PCGBike.Editor.Buildings
             if (!string.IsNullOrWhiteSpace(upperWindows))
                 summary += "\n标准层窗模块：\n" + FormatQuantityReport(upperWindows);
             if (!string.IsNullOrWhiteSpace(attachments)) summary += "\n附件（实际生成过程）：\n" + FormatAttachments(attachments);
+            if (!string.IsNullOrWhiteSpace(referenceAttachments)) summary += "\n固定附件（按完整设备／梯组／管线统计）：\n"
+                + StreetBuildingAttachmentDiagnostics.FormatReference(referenceAttachments);
             return summary;
         }
         internal static string FormatQuantityReport(string report)

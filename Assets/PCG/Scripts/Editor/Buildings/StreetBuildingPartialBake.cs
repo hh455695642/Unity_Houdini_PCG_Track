@@ -26,6 +26,7 @@ namespace PCGBike.Editor.Buildings
                 if (asset == null) continue;
                 asset.PreAssetEvent.RemoveListener(BeforeBake);
                 asset.PreAssetEvent.AddListener(BeforeBake);
+                StreetBuildingPipeBake.Attach(asset);
             }
         }
 
@@ -41,6 +42,9 @@ namespace PCGBike.Editor.Buildings
             var report = StreetBuildingStyleValidator.Validate(authoring.ResolveStyle(), true);
             if (!report.IsValid) throw new InvalidOperationException("正式 Bake 需要完整风格：\n" + report);
             var asset = authoring.GetComponent<HEU_HoudiniAssetRoot>()?.HoudiniAsset;
+            // A synchronous Apply -> Bake may occur before hierarchyChanged/delayCall.
+            // Register here as well so public native Bake always receives pipe consolidation.
+            if (asset != null) StreetBuildingPipeBake.Attach(asset);
             if (asset == null || asset.LastCookResult != HEU_AssetCookResultWrapper.SUCCESS)
                 throw new InvalidOperationException("请先成功应用风格并 Cook，再执行 Bake。");
             if (StreetBuildingRandom.Enabled(asset))

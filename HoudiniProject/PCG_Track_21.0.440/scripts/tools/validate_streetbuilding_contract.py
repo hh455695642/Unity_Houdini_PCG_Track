@@ -536,8 +536,30 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
             == core.node("SELECT_ATTACHMENT_MODULES"), "Attachment-rule wiring failed")
     require(core.node("DETAIL_INSTANCE_POINTS").input(2)
             == core.node("SELECT_FACADE_MODULES"), "AC actual-wall input wiring failed")
+    require(core.node("ATTACHMENT_SUPPORT_CANDIDATES").inputs()[:2] == (
+            core.node("EMPTY_GEOMETRY"), core.node("SELECT_FACADE_MODULES")),
+            "Reference support wiring failed")
+    require(core.node("PLAN_CONTINUOUS_ATTACHMENTS").inputs()[:3] == (
+            core.node("EMPTY_GEOMETRY"), core.node("ATTACHMENT_SUPPORT_CANDIDATES"),
+            core.node("SELECT_FACADE_MODULES")), "Continuous attachment planning wiring failed")
+    require(core.node("PLAN_TYPED_ROOF_PROPS").input(0)
+            == core.node("PLAN_CONTINUOUS_ATTACHMENTS"), "Typed roof planning wiring failed")
+    require(core.node("ASSEMBLE_CONTINUOUS_ATTACHMENTS").inputs()[:2] == (
+            core.node("DETAIL_INSTANCE_POINTS"), core.node("PLAN_TYPED_ROOF_PROPS")),
+            "Reference attachment assembly wiring failed")
+    require(core.node("VALIDATE_REFERENCE_ATTACHMENTS").input(0)
+            == core.node("ASSEMBLE_CONTINUOUS_ATTACHMENTS"),
+            "Reference attachment validator wiring failed")
+    require(core.node("ATTACHMENT_DIAGNOSTICS").input(0)
+            == core.node("VALIDATE_REFERENCE_ATTACHMENTS"),
+            "Reference attachment diagnostic wiring failed")
     require(core.node("VALIDATE_DIRECT_DETAIL_INSTANCES").input(0)
-            == core.node("DETAIL_INSTANCE_POINTS"), "Detail validator wiring failed")
+            == core.node("ATTACHMENT_DIAGNOSTICS"), "Detail validator wiring failed")
+    require(core.node("METADATA_ATTACHMENT_INPUTS").input(1)
+            == core.node("PROJECT_REFERENCE_METADATA_INPUT")
+            and core.node("PROJECT_REFERENCE_METADATA_INPUT").input(0)
+            == core.node("ATTACHMENT_DIAGNOSTICS"),
+            "Reference metadata wiring failed")
     require(core.node("DETAIL_MODULE_SOURCE_SWITCH").input(1)
             == core.node("VALIDATE_DIRECT_DETAIL_INSTANCES"), "Detail switch wiring failed")
     require(core.node("OUT_DETAIL_INSTANCES").input(0)
@@ -1783,7 +1805,7 @@ def assert_attachment_diagnostics(parent: hou.Node) -> dict[str, Any]:
     """Probe real locked outputs, including removal of previous Cook objects."""
     asset = parent.parent().createNode(parent.type().name(), 'VERIFY_ATTACHMENT_DIAGNOSTICS')
     rows = [r for r in STYLE_CATALOG.splitlines() if not (r.startswith('M|') and int(r.split('|')[2]) in (14, 15, 16))]
-    rows += [style_row(role, DETAIL_PREFIX + name + '.prefab', facades=1, floors=1)
+    rows += [style_row(role, DETAIL_PREFIX + name + '.prefab', height=.30, facades=1, floors=1)
              for role, name in ((14, 'AwningDiagnostic'), (15, 'SignDiagnostic'))]
     configure(asset, '\n'.join(rows), floors=6, roof=0, attachments=1, density=1)
     asset.setParms(dict(ground_attachment_placement=1, ground_floor_use=2,
@@ -1867,6 +1889,247 @@ def assert_generation_policy(asset: hou.Node) -> dict[str, Any]:
     return {'fixed_reports': len(set(fixed_reports)), 'ranged_reports': len(set(random_reports))}
 
 
+def assert_reference_attachments(asset: hou.Node) -> dict[str, Any]:
+    """Independent behavior fixture: quotas count groups; joints use real points.
+
+    Deliberately constructs catalog semantics without importing the migration.
+    Unknown filenames prove that subtype selection never guesses asset names.
+    """
+    from streetbuilding_attachment_interface import FIELDS, EXPECTED_TYPES
+    for name in FIELDS:
+        require(asset.parm(name) is not None, 'Missing reference attachment field: ' + name)
+        expected_type = getattr(hou.parmTemplateType, EXPECTED_TYPES[name])
+        template = asset.type().definition().parmTemplateGroup().find(name)
+        require(template is not None and template.type() == expected_type and not template.isHidden(),
+                'Reference definition storage type/visibility is invalid: ' + name)
+    old = {p.name(): p.rawValue() for p in asset.parms() if not p.isMultiParmParent()}
+    rows = []
+    roof_source_bounds = {}
+    def fixture(role, subtype, name, size, minimum, joint=0, floors=7):
+        path = DETAIL_PREFIX + name + '.prefab'
+        rows.extend((f'M|7|{role}|{name}|{path}|2|1|3|0|1|15|{floors}|'
+                     + '|'.join(str(x) for x in (*size, *minimum)), f'X|1|{path}|{subtype}|{joint}'))
+        if role == 18:
+            roof_source_bounds[path] = (tuple(minimum), tuple(size))
+    fixture(18, 1, 'UnknownA', (1.8,3.5,1.8), (-.9,0,-.9), floors=4)
+    fixture(18, 2, 'UnknownB', (.6,1.4,.6), (-.3,0,-.3), floors=4)
+    fixture(16, 3, 'UnknownC', (3,3.9,1), (-1.5,0,.45), 3, floors=2)
+    fixture(16, 4, 'UnknownD', (3,3.9,1), (-1.5,0,.45), 3, floors=2)
+    fixture(16, 5, 'UnknownE', (3,.9,1), (-1.5,0,.45), floors=2)
+    fixture(16, 6, 'UnknownF', (3,.1,1), (-1.5,0,.45), floors=2)
+    fixture(16, 7, 'UnknownRoofAccess', (.65,4.625,.72), (-.325,-3,-.15), floors=4)
+    # The same straight asset explicitly supports both occupied floor bands.
+    # An all-floor fixture would hide the real Style1 scope failure in HAPI.
+    fixture(23, 8, 'UnknownG', (.1,1,.1), (-.05,0,.5), 1, floors=1)
+    fixture(23, 8, 'UnknownG', (.1,1,.1), (-.05,0,.5), 1, floors=2)
+    fixture(23, 9, 'UnknownH', (.1,.1,.5), (-.05,-.05,.05), floors=4)
+    fixture(23, 10, 'UnknownI', (.1,.1,.3), (-.05,0,.5), floors=1)
+    catalog = STYLE_CATALOG + '\n' + '\n'.join(rows)
+    result = {}
+    def assert_roof_prop_separation(value, expected_count):
+        # Reconstruct from the fixture's independent source bounds and real P.
+        # The wrangle's own attachment_bounds/accepted-count metadata cannot
+        # prove that multiple addpoint() calls reserved distinct roof space.
+        footprints = []
+        for point in value.points():
+            if point.stringAttribValue('module_role') != 'RoofProp':
+                continue
+            path = point.stringAttribValue('unity_instance')
+            require(path in roof_source_bounds, 'Typed roof output used an unverified source: ' + path)
+            # This typed fixture has no yaw option; current RoofProp contract
+            # uses identity orientation and unit scale, with Houdini P.x mirrored.
+            orient = tuple(point.attribValue('orient'))
+            require(all(abs(v) <= 1e-6 for v in orient[:3]) and abs(abs(orient[3])-1) <= 1e-6,
+                    'Typed roof fixture unexpectedly rotated a source footprint')
+            require(tuple(point.attribValue('scale')) == (1,1,1), 'Typed roof source footprint was scaled')
+            minimum, size = roof_source_bounds[path]
+            p = tuple(point.position())
+            origin = (-p[0], p[1], p[2])
+            low = tuple(origin[axis] + minimum[axis] for axis in range(3))
+            high = tuple(low[axis] + size[axis] for axis in range(3))
+            footprints.append((path, low, high))
+        require(len(footprints) == expected_count, 'Roof separation requires every actual source footprint')
+        pairs = 0
+        minimum_separation = None
+        for index, (path_a, low_a, high_a) in enumerate(footprints):
+            for path_b, low_b, high_b in footprints[index+1:]:
+                overlap_x = min(high_a[0],high_b[0]) - max(low_a[0],low_b[0])
+                overlap_z = min(high_a[2],high_b[2]) - max(low_a[2],low_b[2])
+                require(overlap_x <= .001 or overlap_z <= .001,
+                        f'Actual RoofProp footprints overlap: {path_a} / {path_b}; '
+                        f'overlapX={overlap_x:.6f}m, overlapZ={overlap_z:.6f}m')
+                separation = max(-overlap_x, -overlap_z)
+                minimum_separation = separation if minimum_separation is None else min(minimum_separation,separation)
+                pairs += 1
+        return dict(actual_props=len(footprints),pairs=pairs,minimum_axis_separation=minimum_separation,
+                    overlap_tolerance=.001,independent_source_bounds=True)
+    def verified_records(value):
+        report = value.attribValue('reference_attachment_diagnostics')
+        records = {f[1]: (int(f[2]), int(f[3]), f[4]) for row in report.splitlines()
+                   if len(f := row.split('|')) == 6 and f[0] == 'R'}
+        kinds = ('WaterTower', 'Chimney', 'FireEscape', 'DrainPipe')
+        require(set(records) == set(kinds), 'Reference diagnostic kinds are incomplete')
+        actual_groups = {kind: set() for kind in kinds}
+        actual_parts = {kind: 0 for kind in kinds}
+        has_subtype = value.findPointAttrib('attachment_subtype') is not None
+        for point in value.points():
+            subtype = point.intAttribValue('attachment_subtype') if has_subtype else 0
+            kind = ('WaterTower' if subtype == 1 else 'Chimney' if subtype == 2 else
+                    'FireEscape' if 3 <= subtype <= 7 else 'DrainPipe' if 8 <= subtype <= 12 else None)
+            if kind is None:
+                continue
+            group = point.stringAttribValue('attachment_group_id')
+            require(bool(group) and bool(point.stringAttribValue('unity_instance')),
+                    'Reference output has a missing group or asset path')
+            actual_groups[kind].add(group)
+            actual_parts[kind] += 1
+        for kind, token in zip(kinds, ('water', 'chimney', 'fire', 'drain')):
+            require(records[kind][1] == len(actual_groups[kind]),
+                    f'{kind} diagnostic does not match final output groups')
+            require(value.intAttribValue('reference_' + token + '_parts') == actual_parts[kind],
+                    f'{kind} part metadata does not match final output points')
+        # The separate metadata branch must agree with the actual Engine output.
+        metadata_report = geometry(asset, 'OUT_BUILDING_METADATA').attribValue('reference_attachment_diagnostics')
+        require(metadata_report == report, 'Metadata reports attachments absent from the final detail output')
+        return records, actual_parts
+    try:
+        configure(asset, catalog, width=8, depth=10, floors=3, density=0)
+        asset.setParms(dict(roof_props_layout_mode=1, water_tower_count=1, chimney_count=2,
+                            fire_escape_layout_mode=1, fire_escape_group_count=1,
+                            fire_escape_face_mask=8, fire_escape_floor_start=2,
+                            fire_escape_floor_end=3, drainpipe_enabled=1, drainpipe_count=2,
+                            drainpipe_face_mask=12, facade_layout_mode=0))
+        value = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        records, actual_parts = verified_records(value)
+        projection = geometry(asset, 'PROJECT_REFERENCE_METADATA_INPUT')
+        require(len(projection.points()) == len(value.points()),
+                'Metadata projection lost final attachment points used by diagnostics')
+        for attribute in ('attachment_group_id','attachment_part_index','attachment_subtype',
+                          'connection_start','connection_end','attachment_bounds_min','attachment_bounds_max'):
+            require(projection.findPointAttrib(attribute) is None,
+                    'Attachment-only point schema leaked into metadata merge: ' + attribute)
+        require(projection.attribValue('reference_attachment_diagnostics') == value.attribValue('reference_attachment_diagnostics'),
+                'Metadata projection lost reference detail diagnostics')
+        for role, count in [('WaterTower',1),('Chimney',2),('FireEscape',1),('DrainPipe',2)]:
+            require(records[role][:2] == (count,count), f'{role} request/actual mismatch: {records[role]}')
+        result['roof_prop_separation'] = {'benchmark':assert_roof_prop_separation(value,3)}
+        groups = {}
+        for p in value.points():
+            require(tuple(p.attribValue('scale')) == (1,1,1), 'Reference attachment must use unit scale')
+            key = p.stringAttribValue('attachment_group_id')
+            if key:
+                groups.setdefault(key, []).append(p)
+        for key, points in groups.items():
+            links = [p for p in points if p.intAttribValue('attachment_subtype') in (3,4,8)]
+            links.sort(key=lambda p:p.intAttribValue('attachment_part_index'))
+            for a,b in zip(links,links[1:]):
+                require(hou.Vector3(a.attribValue('connection_end')).distanceTo(hou.Vector3(b.attribValue('connection_start'))) <= .005,
+                        'Disconnected reference attachment: ' + key)
+        result['benchmark'] = records
+        result['benchmark_parts'] = actual_parts
+        header = STYLE_CATALOG.splitlines()[0].split('|')
+        ground_height, typical_height = float(header[2]), float(header[3])
+        for point in value.points():
+            if point.intAttribValue('attachment_subtype') != 8:
+                continue
+            y = point.position().y()
+            floor = 0 if y < ground_height - .001 else min(2, 1 + math.floor((y - ground_height) / typical_height))
+            require(point.intAttribValue('floor_index') == floor,
+                    'Pipe segment floor metadata does not match its physical height')
+        fixed = lambda g: [(p.attribValue('P'),p.attribValue('unity_instance')) for p in g.points()
+                          if p.stringAttribValue('attachment_group_id')]
+        baseline_fixed = fixed(value)
+        # A valid roof range emits one access piece in the same complete group.
+        asset.parm('fire_escape_roof_access').set(1)
+        access_value = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        access_records, _ = verified_records(access_value)
+        access_points = [p for p in access_value.points() if p.intAttribValue('attachment_subtype') == 7]
+        require(access_records['FireEscape'] == (1,1,'none') and len(access_points) == 1,
+                'Valid roof access did not produce one complete escape group')
+        access_group = access_points[0].stringAttribValue('attachment_group_id')
+        access_subtypes = {p.intAttribValue('attachment_subtype') for p in access_value.points()
+                           if p.stringAttribValue('attachment_group_id') == access_group}
+        require({5,6,7}.issubset(access_subtypes) and bool(access_subtypes & {3,4}),
+                'Roof access is detached from the storey and termination pieces')
+        require(access_points[0].intAttribValue('floor_index') == 3 and
+                abs(access_points[0].position().y() - (ground_height + 2 * typical_height)) <= .005,
+                'Roof access is not anchored at the actual roof plane')
+        result['roof_access_success'] = access_records['FireEscape']
+        # An access ladder must reach the actual roof. A shorter floor range
+        # rejects the whole group; emitting a partial escape would strand it.
+        asset.setParms(dict(fire_escape_roof_access=1, fire_escape_floor_end=2))
+        rejected = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        verified_records(rejected)
+        fire_rows = [row.split('|') for row in rejected.attribValue('reference_attachment_diagnostics').splitlines()
+                     if row.startswith('R|FireEscape|')]
+        require(len(fire_rows)==1 and fire_rows[0][2:5]==['1','0','roof_access_floor_range'],
+                'Roof access floor range did not reject the complete group')
+        require(not any(p.stringAttribValue('module_role')=='FireEscape' and
+                        p.stringAttribValue('attachment_group_id') for p in rejected.points()),
+                'Rejected roof access left orphan escape parts')
+        result['roof_access_range_rejection'] = fire_rows[0][2:5]
+        asset.setParms(dict(fire_escape_roof_access=0, fire_escape_floor_end=3))
+        # An upper-only straight cannot silently be used for the ground portion.
+        ground_straight = next(row for row in rows if row.startswith('M|') and
+                               row.split('|')[4] == DETAIL_PREFIX + 'UnknownG.prefab' and row.split('|')[11] == '1')
+        missing_ground_catalog = STYLE_CATALOG + '\n' + '\n'.join(row for row in rows if row != ground_straight)
+        asset.parm('unity_style_catalog').set(missing_ground_catalog)
+        missing_ground = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        missing_records, missing_parts = verified_records(missing_ground)
+        require(missing_records['DrainPipe'] == (2,0,'no_material') and missing_parts['DrainPipe'] == 0,
+                'Missing ground pipe scope did not reject complete pipe groups')
+        require(asset.evalParm('drainpipe_count') == 2, 'Pipe scope rejection rewrote the instance request')
+        result['missing_ground_scope'] = missing_records['DrainPipe']
+        asset.parm('unity_style_catalog').set(catalog)
+        # Fixed mode bypasses all legacy densities, while hidden maxima cannot
+        # create a second quota. Repeated cooks must be stable.
+        asset.setParms(dict(roof_props_max_count=0,fire_escape_max_count=0,attachment_global_density=1))
+        again = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        verified_records(again)
+        require(baseline_fixed == fixed(again), 'Legacy maxima/densities changed fixed layout')
+        asset.parm('attachments_enabled').set(0)
+        require(len(geometry(asset,'OUT_DETAIL_INSTANCES').points())==0, 'Master attachment switch ignored')
+        asset.parm('attachments_enabled').set(1)
+        # All four concave footprints: expanded support bounds must never cross
+        # the removed rectangle even when the center remains on the roof.
+        for side in range(4):
+            asset.setParms(dict(massing_shape=1,l_notch_side=side,l_notch_width=4,l_notch_depth=4))
+            g = geometry(asset,'OUT_DETAIL_INSTANCES')
+            for p in g.points():
+                if p.stringAttribValue('module_role')!='RoofProp': continue
+                lo,hi = hou.Vector3(p.attribValue('attachment_bounds_min')),hou.Vector3(p.attribValue('attachment_bounds_max'))
+                # Bounds are expressed in Unity coordinates (x conversion is
+                # intentionally explicit so HAPI-handedness errors are caught).
+                require(lo.x()>=-4-.001 and hi.x()<=4+.001 and lo.z()>=-10-.001 and hi.z()<=.001,'Roof footprint escaped outer polygon')
+                nx0,nx1=(-4,0) if side%2==0 else (0,4)
+                nz0,nz1=(-10,-6) if side<2 else (-4,0)
+                require(not (hi.x()>nx0 and lo.x()<nx1 and hi.z()>nz0 and lo.z()<nz1),'Roof footprint crossed concave notch')
+        # More than one tower must reserve space during the same detail-wrangle
+        # execution, not just avoid input points from the preceding SOP.
+        asset.setParms(dict(massing_shape=0,building_width=16,building_depth=12,
+                            water_tower_count=2,chimney_count=4))
+        multiple = geometry(asset,'OUT_DETAIL_INSTANCES')
+        multiple_records, _ = verified_records(multiple)
+        require(multiple_records['WaterTower'] == (2,2,'none') and multiple_records['Chimney'] == (4,4,'none'),
+                'Spacious typed multi-prop fixture did not satisfy its independent requests')
+        result['roof_prop_separation']['typed_multiple'] = assert_roof_prop_separation(multiple,6)
+        # Old catalogs remain valid and requested counts are retained when the
+        # explicitly typed material is missing.
+        asset.setParms(dict(massing_shape=0,unity_style_catalog=STYLE_CATALOG,water_tower_count=1,chimney_count=2))
+        g=geometry(asset,'OUT_DETAIL_INSTANCES')
+        require('no_material' in g.attribValue('reference_attachment_diagnostics'),'Missing material not diagnosed')
+        require(asset.evalParm('water_tower_count')==1,'Catalog rewrote instance quota')
+        result['groups_checked']=len(groups)
+    finally:
+        # New test runs last but still restore all instance values for callers.
+        for name, value in old.items():
+            p=asset.parm(name)
+            if p is not None:
+                try: p.set(value)
+                except (hou.Error,TypeError): pass
+    return result
+
+
 def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(hda.is_file() and hip.is_file(), "StreetBuilding HDA/HIP is missing")
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
@@ -1918,6 +2181,11 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                 "StreetBuilding.Layers.StyleDefaultsAndOverrides", "StreetBuilding.Layers.FloorOwnership",
                 "StreetBuilding.Layers.IndependentSelection", "StreetBuilding.Layers.MigrationAndTransactions",
                 "StreetBuilding.Panel.GenerationPolicy"}
+    expected.update({"StreetBuilding.Roof.CountModes", "StreetBuilding.Roof.LegacyPlacement",
+                     "StreetBuilding.Roof.SeededDeterminism", "StreetBuilding.Roof.IndependentRandomDomains",
+                     "StreetBuilding.Roof.CapacityRetainsRequest", "StreetBuilding.Roof.SourceBoundsAndReservations",
+                     "StreetBuilding.Roof.InstanceDefaults", "StreetBuilding.Roof.GroupNamespace",
+                     "StreetBuilding.Roof.V2AttachmentRedraw"})
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
@@ -1963,7 +2231,12 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     attachment_diagnostics = assert_attachment_diagnostics(fresh)
     from validate_streetbuilding_ac_notches import validate_ac_notches
     ac_notches = validate_ac_notches(fresh)
-    return {"random_v2": random_v2, "attachment_diagnostics": attachment_diagnostics, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    reference_attachments = assert_reference_attachments(fresh)
+    from validate_streetbuilding_pipe_placement import run_pipe_placement_contract
+    pipe_placement = run_pipe_placement_contract(fresh)
+    from validate_streetbuilding_roof_placement import assert_roof_placement
+    roof_placement = assert_roof_placement(fresh, configure, geometry, STYLE_CATALOG)
+    return {"pipe_placement": pipe_placement, "random_v2": random_v2, "attachment_diagnostics": attachment_diagnostics, "reference_attachments": reference_attachments, "roof_placement": roof_placement, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -2066,6 +2339,8 @@ def _sb_export_candidate(path):
     templates = promote_facades(templates, asset)
     from streetbuilding_arrangement_interface import promote as promote_arrangement
     templates = promote_arrangement(templates, asset)
+    from streetbuilding_attachment_interface import promote as promote_attachments
+    templates = promote_attachments(templates, asset)
     # Promote only the approved field, preserving canonical definition folders.
     templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
     candidate_hda = candidate / 'StreetBuilding.hda'
