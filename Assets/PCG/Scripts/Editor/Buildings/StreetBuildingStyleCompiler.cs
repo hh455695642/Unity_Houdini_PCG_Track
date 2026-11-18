@@ -130,6 +130,40 @@ namespace PCGBike.Editor.Buildings
             bool FiniteVector(Vector3 v) => Finite(v.x) && Finite(v.y) && Finite(v.z);
             if (module.HasAttachmentMount && !FiniteVector(module.AttachmentMount))
                 report.Error(key + " attachment mount must be finite.");
+            var anchors = new Dictionary<string, Vector3>(StringComparer.Ordinal);
+            string[] semantics = new[] { "lamp_left", "lamp_right", "threshold", "mount", "opening_min", "opening_max", "wall_contact_min", "wall_contact_max" }
+                .Concat(Enumerable.Range(0, 3).SelectMany(i => new[] { "solid_" + i + "_min", "solid_" + i + "_max" })).ToArray();
+            foreach (var anchor in module.Style3Anchors)
+            {
+                if (anchor == null || !semantics.Contains(anchor.Semantic) || !FiniteVector(anchor.Position))
+                { report.Error(key + " named local anchor is unknown or non-finite."); continue; }
+                if (!anchors.TryAdd(anchor.Semantic, anchor.Position))
+                    report.Error(key + " duplicates named local anchor: " + anchor.Semantic);
+            }
+            var role = module.ModuleRole;
+            ValidateStyle3Volumes(report, module, key, anchors);
+            if (role is StreetBuildingModuleRole.WallLamp or StreetBuildingModuleRole.Balcony)
+            {
+                if (!anchors.ContainsKey("mount")) report.Error(key + " requires a named mount anchor.");
+                if (module.WidthSpan != 1) report.Error(key + " supports a single facade bay only.");
+            }
+            if (role == StreetBuildingModuleRole.BalconyDoor)
+            {
+                if (module.WidthSpan != 1) report.Error(key + " balcony door must occupy one bay.");
+                foreach (string semantic in new[] { "threshold", "opening_min", "opening_max" })
+                    if (!anchors.ContainsKey(semantic)) report.Error(key + " balcony door requires " + semantic + ".");
+                if (anchors.TryGetValue("threshold", out var threshold) && Mathf.Abs(threshold.y) > .02f)
+                    report.Error(key + " balcony threshold must touch the floor placement plane.");
+            }
+            if (anchors.TryGetValue("opening_min", out var openingMin)
+                && anchors.TryGetValue("opening_max", out var openingMax)
+                && (openingMax.x <= openingMin.x || openingMax.y <= openingMin.y || openingMax.z < openingMin.z))
+                report.Error(key + " opening bounds must be ordered and have positive width/height.");
+            if (anchors.ContainsKey("opening_min") != anchors.ContainsKey("opening_max"))
+                report.Error(key + " opening bounds require both min and max anchors.");
+            if (anchors.ContainsKey("lamp_left") || anchors.ContainsKey("lamp_right"))
+                foreach (string required in new[] { "lamp_left", "lamp_right", "opening_min", "opening_max" })
+                    if (!anchors.ContainsKey(required)) report.Error(key + " lamp host requires " + required + ".");
             if (module.HasConnectionPoints && (!FiniteVector(module.ConnectionStart)
                 || !FiniteVector(module.ConnectionEnd) || !Finite(module.ConnectionRadius)
                 || module.ConnectionRadius <= 0 || !Finite(module.ConnectionLengthRange.x)
@@ -153,6 +187,62 @@ namespace PCGBike.Editor.Buildings
             if ((subtype is StreetBuildingAttachmentSubtype.FireEscapeStoreyLeft
                 or StreetBuildingAttachmentSubtype.FireEscapeStoreyRight or StreetBuildingAttachmentSubtype.DrainStraight)
                 && !(module.ConnectionHeight > 0)) report.Error(key + " connecting segment requires a positive connection height.");
+        }
+
+        private static void ValidateStyle3Volumes(StreetBuildingStyleValidationReport report,
+            StreetBuildingModuleDefinition module, string key, Dictionary<string, Vector3> anchors)
+        {
+            bool authored = anchors.Keys.Any(a => a.StartsWith("solid_", StringComparison.Ordinal) || a.StartsWith("wall_contact_", StringComparison.Ordinal));
+            if (!authored) return; // Old kits retain their conservative whole-source bounds.
+            if (module.ModuleRole != StreetBuildingModuleRole.Balcony)
+            { report.Error(key + " authored solid/contact volumes are supported only by Balcony."); return; }
+            if (!TryGetLocalBounds(module.Prefab, out var source)) return;
+            var tolerance = source; tolerance.Expand(.004f);
+            var solids = new List<Bounds>(3);
+            bool gap = false;
+            bool Pair(string prefix, out Bounds box)
+            {
+                box = default;
+                bool hasMin = anchors.TryGetValue(prefix + "_min", out var min);
+                bool hasMax = anchors.TryGetValue(prefix + "_max", out var max);
+                if (!hasMin && !hasMax) return false;
+                if (!hasMin || !hasMax || max.x <= min.x || max.y <= min.y || max.z <= min.z)
+                { report.Error(key + " requires a complete ordered volume pair: " + prefix); return false; }
+                if (!tolerance.Contains(min) || !tolerance.Contains(max))
+                { report.Error(key + " authored volume exceeds source bounds: " + prefix); return false; }
+                box.SetMinMax(min, max); return true;
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                if (Pair("solid_" + i, out var box))
+                {
+                    if (gap) report.Error(key + " solid volume indices must be contiguous from zero.");
+                    box.Expand(.004f); solids.Add(box);
+                }
+                else gap = true;
+            }
+            if (Pair("wall_contact", out var contact))
+            {
+                if (solids.Count == 0) report.Error(key + " wall contact requires authored solid volumes.");
+                if (!anchors.TryGetValue("mount", out var mount) || contact.max.y > mount.y + .01f)
+                    report.Error(key + " wall contact must stay below the balcony threshold.");
+            }
+            if (solids.Count == 0) return;
+            // Editor-only material validation: bounded three-box union must cover the
+            // actual source mesh, so authored metadata cannot hide colliding geometry.
+            foreach (var filter in module.Prefab.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mesh = filter.sharedMesh;
+                if (mesh == null) continue;
+                if (!mesh.isReadable)
+                { report.Error(key + " authored solid volumes require readable authoring meshes."); return; }
+                var matrix = module.Prefab.transform.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+                var vertices = mesh.vertices.Select(matrix.MultiplyPoint3x4).ToArray();
+                var triangles = mesh.triangles;
+                for (int i = 0; i < triangles.Length; i += 3)
+                    if (!solids.Any(b => b.Contains(vertices[triangles[i]]) && b.Contains(vertices[triangles[i + 1]]) && b.Contains(vertices[triangles[i + 2]])))
+                    { report.Error(key + " authored solid volumes must cover source geometry triangles."); return; }
+            }
         }
 
         public static bool TryGetLocalBounds(GameObject prefab, out Bounds bounds)
@@ -187,7 +277,7 @@ namespace PCGBike.Editor.Buildings
                     or StreetBuildingModuleRole.GroundShopDoor or StreetBuildingModuleRole.GroundWall
                     or StreetBuildingModuleRole.Entrance,
                 StreetBuildingModuleGroup.UpperFacade => role is StreetBuildingModuleRole.MiddleWindow
-                    or StreetBuildingModuleRole.MiddleBlank,
+                    or StreetBuildingModuleRole.MiddleBlank or StreetBuildingModuleRole.BalconyDoor,
                 StreetBuildingModuleGroup.SideRear => role is StreetBuildingModuleRole.SideWall
                     or StreetBuildingModuleRole.RearWall,
                 StreetBuildingModuleGroup.ConvexConcaveCorner => role is StreetBuildingModuleRole.CornerConvex
@@ -201,7 +291,7 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingModuleGroup.Attachments => role is StreetBuildingModuleRole.Awning
                     or StreetBuildingModuleRole.Sign or StreetBuildingModuleRole.FireEscape
                     or StreetBuildingModuleRole.ACUnit or StreetBuildingModuleRole.RoofProp
-                    or StreetBuildingModuleRole.DrainPipe,
+                    or StreetBuildingModuleRole.DrainPipe or StreetBuildingModuleRole.WallLamp or StreetBuildingModuleRole.Balcony,
                 _ => false,
             };
         }
@@ -288,6 +378,15 @@ namespace PCGBike.Editor.Buildings
                     metadata[path] = row;
                 }
                 string geometryPath = AssetDatabase.GetAssetPath(module.Prefab).Replace('\\', '/');
+                foreach (var anchor in module.Style3Anchors.OrderBy(a => a.Semantic, StringComparer.Ordinal))
+                {
+                    Vector3 a = anchor.Position;
+                    string row = string.Join("|", "S3", "1", geometryPath, anchor.Semantic, F(a.x), F(a.y), F(a.z));
+                    string key = "S3|" + geometryPath + "|" + anchor.Semantic;
+                    if (metadata.TryGetValue(key, out string existing) && existing != row)
+                        throw new InvalidOperationException("Conflicting named local anchor: " + key);
+                    metadata[key] = row;
+                }
                 if (module.HasAttachmentMount)
                 {
                     Vector3 a = module.AttachmentMount;

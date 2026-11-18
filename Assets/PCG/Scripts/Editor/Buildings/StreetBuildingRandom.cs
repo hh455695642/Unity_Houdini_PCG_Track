@@ -69,7 +69,13 @@ namespace PCGBike.Editor.Buildings
 
         internal static Group ForField(string name)
         {
-            if (name == "attachments_enabled" || name == "ground_attachment_placement" || name.StartsWith("attachment_override_", StringComparison.Ordinal) || name.Contains("density") || name.EndsWith("max_count", StringComparison.Ordinal)) return Group.Attachments;
+            if (name == "attachments_enabled" || name == "ground_attachment_placement"
+                || name.StartsWith("wall_lamp_", StringComparison.Ordinal) || name.StartsWith("balcony_", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_", StringComparison.Ordinal)
+                || name.StartsWith("fire_escape_", StringComparison.Ordinal) || name.StartsWith("drainpipe_", StringComparison.Ordinal)
+                || name.StartsWith("water_tower_", StringComparison.Ordinal) || name.StartsWith("chimney_", StringComparison.Ordinal)
+                || name.StartsWith("roof_prop", StringComparison.Ordinal)
+                || name.Contains("density") || name.EndsWith("max_count", StringComparison.Ordinal)) return Group.Attachments;
             if (name.StartsWith("facade_override_", StringComparison.Ordinal)) return name.Contains("shopfront") ? Group.Ground : Group.Upper;
             if (name == "window_count" || name == "facade_rhythm") return Group.Upper;
             if (name.StartsWith("shopfront", StringComparison.Ordinal) || name == "@shopfront_faces" || name == "entrance_count" || name.StartsWith("ground_", StringComparison.Ordinal) || name == "residential_door_enabled") return Group.Ground;

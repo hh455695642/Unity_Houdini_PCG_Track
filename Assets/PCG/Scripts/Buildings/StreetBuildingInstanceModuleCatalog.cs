@@ -27,6 +27,9 @@ namespace PCGBike.Buildings
         ParapetConcaveCorner,
         FloorBandCorner, // 首层凸角腰线收口；追加编号 22，保持已有载荷兼容。
         DrainPipe, // 追加 23；连续管线零件，数量仍由实例控制。
+        WallLamp, // 24：首层壁灯，数量按盏统计。
+        Balcony, // 25：平台、栏杆、托臂作为一套附件。
+        BalconyDoor, // 26：独立标准层门洞宿主，不占用普通窗请求。
     }
 
     /// <summary>附件素材规格。X|1 元数据使用稳定整数；禁止从文件名推断语义。</summary>

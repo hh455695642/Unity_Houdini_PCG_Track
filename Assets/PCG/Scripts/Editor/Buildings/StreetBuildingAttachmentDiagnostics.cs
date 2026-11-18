@@ -26,13 +26,14 @@ namespace PCGBike.Editor.Buildings
         {
             internal string Kind, Reasons, Source;
             internal int Requested, Actual;
-            internal string Label => Kind switch { "WaterTower" => "水塔", "Chimney" => "烟囱", "FireEscape" => "连续消防梯组", "DrainPipe" => "完整落水管", _ => Kind };
-            internal string Text => $"{Label}：请求 {Requested}；实际 {Actual}；单位：{(Kind == "FireEscape" ? "组" : Kind == "DrainPipe" ? "条" : "件")}\n来源：{SourceLabel(Source)}；原因：{ReasonLabel(Reasons)}";
+            internal string Label => Kind switch { "WaterTower" => "水塔", "Chimney" => "烟囱", "FireEscape" => "连续消防梯组", "DrainPipe" => "完整落水管", "WallLamp" => "壁灯（整栋首层）", "Balcony" => "阳台（门与平台为一套／整栋标准层）", _ => Kind };
+            internal string Text => $"{Label}：请求 {Requested}；实际 {Actual}；单位：{(Kind == "FireEscape" ? "组" : Kind == "DrainPipe" ? "条" : Kind == "WallLamp" ? "盏" : Kind == "Balcony" ? "套" : "件")}\n来源：{SourceLabel(Source)}；原因：{ReasonLabel(Reasons)}";
         }
         internal sealed class ReferenceReport
         {
             internal string Error;
             internal readonly List<ReferenceRow> Rows = new();
+            internal ReferenceRow Balcony => Rows.Find(row => row.Kind == "Balcony");
         }
         internal static ReferenceReport ParseReference(string report)
         {
@@ -63,6 +64,72 @@ namespace PCGBike.Editor.Buildings
             if (parsed.Error != null) text.AppendLine(parsed.Error);
             foreach (var row in parsed.Rows) text.AppendLine(row.Text);
             return text.ToString().TrimEnd();
+        }
+        // 独立协议保证旧 v1 的 15 行附件报告与四类完整设备报告字节兼容。
+        internal static ReferenceReport ParseStyle3(string report)
+        {
+            var result = new ReferenceReport();
+            if (string.IsNullOrEmpty(report) || !report.StartsWith("v1\n", StringComparison.Ordinal))
+            { result.Error = "壁灯／阳台诊断不可确认：缺少记录或不支持的版本。"; return result; }
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string line in report.Split('\n'))
+            {
+                if (line == "v1" || string.IsNullOrWhiteSpace(line)) continue;
+                var f = line.Split('|');
+                if (f.Length != 6 || f[0] != "R" || !(f[1] is "WallLamp" or "Balcony" or "BalconyDoor")
+                    || !int.TryParse(f[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int requested)
+                    || !int.TryParse(f[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out int actual)
+                    || requested < 0 || actual < 0 || actual > requested || string.IsNullOrEmpty(f[4])
+                    || string.IsNullOrEmpty(f[5]) || !seen.Add(f[1]))
+                { result.Error = "壁灯／阳台诊断不可确认：记录损坏、重复或实际超过请求。"; continue; }
+                result.Rows.Add(new ReferenceRow { Kind=f[1], Requested=requested, Actual=actual, Reasons=f[4], Source=f[5] });
+            }
+            if (result.Error != null) return result;
+            if (seen.Count != 3)
+            {
+                result.Error = "壁灯／阳台诊断不可确认：缺少部分用途记录。";
+                return result;
+            }
+            var balcony = result.Balcony;
+            var door = result.Rows.Find(row => row.Kind == "BalconyDoor");
+            if (balcony.Requested != door.Requested || balcony.Actual != door.Actual
+                || balcony.Reasons != door.Reasons || balcony.Source != door.Source)
+                result.Error = "阳台整套诊断与墙体门模块诊断不一致。";
+            return result;
+        }
+        internal static string FormatStyle3(string report)
+        {
+            if (string.IsNullOrEmpty(report)) return string.Empty;
+            var parsed = ParseStyle3(report);
+            var text = new StringBuilder();
+            if (parsed.Error != null) text.AppendLine(parsed.Error);
+            foreach (var row in parsed.Rows)
+                if (row.Kind != "BalconyDoor") text.AppendLine(row.Text);
+            return text.ToString().TrimEnd();
+        }
+        internal static string ValidateStyle3Hosts(string report, ReferenceRow balcony)
+        {
+            if (string.IsNullOrEmpty(report)) return balcony.Requested == 0 ? null : "阳台缺少逐栋数量诊断。";
+            if (!report.StartsWith("v1\n", StringComparison.Ordinal)) return "阳台逐栋诊断版本无效。";
+            var seen = new HashSet<int>();
+            long requestedTotal = 0, actualTotal = 0;
+            foreach (string line in report.Split('\n'))
+            {
+                if (line == "v1" || string.IsNullOrWhiteSpace(line)) continue;
+                var f = line.Split('|');
+                if (f.Length != 8 || f[0] != "H" || !int.TryParse(f[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int building)
+                    || f[2] != "-1" || f[3] != "-1"
+                    || !int.TryParse(f[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out int requested)
+                    || !int.TryParse(f[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out int actual)
+                    || building < 0 || requested < 0 || actual < 0 || actual > requested
+                    || string.IsNullOrEmpty(f[6]) || string.IsNullOrEmpty(f[7]) || !seen.Add(building))
+                    return "阳台逐栋诊断损坏、重复或数量无效。";
+                if (requested > actual && f[6] == "none") return "阳台逐栋诊断缺少短缺原因。";
+                requestedTotal += requested;
+                actualTotal += actual;
+            }
+            return requestedTotal == balcony.Requested && actualTotal == balcony.Actual
+                ? null : "阳台逐栋诊断与整套数量汇总不一致。";
         }
         internal static StreetBuildingAttachmentDiagnostics Parse(string report)
         {
@@ -102,9 +169,14 @@ namespace PCGBike.Editor.Buildings
                 ["no_eligible_host"]="无合格挂点",["random_miss"]="随机未命中",["budget_truncated"]="预算截断",
                 ["maximum_truncated"]="数量上限截断",["none"]="无阻止原因",
                 ["disabled"]="当前模式或开关关闭",["capacity"]="合法支承空间不足",["floor_range"]="有效楼层范围不足",
+                ["face_scope"]="立面候选无合法交集；消防梯与落水管仅允许侧面／背面",
                 ["height_mismatch"]="素材连接点与实际层高不匹配",["unsupported_roof_access"]="缺少合法屋顶检修连接",
                 ["roof_access_floor_range"]="检修梯未延伸到屋顶，整组消防梯已拒绝",
-                ["roof_disabled"]="屋顶关闭",["no_face"]="无启用立面",["collision"]="与既有构件冲突" };
+                ["roof_disabled"]="屋顶关闭",["no_face"]="无启用立面",["collision"]="与既有构件冲突",
+                ["no_blank_host"]="无剩余单格实墙宿主",["no_compatible_host_material"]="缺少兼容阳台门素材",
+                ["no_compatible_material"]="缺少兼容附件素材",["no_mount"]="缺少命名挂点",["missing_anchor"]="宿主或附件缺少命名挂点",
+                ["pair_capacity"]="成对布局容量不足（请求保持不变）",["clearance"]="连接位置净空不足",
+                ["no_balcony_host"]="无兼容阳台门宿主",["invalid_opening"]="门洞或门槛连接无效" };
             var text = new List<string>();
             foreach (var token in (reasons ?? "").Split(',')) if (token.Length > 0) text.Add(known.TryGetValue(token, out var label) ? label : token);
             return text.Count == 0 ? "原因未提供" : string.Join("、", text);

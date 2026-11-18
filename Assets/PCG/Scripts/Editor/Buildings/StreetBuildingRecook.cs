@@ -37,6 +37,8 @@ namespace PCGBike.Editor.Buildings
         {
             EditorApplication.delayCall += Attach;
             EditorApplication.hierarchyChanged += Attach;
+            // 场景重开后立即绑定新反序列化的事件，避免首次独立 Recook 越过项目桥接。
+            EditorSceneManager.sceneOpened += (_, __) => Attach();
         }
         public static void Attach()
         {
@@ -159,7 +161,14 @@ namespace PCGBike.Editor.Buildings
         }
         private static void AfterCook(HEU_CookedEventData data)
         {
-            if (!PendingCooks.Remove(data.Asset,out var pending)) return;
+            if (!PendingCooks.Remove(data.Asset,out var pending))
+            {
+                // 保存重开后 AssetID 尚未恢复，PreCook 不能读写原生参数。
+                // HEU 会在本次 Cook 内恢复节点；只保护其成功输出，不伪造项目验收结果。
+                if (data.CookSuccess && data.Asset.GetComponentInParent<StreetBuildingAuthoring>()?.ResolveStyle() != null)
+                    StreetBuildingStyleApplier.PreserveGeneratedPrefabState(data.Asset);
+                return;
+            }
             var author=pending.Authoring;
             if (!data.CookSuccess)
             {
@@ -169,7 +178,11 @@ namespace PCGBike.Editor.Buildings
                 RollbackFailure(data.Asset, pending, reason);
                 return;
             }
-            try { StreetBuildingPanelState.Commit(data.Asset, author); }
+            try
+            {
+                StreetBuildingStyleApplier.PreserveGeneratedPrefabState(data.Asset);
+                StreetBuildingPanelState.Commit(data.Asset, author);
+            }
             catch (Exception failure)
             {
                 RollbackFailure(data.Asset, pending, failure.Message);
@@ -237,7 +250,7 @@ namespace PCGBike.Editor.Buildings
             float ratio = 0;
             string fallback = string.Empty, upperWindows = string.Empty, shopReport = string.Empty, attachments = string.Empty, randomContext = string.Empty;
             bool hasUse = false, hasRatio = false;
-            string referenceAttachments = null;
+            string referenceAttachments = null, style3Attachments = null;
             int? outputLayoutSeed = null, sampledDoorRequest = null;
             foreach (var geo in core.GeoNodes)
             foreach (var part in geo.GetParts())
@@ -246,6 +259,8 @@ namespace PCGBike.Editor.Buildings
                     attachments = a;
                 if (ReadDetailString(session, geo.GeoID, part.PartID, "reference_attachment_diagnostics", out string reference) && !string.IsNullOrEmpty(reference))
                     referenceAttachments = reference;
+                if (ReadDetailString(session, geo.GeoID, part.PartID, "style3_attachment_diagnostics", out string style3) && !string.IsNullOrEmpty(style3))
+                    style3Attachments = style3;
                 if (ReadDetailString(session, geo.GeoID, part.PartID, "random_context", out string context) && !string.IsNullOrEmpty(context))
                     randomContext = context;
                 if (ReadDetailInt(session, geo.GeoID, part.PartID, "effective_ground_use", out int u))
@@ -290,6 +305,8 @@ namespace PCGBike.Editor.Buildings
             if (!string.IsNullOrWhiteSpace(attachments)) summary += "\n附件（实际生成过程）：\n" + FormatAttachments(attachments);
             if (!string.IsNullOrWhiteSpace(referenceAttachments)) summary += "\n固定附件（按完整设备／梯组／管线统计）：\n"
                 + StreetBuildingAttachmentDiagnostics.FormatReference(referenceAttachments);
+            if (!string.IsNullOrWhiteSpace(style3Attachments)) summary += "\n壁灯／阳台：\n"
+                + StreetBuildingAttachmentDiagnostics.FormatStyle3(style3Attachments);
             return summary;
         }
         internal static string FormatQuantityReport(string report)

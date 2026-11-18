@@ -526,8 +526,12 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
         core.node("BUILD_DIRECT_SIDE_REAR_INSTANCES"),
         core.node("BUILD_DIRECT_ROOF_INSTANCES"),
         core.node("BUILD_DIRECT_ROOF_EDGE_INSTANCES")), "Full-envelope merge wiring failed")
+    commit = core.node("COMMIT_STYLE3_BALCONY_PAIRS")
+    require(commit.evalParm("class") == 0 and commit.inputs() == (
+            core.node("FILTER_REAL_INSTANCES"), core.node("PLAN_STYLE3_ATTACHMENTS")),
+            "Balcony commit must read the production shell and accepted attachment plan")
     require(core.node("VALIDATE_DIRECT_BUILDING_INSTANCES").input(0)
-            == core.node("FILTER_REAL_INSTANCES"), "Preview filter/validator wiring failed")
+            == commit, "Balcony commit/validator wiring failed")
     require(core.node("LOD0_MODULE_SOURCE_SWITCH").input(1)
             == core.node("VALIDATE_DIRECT_BUILDING_INSTANCES"), "V6 shell switch wiring failed")
     require(core.node("DETAIL_INSTANCE_POINTS").input(0)
@@ -553,8 +557,11 @@ def assert_network(asset: hou.Node, contract: dict[str, Any]) -> None:
     require(core.node("ATTACHMENT_DIAGNOSTICS").input(0)
             == core.node("VALIDATE_REFERENCE_ATTACHMENTS"),
             "Reference attachment diagnostic wiring failed")
+    require(core.node("PLAN_STYLE3_ATTACHMENTS").inputs() == (
+            core.node("ATTACHMENT_DIAGNOSTICS"), core.node("SELECT_FACADE_MODULES")),
+            "Style3 attachment planner wiring failed")
     require(core.node("VALIDATE_DIRECT_DETAIL_INSTANCES").input(0)
-            == core.node("ATTACHMENT_DIAGNOSTICS"), "Detail validator wiring failed")
+            == core.node("PLAN_STYLE3_ATTACHMENTS"), "Detail validator wiring failed")
     require(core.node("METADATA_ATTACHMENT_INPUTS").input(1)
             == core.node("PROJECT_REFERENCE_METADATA_INPUT")
             and core.node("PROJECT_REFERENCE_METADATA_INPUT").input(0)
@@ -2039,6 +2046,44 @@ def assert_reference_attachments(asset: hou.Node) -> dict[str, Any]:
         fixed = lambda g: [(p.attribValue('P'),p.attribValue('unity_instance')) for p in g.points()
                           if p.stringAttribValue('attachment_group_id')]
         baseline_fixed = fixed(value)
+        # Native Inspector/Recook must enforce the same wall scope as the Unity
+        # policy. Keep these raw requests independent of its candidate sampler.
+        face_scope_cases = []
+        for face_mask in (1, 2, 3):
+            asset.setParms(dict(fire_escape_face_mask=face_mask, drainpipe_face_mask=face_mask))
+            scoped = geometry(asset, 'OUT_DETAIL_INSTANCES')
+            scoped_records, scoped_parts = verified_records(scoped)
+            for kind, token, request, quantity_name, mask_name in (
+                ('FireEscape', 'fire', 1, 'fire_escape_group_count', 'fire_escape_face_mask'),
+                ('DrainPipe', 'drain', 2, 'drainpipe_count', 'drainpipe_face_mask'),
+            ):
+                require(scoped_records[kind] == (request, 0, 'face_scope'),
+                        f'Native front-only {kind} request lacks an explicit face-scope rejection: '
+                        f'{scoped_records[kind]}')
+                require(scoped.intAttribValue('reference_' + token + '_actual') == 0
+                        and scoped_parts[kind] == 0,
+                        f'Native front-only {kind} request emitted attachment parts')
+                require(asset.evalParm(mask_name) == face_mask and asset.evalParm(quantity_name) == request,
+                        f'Native face-scope rejection rewrote the {kind} request')
+            face_scope_cases.append(face_mask)
+        asset.setParms(dict(fire_escape_face_mask=15, drainpipe_face_mask=15))
+        mixed_scope = geometry(asset, 'OUT_DETAIL_INSTANCES')
+        mixed_records, _ = verified_records(mixed_scope)
+        for kind in ('FireEscape', 'DrainPipe'):
+            require(mixed_records[kind][1] > 0, f'Native mixed-face {kind} fixture is vacuous')
+        for point in mixed_scope.points():
+            if point.stringAttribValue('module_role') not in ('FireEscape', 'DrainPipe'):
+                continue
+            face, surface = point.intAttribValue('face_index'), point.stringAttribValue('surface_role')
+            require(surface != 'secondary_front' and face in (1, 2, 3),
+                    f'Native mixed candidate escaped side/rear scope: face={face}, surface={surface}')
+        require(asset.evalParm('fire_escape_face_mask') == 15 and asset.evalParm('drainpipe_face_mask') == 15
+                and asset.evalParm('fire_escape_group_count') == 1 and asset.evalParm('drainpipe_count') == 2,
+                'Native mixed-face adoption rewrote the original mask or quantity request')
+        result['native_side_rear_scope'] = dict(
+            contract='StreetBuilding.Attachments.SideRearFaceSubsets', rejected_masks=face_scope_cases,
+            mixed_mask=15, mixed_actual={kind: mixed_records[kind][1] for kind in ('FireEscape', 'DrainPipe')})
+        asset.setParms(dict(fire_escape_face_mask=8, drainpipe_face_mask=12))
         # A valid roof range emits one access piece in the same complete group.
         asset.parm('fire_escape_roof_access').set(1)
         access_value = geometry(asset, 'OUT_DETAIL_INSTANCES')
@@ -2236,7 +2281,9 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     pipe_placement = run_pipe_placement_contract(fresh)
     from validate_streetbuilding_roof_placement import assert_roof_placement
     roof_placement = assert_roof_placement(fresh, configure, geometry, STYLE_CATALOG)
-    return {"pipe_placement": pipe_placement, "random_v2": random_v2, "attachment_diagnostics": attachment_diagnostics, "reference_attachments": reference_attachments, "roof_placement": roof_placement, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
+    from validate_streetbuilding_style3 import run_style3_contract
+    style3_attachments = run_style3_contract(fresh)
+    return {"style3_attachments": style3_attachments, "pipe_placement": pipe_placement, "random_v2": random_v2, "attachment_diagnostics": attachment_diagnostics, "reference_attachments": reference_attachments, "roof_placement": roof_placement, "trim_missing": trim_missing, "ground_corner": ground_corner, "trim_endpoints": trim_endpoints, "core_cleanup": core_cleanup, "maintenance": maintenance, "instance_rules": instance_rules, "facade_modes": validate_facade_modes(fresh), "parameters": validate_parameters(fresh), "notches": validate_notches(fresh), "status": "PASS", "asset_type": fresh.type().name(), "instance": fresh.path(),
             "locked": not fresh.isEditable(), "internal_proxy": assert_internal(fresh),
             "prefab_filename_variant": assert_prefab_filename_variant(fresh),
             "versionless_full_envelope": assert_full_envelope(fresh),
@@ -2341,6 +2388,9 @@ def _sb_export_candidate(path):
     templates = promote_arrangement(templates, asset)
     from streetbuilding_attachment_interface import promote as promote_attachments
     templates = promote_attachments(templates, asset)
+    if asset.parm('wall_lamp_enabled') is not None:
+        from streetbuilding_style3_attachments import promote as promote_style3
+        templates = promote_style3(templates, asset)
     # Promote only the approved field, preserving canonical definition folders.
     templates.replace('lod_outputs_enabled', asset.parmTemplateGroup().find('lod_outputs_enabled'))
     candidate_hda = candidate / 'StreetBuilding.hda'

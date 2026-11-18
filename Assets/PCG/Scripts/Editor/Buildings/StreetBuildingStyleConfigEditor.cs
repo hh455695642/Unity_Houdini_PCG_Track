@@ -158,6 +158,9 @@ namespace PCGBike.Editor.Buildings
                     bool expanded = EditorGUILayout.Foldout(_advanced.Contains(key), "高级约束", true);
                     if (expanded) _advanced.Add(key); else _advanced.Remove(key);
                     if (!expanded) continue;
+                    if (role.intValue is 1 or 3 or 24 or 25 or 26)
+                        EditorGUILayout.PropertyField(e.FindPropertyRelative("_style3Anchors"),
+                            new GUIContent("命名局部锚点", "素材几何规格（米）：lamp_left/right、opening_min/max、threshold、mount。阳台可选 solid_0..2_min/max 分体实体盒（须覆盖全部三角形）及 wall_contact_min/max 墙面接触区；不填写时使用整件 Bounds 保守避让。"), true);
                     if (role.intValue is 0 or 1 or 3 or 14 or 15)
                     {
                         var useMount = e.FindPropertyRelative("_hasAttachmentMount");

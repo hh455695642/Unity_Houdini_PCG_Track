@@ -1207,6 +1207,12 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             importlib.reload(streetbuilding_attachment_interface)
             from streetbuilding_attachment_interface import promote as promote_attachments
             promoted_templates = promote_attachments(promoted_templates, asset)
+        if asset.parm('wall_lamp_enabled') is not None:
+            # 仅提升已在 Live 验证的自有附件接口，保留旧文件夹身份与实例请求。
+            import importlib
+            import streetbuilding_style3_attachments
+            importlib.reload(streetbuilding_style3_attachments)
+            promoted_templates = streetbuilding_style3_attachments.promote(promoted_templates, asset)
     if expected_type == 'pcgbike::CityRoad::1.0' and not preserve_public_interface:
         # Preserve canonical definition identities while promoting the categorized UI.
         if len(asset.parmTemplateGroup().findIndices('road_network_source')) > 1:

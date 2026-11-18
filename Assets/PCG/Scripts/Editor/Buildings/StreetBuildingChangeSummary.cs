@@ -33,10 +33,16 @@ namespace PCGBike.Editor.Buildings
             ["corner_building"]="街角建筑", ["corner_street_side"]="首层临街侧面", ["attachments_enabled"]="附件开关",
             ["attachment_global_density"]="附件全局密度", ["ground_attachment_placement"]="雨棚／招牌挂点模式",
             ["roof_props_layout_mode"]="屋顶附件模式", ["water_tower_count"]="水塔数量（每栋）", ["chimney_count"]="烟囱数量（每栋）",
+            ["water_tower_count_mode"]="水塔数量区间状态", ["water_tower_count_min"]="水塔数量下限（每栋）", ["water_tower_count_max"]="水塔数量上限（每栋）",
+            ["chimney_count_mode"]="烟囱数量区间状态", ["chimney_count_min"]="烟囱数量下限（每栋）", ["chimney_count_max"]="烟囱数量上限（每栋）",
+            ["roof_prop_position_mode"]="屋顶附件位置",
             ["fire_escape_layout_mode"]="消防梯模式", ["fire_escape_group_count"]="连续梯组数量（每栋）",
             ["fire_escape_face_mask"]="消防梯可用物理立面", ["fire_escape_floor_start"]="消防梯起始楼层",
             ["fire_escape_floor_end"]="消防梯结束楼层", ["fire_escape_roof_access"]="屋顶检修梯",
             ["drainpipe_enabled"]="落水管开关", ["drainpipe_count"]="完整落水管数量（每栋）", ["drainpipe_face_mask"]="落水管可用物理立面",
+            ["wall_lamp_enabled"]="壁灯开关", ["wall_lamp_count"]="壁灯数量（盏／整栋首层）", ["wall_lamp_layout"]="壁灯布局",
+            ["balcony_enabled"]="阳台开关", ["balcony_count"]="阳台数量（套／整栋标准层）",
+            ["balcony_floor_start"]="阳台起始楼层", ["balcony_floor_end"]="阳台结束楼层",
             ["variation_seed"]="用途与素材种子", ["layout_seed"]="门位与布局种子", ["site_source_auto"]="地块来源自动判断",
             ["unity_generation_policy"]="区间与候选配置", ["generation_sequence"]="生成序号",
             ["random_algorithm"]="采样算法版本", ["random_seed"]="主随机种子", ["random_feasible"]="采样策略",
@@ -72,6 +78,7 @@ namespace PCGBike.Editor.Buildings
             var result = new List<Entry>();
             foreach (var name in old.Keys.Union(now.Keys).OrderBy(n=>n,StringComparer.Ordinal))
             {
+                if (name == StreetBuildingGenerationPolicy.LegacyBalconyDoorCount) continue;
                 if (old.GetValueOrDefault(name) == now.GetValueOrDefault(name)) continue;
                 var row = Row(name);
                 if (row.Success && !Fields.ContainsKey(row.Groups[2].Value)) continue; // 退休兼容字段没有生成语义。
@@ -119,8 +126,11 @@ namespace PCGBike.Editor.Buildings
             }
             int.TryParse(v,out int i);
             if(name=="ground_floor_use")return Pick(new[]{"随机","住宅","商业"},i);
-            if(name=="roof_props_layout_mode")return Pick(new[]{"原概率散布","按子类型固定数量"},i);
+            if(name=="roof_props_layout_mode")return Pick(new[]{"原概率散布","按设备类型计数"},i);
+            if(name=="roof_prop_position_mode")return Pick(new[]{"兼容固定扫描","按建筑种子分布"},i);
+            if(name is "water_tower_count_mode" or "chimney_count_mode")return Pick(new[]{"固定值","随机范围"},i);
             if(name=="fire_escape_layout_mode")return Pick(new[]{"原概率散布","连续梯组"},i);
+            if(name=="wall_lamp_layout")return Pick(new[]{"单灯","入口双侧成对"},i);
             if(name=="fire_escape_face_mask"||name=="drainpipe_face_mask")
                 return i==0 ? "未选立面" : string.Join("、",Enumerable.Range(0,4).Where(bit=>(i&(1<<bit))!=0).Select(bit=>Targets[bit]));
             if(name=="fire_escape_roof_access")return i==0?"关闭":"开启";
@@ -146,7 +156,9 @@ namespace PCGBike.Editor.Buildings
         }
         private static string BaseScope(Dictionary<string,string>d,string name,string area)
         {
-            if(name=="water_tower_count"||name=="chimney_count")return "整栋屋顶；完整设备数量";
+            if(name.StartsWith("wall_lamp_",StringComparison.Ordinal))return "整栋首层；按盏计数";
+            if(name.StartsWith("balcony_",StringComparison.Ordinal))return "整栋标准层；按完整阳台套数计数";
+            if(name.StartsWith("water_tower_count",StringComparison.Ordinal)||name.StartsWith("chimney_count",StringComparison.Ordinal))return "整栋屋顶；完整设备数量";
             if(name.StartsWith("fire_escape_"))return "整栋共享梯组；"+Floors(I(d,"fire_escape_floor_start",2),I(d,"fire_escape_floor_end",99));
             if(name.StartsWith("drainpipe_"))return "整栋共享完整管线；多个零件不增加条数";
             if(name.StartsWith("entrance_")||name=="ground_quantity_mode")return "整栋首层（商业门总数）";
@@ -161,6 +173,10 @@ namespace PCGBike.Editor.Buildings
         }
         private static bool Active(Dictionary<string,string>d,string n)
         {
+            if(n.StartsWith("wall_lamp_",StringComparison.Ordinal)||n.StartsWith("balcony_",StringComparison.Ordinal))
+                return n is "balcony_floor_start" or "balcony_floor_end"
+                    ? I(d,"attachments_enabled")!=0&&I(d,"balcony_enabled")!=0
+                    : StreetBuildingGenerationPolicy.CanSampleField(n,key=>I(d,key));
             if(StreetBuildingGenerationPolicy.ReferenceFields.Contains(n)||n is "roof_props_density" or "roof_props_max_count" or "fire_escape_density" or "fire_escape_max_count")
                 return StreetBuildingGenerationPolicy.ReferenceFieldActive(n,key=>I(d,key));
             if(n=="window_count_max")return I(d,"facade_layout_mode")==1;
@@ -192,6 +208,7 @@ namespace PCGBike.Editor.Buildings
             : name.StartsWith("facade_override") || name.StartsWith("attachment_override") ? "局部覆盖"
             : name.StartsWith("building_") || name.StartsWith("l_notch") || name is "massing_shape" or "floor_count" or "rear_facade_mode" ? "建筑体块"
             : name.StartsWith("window_") || name.StartsWith("facade_") ? "标准层门窗"
+            : name.StartsWith("wall_lamp_",StringComparison.Ordinal)||name.StartsWith("balcony_",StringComparison.Ordinal) ? "附件"
             : StreetBuildingGenerationPolicy.ReferenceFields.Contains(name) || name.StartsWith("roof_props") || name.Contains("density") || name.Contains("max_count") || name.StartsWith("attachment") ? "附件"
             : name.StartsWith("roof") || name.StartsWith("parapet") || name.Contains("trim") ? "屋顶与线脚"
             : name.Contains("seed") || name.StartsWith("random_") || name.StartsWith("__random_") ? "随机与复现" : "首层门窗";

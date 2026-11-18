@@ -239,19 +239,8 @@ namespace PCGBike.Editor.Buildings
             Toggle("architectural_trim_enabled", "生成线脚"); Toggle("corner_building", "街角建筑");
             if (CandidateIncludes("corner_building", 1)) Popup("corner_street_side", "首层临街侧面", new[] { "左", "右", "两侧" });
         }
-        private void TypedRoofCount(string prefix, string label)
-        {
-            if (!Has(prefix + "_count_mode"))
-            { FixedCount(prefix + "_count", label + "数量（每栋完整设备）"); return; }
-            FixedChoice(prefix + "_count_mode", label + "数量模式", new[] { "固定数量", "随机范围" });
-            if (I(prefix + "_count_mode") == 0)
-                FixedCount(prefix + "_count", label + "数量（每栋完整设备）");
-            else
-            {
-                FixedCount(prefix + "_count_min", label + "最少数量（每栋）");
-                FixedCount(prefix + "_count_max", label + "最多数量（每栋）");
-            }
-        }
+        private void RoofQuantity(string prefix, string label)
+            => Quantity(prefix + "_count", prefix + "_count_min", prefix + "_count_max", I(prefix + "_count_mode"), label + "数量（每栋完整设备）");
         private void DrawAttachments(StreetBuildingPanelState.State state)
         {
             Toggle("attachments_enabled", "生成附件");
@@ -260,7 +249,8 @@ namespace PCGBike.Editor.Buildings
                 EditorGUILayout.LabelField("附件关闭；关联编辑项已收起。本次请求不生成附件。", EditorStyles.wordWrappedMiniLabel);
                 if (state.Result != null && Fold("disabledAttachmentDiagnostics", "上次成功结果：挂点、上限与关闭原因", false))
                     EditorGUILayout.HelpBox("以下为上次成功结果，当前输入尚未生成时不代表当前容量。\n" + state.AttachmentDiagnostics.Format()
-                        + (string.IsNullOrEmpty(state.ReferenceDiagnosticText) ? "" : "\n" + state.ReferenceDiagnosticText), MessageType.None);
+                        + (string.IsNullOrEmpty(state.ReferenceDiagnosticText) ? "" : "\n" + state.ReferenceDiagnosticText)
+                        + (string.IsNullOrEmpty(state.Style3DiagnosticText) ? "" : "\n" + state.Style3DiagnosticText), MessageType.None);
                 return;
             }
             Float("attachment_global_density", "概率散布密度（0～1；固定附件不使用）");
@@ -269,35 +259,35 @@ namespace PCGBike.Editor.Buildings
             var labels = new[] { "雨棚", "招牌", "消防梯", "墙面空调", "屋顶附件" };
             for (int i = 0; i < names.Length; i++) if (Fold(names[i], labels[i], false))
             {
-                bool fixedMode = false;
+                bool showLegacy = true;
                 if (names[i] == "roof_props" && Has("roof_props_layout_mode"))
                 {
-                    FixedChoice("roof_props_layout_mode", "布置方式", new[] { "原概率散布", "按设备类型计数" });
-                    fixedMode = I("roof_props_layout_mode") == 1;
-                    if (fixedMode)
+                    Popup("roof_props_layout_mode", "布置方式", new[] { "原概率散布", "按设备类型计数" });
+                    showLegacy = CandidateIncludes("roof_props_layout_mode", 0);
+                    if (CandidateIncludes("roof_props_layout_mode", 1))
                     {
-                        TypedRoofCount("water_tower", "水塔");
-                        TypedRoofCount("chimney", "烟囱");
+                        RoofQuantity("water_tower", "水塔");
+                        RoofQuantity("chimney", "烟囱");
                         if (Has("roof_prop_position_mode"))
-                            FixedChoice("roof_prop_position_mode", "屋顶位置", new[] { "兼容固定扫描", "按建筑种子分布" });
+                            Popup("roof_prop_position_mode", "屋顶位置", new[] { "兼容固定扫描", "按建筑种子分布" });
                     }
                 }
                 if (names[i] == "fire_escape" && Has("fire_escape_layout_mode"))
                 {
-                    FixedChoice("fire_escape_layout_mode", "布置方式", new[] { "原概率散布", "连续梯组" });
-                    fixedMode = I("fire_escape_layout_mode") == 1;
-                    if (fixedMode)
+                    Popup("fire_escape_layout_mode", "布置方式", new[] { "原概率散布", "连续梯组" });
+                    showLegacy = CandidateIncludes("fire_escape_layout_mode", 0);
+                    if (CandidateIncludes("fire_escape_layout_mode", 1))
                     {
-                        FixedCount("fire_escape_group_count", "梯组数量（整栋共享）");
-                        FixedFaces("fire_escape_face_mask");
-                        FixedCount("fire_escape_floor_start", "起始楼层（首层为 1）");
-                        FixedCount("fire_escape_floor_end", "结束楼层（超出部分由生成器报告）");
-                        FixedChoice("fire_escape_roof_access", "屋顶检修梯", new[] { "关", "开" });
+                        Int("fire_escape_group_count", "梯组数量（整栋共享）");
+                        AttachmentFaces("fire_escape_face_mask");
+                        ScopeInt("fire_escape_floor_start", "起始楼层（首层为 1）");
+                        ScopeInt("fire_escape_floor_end", "结束楼层（超出部分由生成器报告）");
+                        Toggle("fire_escape_roof_access", "屋顶检修梯");
                     }
                 }
-                if (!fixedMode)
+                if (showLegacy)
                 { Float(names[i] + "_density", "采样密度（0～1）"); Int(names[i] + "_max_count", "请求数量上限"); }
-                else EditorGUILayout.LabelField("固定请求不经过概率抽样；不足时保留请求，生成诊断报告实际值与原因。", EditorStyles.wordWrappedMiniLabel);
+                else EditorGUILayout.LabelField("数量端点相等为固定值，不同为随机范围；不足时保留请求并报告实际值与原因。", EditorStyles.wordWrappedMiniLabel);
                 if (state.Result == null) EditorGUILayout.LabelField("挂点与有效上限：等待生成");
                 else
                 {
@@ -308,38 +298,69 @@ namespace PCGBike.Editor.Buildings
             }
             if (Has("drainpipe_enabled") && Fold("drainpipe", "落水管", false))
             {
-                FixedChoice("drainpipe_enabled", "生成落水管", new[] { "关", "开" });
-                if (I("drainpipe_enabled") != 0)
+                Toggle("drainpipe_enabled", "生成落水管");
+                if (CandidateIncludes("drainpipe_enabled", 1))
                 {
-                    FixedCount("drainpipe_count", "完整管线数量（整栋共享）");
-                    FixedFaces("drainpipe_face_mask");
+                    Int("drainpipe_count", "完整管线数量（整栋共享）");
+                    AttachmentFaces("drainpipe_face_mask");
                 }
             }
+            if (Has("wall_lamp_enabled") && Fold("wall_lamp", "壁灯", false))
+            {
+                Toggle("wall_lamp_enabled", "生成壁灯");
+                if (CandidateIncludes("wall_lamp_enabled", 1))
+                {
+                    Int("wall_lamp_count", "壁灯数量（盏／整栋首层）");
+                    Popup("wall_lamp_layout", "挂接布局", new[] { "单灯", "入口双侧成对" });
+                    EditorGUILayout.LabelField("成对布局不会增加请求；奇数请求保留并报告实际配对容量。", EditorStyles.wordWrappedMiniLabel);
+                }
+            }
+            if (Has("balcony_enabled") && Fold("balcony", "阳台", false))
+            {
+                Toggle("balcony_enabled", "生成阳台");
+                if (CandidateIncludes("balcony_enabled", 1))
+                {
+                    Int("balcony_count", "阳台数量（门与平台为一套／整栋标准层）");
+                    ScopeInt("balcony_floor_start", "起始楼层（首层为 1）");
+                    ScopeInt("balcony_floor_end", "结束楼层（直接作用域）");
+                    EditorGUILayout.LabelField("仅选择已有阳台门宿主；不足时保留请求。阳台门宿主数量在标准层设置。", EditorStyles.wordWrappedMiniLabel);
+                }
+            }
+            if (!string.IsNullOrEmpty(state.Style3DiagnosticText) && Fold("style3Diagnostics", "壁灯／阳台：上次成功结果", false))
+                EditorGUILayout.HelpBox(state.Style3DiagnosticText, MessageType.None);
             if (Has("roof_props_layout_mode") && !string.IsNullOrEmpty(state.Result?.referenceAttachments)
-                && Fold("referenceAttachmentDiagnostics", "固定附件：上次成功生成结果", false))
+                && Fold("referenceAttachmentDiagnostics", "完整附件：上次成功生成结果", false))
                 EditorGUILayout.HelpBox(state.ReferenceDiagnosticText, MessageType.None);
         }
         private bool Has(string name) => StreetBuildingInstanceParameters.Exists(asset, name);
-        // 扩展点：新模式继续使用单选、原生固定数量；不复用随机候选／范围控件。
-        private void FixedChoice(string name, string label, string[] choices)
+        private void AttachmentFaces(string name)
         {
-            EditorGUI.BeginChangeCheck();
-            int old = I(name), next = EditorGUILayout.Popup(label, Mathf.Clamp(old, 0, choices.Length - 1), choices);
-            if (EditorGUI.EndChangeCheck() && next != old) Edit(asset, name, next);
-        }
-        private void FixedCount(string name, string label)
-        {
-            if (!Has(name)) return;
-            int old = I(name), next = EditorGUILayout.IntField(label, old);
-            if (next != old) Edit(asset, name, next);
-        }
-        private void FixedFaces(string name)
-        {
-            EditorGUI.BeginChangeCheck();
-            int old = I(name), next = EditorGUILayout.MaskField("可用物理立面（固定集合）", old, new[] { "正面", "次正面", "侧面（左、右）", "背面" });
-            next &= 15;
-            if (EditorGUI.EndChangeCheck() && next != old) Edit(asset, name, next);
-            EditorGUILayout.LabelField("勾选面共同提供候选；数量由整栋共享，不随机抽取立面子集。", EditorStyles.wordWrappedMiniLabel);
+            int raw = StreetBuildingGenerationPolicy.Find(policy, name)?.mask ?? I(name), mask = raw & 12;
+            string[] labels = { "侧面（左、右）", "背面" };
+            int[] bits = { 4, 8 };
+            string selected = string.Join("、", Enumerable.Range(0, 2).Where(i => (mask & bits[i]) != 0).Select(i => labels[i]));
+            Rect dropdown = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), new GUIContent("可用物理立面"));
+            if (EditorGUI.DropdownButton(dropdown, new GUIContent(mask == 0 ? "无合法候选，请选择" : selected), FocusType.Passive, EditorStyles.popup))
+            {
+                var menu = new GenericMenu();
+                for (int i = 0; i < bits.Length; i++)
+                {
+                    int bit = bits[i];
+                    menu.AddItem(new GUIContent(labels[i]), (mask & bit) != 0, () =>
+                    {
+                        int current = (StreetBuildingGenerationPolicy.Find(StreetBuildingGenerationPolicy.WithDefaults(asset), name)?.mask ?? I(name)) & 12;
+                        int next = current ^ bit;
+                        if (next == 0) return;
+                        SaveRule(new StreetBuildingGenerationPolicy.Rule { name = name, kind = "attachment_faces", mask = next });
+                    });
+                }
+                menu.DropDown(dropdown);
+            }
+            if ((raw & ~12) != 0)
+                EditorGUILayout.HelpBox("正面／次正面不支持，已从本次采用候选中排除；原请求保留，请修正立面候选。", MessageType.Warning);
+            if (mask == 0)
+                EditorGUILayout.HelpBox("至少选择侧面或背面；当前请求没有合法候选，生成时会报告冲突。", MessageType.Warning);
+            else EditorGUILayout.LabelField((mask & (mask - 1)) == 0 ? "固定立面；数量整栋共享。" : "生成时选择非空立面子集；数量整栋共享。", EditorStyles.miniLabel);
         }
         private static string AttachmentSource(string source) => source == "instance" ? "基础参数"
             : source.StartsWith("attachment_override:", StringComparison.Ordinal) ? "附件覆盖第" + source.Substring("attachment_override:".Length) + "条"
@@ -431,7 +452,7 @@ namespace PCGBike.Editor.Buildings
                 Popup("attachment_override_kind" + row, "附件类型", new[] { "雨棚", "招牌", "消防梯", "墙面空调", "屋顶附件" });
                 Float("attachment_override_density" + row, "密度（0～1）"); Int("attachment_override_max_count" + row, "数量上限");
                 foreach (var pair in new[] { ("front", "正面"), ("secondary_front", "次正面"), ("side", "侧面（左、右）"), ("rear", "背面") })
-                    Toggle("attachment_override_" + pair.Item1 + row, pair.Item2);
+                    ScopeToggle("attachment_override_" + pair.Item1 + row, pair.Item2);
                 ScopeInt("attachment_override_floor_start" + row, "起始楼层"); ScopeInt("attachment_override_floor_end" + row, "结束楼层");
                 var targets = new[] { ("front", "正面"), ("secondary_front", "次正面"), ("side", "侧面（左、右）"), ("rear", "背面") }
                     .Where(p => I("attachment_override_" + p.Item1 + row) != 0).Select(p => p.Item2);
@@ -462,6 +483,7 @@ namespace PCGBike.Editor.Buildings
         private void Quantity(string key, string min, string max, int mode, string label)
         {
             int low = key == "entrance_count" && mode == 0 ? I(max) : key == "shopfront_count" && mode == 0 ? I(key) : I(min);
+            if (mode == 0 && (key is "water_tower_count" or "chimney_count")) low = I(key);
             int high = mode == 1 ? I(max) : low;
             var p = asset.Parameters.GetParameter(max)?._parmInfo;
             int boundMin = p.HasValue && p.Value.hasMin ? Mathf.RoundToInt(p.Value.min) : 0;
@@ -486,6 +508,11 @@ namespace PCGBike.Editor.Buildings
             return row != null && float.TryParse(row.value, NumberStyles.Float, CultureInfo.InvariantCulture, out float value) ? value : fallback;
         }
         private void ScopeInt(string name, string label) { int old = I(name), value = EditorGUILayout.IntField(label, old); if (old != value) Edit(asset, name, value); }
+        private void ScopeToggle(string name, string label)
+        {
+            bool old = I(name) != 0, value = EditorGUILayout.Toggle(label, old);
+            if (old != value) Edit(asset, name, value ? 1 : 0);
+        }
         private void Int(string name, string label)
         {
             var p = asset.Parameters.GetParameter(name)?._parmInfo;
@@ -627,7 +654,7 @@ namespace PCGBike.Editor.Buildings
             : name.StartsWith("facade_override") || name.StartsWith("attachment_override") ? "局部覆盖"
             : name.StartsWith("building_") || name.StartsWith("l_notch") || name == "massing_shape" || name == "floor_count" || name == "rear_facade_mode" ? "建筑体块"
             : name.StartsWith("window_") || name.StartsWith("facade_") ? "标准层门窗"
-            : name.Contains("density") || name.Contains("max_count") || name.StartsWith("attachment") ? "附件"
+            : StreetBuildingGenerationPolicy.ReferenceFields.Contains(name) || name.Contains("density") || name.Contains("max_count") || name.StartsWith("attachment") ? "附件"
             : name.StartsWith("roof") || name.StartsWith("parapet") || name.Contains("trim") ? "屋顶与线脚"
             : name.Contains("seed") ? "种子" : "首层门窗";
     }

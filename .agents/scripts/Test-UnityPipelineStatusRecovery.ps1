@@ -125,6 +125,9 @@ function unity {
     }
     if ($arguments -contains 'test list') {
         $tests = @($script:ExpectedNames | ForEach-Object { @{FullName=$_;Assembly='PCGBike.StreetBuilding.Tests.Editor'} })
+        if ($script:Scenario.DirectDiscoveryArray) {
+            return (@{success=$true;data=@{result=$tests}} | ConvertTo-Json -Depth 10 -Compress)
+        }
         return (@{success=$true;data=@{result=@{Tests=$tests}}} | ConvertTo-Json -Depth 10 -Compress)
     }
     if ($arguments -contains 'test run') {
@@ -154,6 +157,7 @@ function unity {
 }
 
 $scenarios=@(
+    @{Name='pipeline_1_direct_test_discovery';Xml='Fresh';Status='no_tests';TransportFailures=0;DeferXmlUntilSecondPoll=$false;ExpectPass=$true;DirectDiscoveryArray=$true},
     @{Name='transient_transport_then_no_tests_fresh_exact_90';Xml='Fresh';Status='no_tests';TransportFailures=1;DeferXmlUntilSecondPoll=$true;ExpectPass=$true;MaxPolls=2},
     @{Name='previous_xml_with_new_file_mtime';Xml='Previous';Status='no_tests';TransportFailures=0;DeferXmlUntilSecondPoll=$false;ExpectPass=$false},
     @{Name='same_total_wrong_fullname';Xml='WrongNames';Status='no_tests';TransportFailures=0;DeferXmlUntilSecondPoll=$false;ExpectPass=$false},

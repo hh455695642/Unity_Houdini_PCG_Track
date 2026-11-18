@@ -59,6 +59,7 @@ namespace PCGBike.Editor.Buildings
                         + ReadCookFailure(asset));
                 var panelState = StreetBuildingPanelState.Get(authoring);
                 if (!string.IsNullOrEmpty(panelState.Error)) throw new InvalidOperationException(panelState.Error);
+                PreserveGeneratedPrefabState(asset);
 
                 // Rebuild/domain reload can replace UnityEvent instances. Attach
                 // synchronously before exposing freshly generated outputs to Bake.
@@ -131,6 +132,38 @@ namespace PCGBike.Editor.Buildings
         private static bool DefaultRequestCook(HEU_HoudiniAsset asset) =>
             asset.RequestCook(true, false, true, true)
             && asset.LastCookResult == HEU_AssetCookResultWrapper.SUCCESS;
+
+        internal static void PreserveGeneratedPrefabState(HEU_HoudiniAsset asset)
+        {
+            var core = asset.GetObjectNodeByName("StreetBuildingCore");
+            if (core == null) return;
+            var root = asset.GetComponentInParent<HEU_HoudiniAssetRoot>();
+            if (root == null) return;
+            var seen = new HashSet<UnityEngine.GameObject>();
+            // 编辑期成功 Cook 边界处理；不增加逐帧或运行时遍历。
+            // 扩展点：后续原生视觉输出在这里显式登记，不冻结 Prefab 内部素材属性。
+            foreach (var geo in core.GeoNodes)
+            {
+                if (geo.GeoName != "OUT_BUILDING_LOD0" && geo.GeoName != "OUT_DETAIL_INSTANCES") continue;
+                foreach (var part in geo.GetParts())
+                {
+                    if (part.ObjectInstanceInfos == null) continue;
+                    foreach (var info in part.ObjectInstanceInfos)
+                    {
+                        if (info == null || info._instances == null) continue;
+                        foreach (var instance in info._instances)
+                        {
+                            if (instance == null || !seen.Add(instance) || EditorUtility.IsPersistent(instance)
+                                || !instance.transform.IsChildOf(root.transform)
+                                || !PrefabUtility.IsPartOfPrefabInstance(instance)) continue;
+                            // HEU 设置生成名称/TRS 后，必须记录为实例覆盖才能跨源素材更新保留。
+                            PrefabUtility.RecordPrefabInstancePropertyModifications(instance);
+                            PrefabUtility.RecordPrefabInstancePropertyModifications(instance.transform);
+                        }
+                    }
+                }
+            }
+        }
 
         // 回滚会覆盖 HAPI 的最近一次 Cook 状态，先保留失败节点的真实诊断。
         // 仅失败时查询，正常编辑和 Bake 不增加接口调用。

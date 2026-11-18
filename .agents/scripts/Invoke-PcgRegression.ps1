@@ -123,7 +123,8 @@ function Invoke-UnityTool {
             # Exact path is essential: the same folder can contain thousands of
             # historical HDA backups, which otherwise consume even a 1000-row cap.
             $exactHdaFilter = 'glob:' + $moduleConfig[$Module].Hda.Replace('\', '/')
-            $cliArgs += @('--name', $exactHdaFilter, '--search_in',
+            $searchOption = if ((Resolve-PcgUnityCommand $cliName) -eq 'asset find') { '--search-in' } else { '--search_in' }
+            $cliArgs += @('--name', $exactHdaFilter, $searchOption,
                 $InputObject.searchInFolders[0], '--limit', '20')
         }
         if ($Tool -eq 'console-get-logs') {
@@ -139,7 +140,7 @@ function Invoke-UnityTool {
             try {
                 $rawReply = (& unity @cliArgs | Out-String)
                 $candidate = $rawReply | ConvertFrom-Json
-                if ($LASTEXITCODE -eq 0 -and $candidate.success) {
+                if ($LASTEXITCODE -eq 0 -and $candidate.success -and $candidate.data.success -ne $false) {
                     $reply = $candidate
                     break
                 }
@@ -154,9 +155,17 @@ function Invoke-UnityTool {
         }
         $result = switch ($Tool) {
             'editor-application-get-state' { @{ IsPlaying = ($data.playMode -ne 'stopped'); IsPlayingOrWillChangePlaymode = ($data.playMode -ne 'stopped'); IsCompiling = $data.compiling; IsUpdating = $data.domainReloadInProgress } }
-            'scene-list-opened' { @($data.scenes) }
-            'assets-find' { @($data.assets) }
-            'console-get-logs' { @($data.entries | Where-Object { $_.logType -eq $InputObject.logTypeFilter } | ForEach-Object { @{ LogType=$_.logType; Message=$_.message; Timestamp=$_.timestampUtc } }) }
+            # Pipeline 1.0 streams typed records as the result array; older
+            # servers wrapped the same records in scenes/assets properties.
+            'scene-list-opened' { if ($data.PSObject.Properties.Name -contains 'scenes') { @($data.scenes) } else { @($data) } }
+            'assets-find' { if ($data.PSObject.Properties.Name -contains 'assets') { @($data.assets) } else { @($data) } }
+            'console-get-logs' {
+                if ($data.dropped) { throw 'Unity console response dropped diagnostics; cannot establish a complete regression snapshot.' }
+                @($data.entries | Where-Object {
+                    if ($InputObject.logTypeFilter -eq 'Error') { $_.logType -in @('Error','Exception','Assert') }
+                    else { $_.logType -eq $InputObject.logTypeFilter }
+                } | ForEach-Object { @{ LogType=$_.logType; Message=$_.message; Timestamp=$_.timestampUtc } })
+            }
         }
         return @{ structured = @{ result = $result } }
     }
@@ -380,7 +389,8 @@ function Invoke-StreetBuildingPipelineTests {
     if ($LASTEXITCODE -ne 0 -or -not $open.success) {
         throw 'Cannot inspect open Unity scenes before StreetBuilding tests.'
     }
-    foreach ($scene in @($open.data.result.scenes | Where-Object { $_.isDirty })) {
+    $openScenes = if ($open.data.result.PSObject.Properties.Name -contains 'scenes') { @($open.data.result.scenes) } else { @($open.data.result) }
+    foreach ($scene in @($openScenes | Where-Object { $_.isDirty })) {
         if ($scene.path -ne 'Assets/PCG/Scenes/PCG_Building.unity') {
             throw "Refusing to switch away from unrelated dirty scene: $($scene.path)"
         }
@@ -402,8 +412,9 @@ function Invoke-StreetBuildingPipelineTests {
     }
     $clean = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'list_open_scenes') --json |
         Out-String | ConvertFrom-Json)
+    $cleanScenes = if ($clean.data.result.PSObject.Properties.Name -contains 'scenes') { @($clean.data.result.scenes) } else { @($clean.data.result) }
     if ($LASTEXITCODE -ne 0 -or -not $clean.success -or
-        @($clean.data.result.scenes | Where-Object { $_.isDirty }).Count -gt 0) {
+        @($cleanScenes | Where-Object { $_.isDirty }).Count -gt 0) {
         throw 'Unity scene remains dirty; refusing to start tests and open a save dialog.'
     }
     $discovery = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'list_tests') --mode editor --json |
@@ -411,15 +422,21 @@ function Invoke-StreetBuildingPipelineTests {
     if ($LASTEXITCODE -ne 0 -or -not $discovery.success) {
         throw 'StreetBuilding EditMode test discovery failed.'
     }
-    $tests = @($discovery.data.result.Tests | Where-Object { $_.Assembly -eq $assembly })
+    $discoveredTests = if ($discovery.data.result.PSObject.Properties.Name -contains 'Tests') {
+        @($discovery.data.result.Tests)
+    } else { @($discovery.data.result) }
+    $tests = @($discoveredTests | Where-Object { $_.Assembly -eq $assembly })
     if ($tests.Count -lt 4) {
         throw "StreetBuilding EditMode tests are missing: found $($tests.Count), expected at least 4."
     }
     # The Pipeline's synchronous Test Runner can hold the command endpoint
     # across a domain reload. Start its typed asynchronous job and poll status.
     $runStartedAt = [DateTime]::UtcNow
-    $reply = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'run_tests') --mode editor `
-        --filter_type assembly --filter $assembly --async_tests true --timeout 900 --json |
+    $runCommand = Resolve-PcgUnityCommand 'run_tests'
+    $filterOption = if ($runCommand -eq 'test run') { '--filter-type' } else { '--filter_type' }
+    $asyncOption = if ($runCommand -eq 'test run') { '--async-tests' } else { '--async_tests' }
+    $reply = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot $runCommand --mode editor `
+        $filterOption assembly --filter $assembly $asyncOption true --timeout 900 --json |
         Out-String | ConvertFrom-Json)
     if ($LASTEXITCODE -ne 0 -or -not $reply.success) {
         throw 'StreetBuilding Pipeline EditMode test invocation failed.'
@@ -439,7 +456,7 @@ function Invoke-StreetBuildingPipelineTests {
         $poll = $null
         $pollError = $null
         try {
-            $pollText = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'test_status') --timeout 90 --json | Out-String)
+            $pollText = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot --timeout 90 (Resolve-PcgUnityCommand 'test_status') --json | Out-String)
             $pollExit = $LASTEXITCODE
             $poll = $pollText | ConvertFrom-Json
             if ($pollExit -ne 0 -or -not $poll.success -or $poll.data.success -eq $false) { $pollError = $pollText }
@@ -498,7 +515,7 @@ function Invoke-StreetBuildingPipelineTests {
                         (($actual -join '|') -eq ($expected -join '|'))
                     if ($allPassed) {
                         if ($status.status -eq 'running') {
-                            $cancelled = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot (Resolve-PcgUnityCommand 'cancel_tests') --timeout 90 --json |
+                            $cancelled = (& unity command --caller plugin --skill unity-cli --project-path $projectRoot --timeout 90 (Resolve-PcgUnityCommand 'cancel_tests') --json |
                                 Out-String | ConvertFrom-Json)
                             if ($LASTEXITCODE -ne 0 -or -not $cancelled.success) {
                                 throw 'Pipeline result collector remained running and could not be reset.'
@@ -589,6 +606,10 @@ try {
         & powershell -NoProfile -ExecutionPolicy Bypass -File (
             Join-Path $PSScriptRoot 'Test-UnityPipelineStatusRecovery.ps1') -OutputDirectory $probeDirectory
         if ($LASTEXITCODE -ne 0) { throw 'Pipeline status recovery cumulative contracts failed.' }
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (
+            Join-Path $PSScriptRoot 'Test-UnityPipelineCompatibility.ps1') -OutputDirectory (
+            Join-Path (Split-Path -Path $snapshotPath -Parent) 'pipeline-typed-compatibility')
+        if ($LASTEXITCODE -ne 0) { throw 'Pipeline typed compatibility cumulative contracts failed.' }
         # Export current Live edits and validate a disposable locked candidate
         # before any production definition/HIP save.
         Invoke-Hython -Arguments @(
@@ -690,6 +711,12 @@ try {
             '        No geometry generated!'
             ''
         ) -join "`n")
+    }
+    if ($Module -eq 'StreetBuilding') {
+        # Unity Package Manager fetch cancellation is present in the 2026-09-13
+        # StreetBuilding Console baseline (parameter-simplification). Match the
+        # complete editor-only diagnostic, including severity and both lines.
+        $allowedUnityDiagnostics += "Error|[Package Manager Window] Error fetching package list.`nOperation cancelled"
     }
     $newDiagnostics = @($currentDiagnostics | Where-Object {
         $_ -notin $baselineDiagnostics -and $_ -notin $allowedUnityDiagnostics

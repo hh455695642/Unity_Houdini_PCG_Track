@@ -225,6 +225,17 @@ namespace PCGBike.Buildings
     }
 
     [Serializable]
+    public sealed class StreetBuildingModuleAnchor
+    {
+        [SerializeField] private string _semantic;
+        [SerializeField] private Vector3 _position;
+        public string Semantic => _semantic;
+        public Vector3 Position => _position;
+        public StreetBuildingModuleAnchor(string semantic, Vector3 position)
+        { _semantic = semantic; _position = position; }
+    }
+
+    [Serializable]
     public sealed class StreetBuildingModuleDefinition
     {
         [SerializeField] private GameObject _prefab;
@@ -247,6 +258,8 @@ namespace PCGBike.Buildings
         [SerializeField] private Vector3 _connectionEnd;
         [SerializeField, Min(0f)] private float _connectionRadius;
         [SerializeField] private Vector2 _connectionLengthRange;
+        // 扩展点：版本化命名局部锚点；只描述模型几何，不保存生成配额。
+        [SerializeField] private List<StreetBuildingModuleAnchor> _style3Anchors = new();
 
         public GameObject Prefab => _prefab;
         public StreetBuildingModuleRole ModuleRole => _moduleRole;
@@ -267,6 +280,8 @@ namespace PCGBike.Buildings
         public Vector3 ConnectionEnd => _connectionEnd;
         public float ConnectionRadius => _connectionRadius;
         public Vector2 ConnectionLengthRange => _connectionLengthRange;
+        public IReadOnlyList<StreetBuildingModuleAnchor> Style3Anchors =>
+            _style3Anchors ?? (IReadOnlyList<StreetBuildingModuleAnchor>)Array.Empty<StreetBuildingModuleAnchor>();
 
         public float ResolveHeight(StreetBuildingStyleConfig style) => _heightType switch
         {
@@ -290,7 +305,17 @@ namespace PCGBike.Buildings
             copy._connectionEnd = _connectionEnd;
             copy._connectionRadius = _connectionRadius;
             copy._connectionLengthRange = _connectionLengthRange;
+            copy._style3Anchors = new List<StreetBuildingModuleAnchor>();
+            foreach (var anchor in Style3Anchors)
+                copy._style3Anchors.Add(new StreetBuildingModuleAnchor(anchor.Semantic, anchor.Position));
             return copy;
+        }
+        public void SetStyle3Anchor(string semantic, Vector3 position)
+        {
+            _style3Anchors ??= new();
+            int index = _style3Anchors.FindIndex(a => a.Semantic == semantic);
+            var anchor = new StreetBuildingModuleAnchor(semantic, position);
+            if (index < 0) _style3Anchors.Add(anchor); else _style3Anchors[index] = anchor;
         }
         public void SetAttachmentMount(Vector3 mount)
         { _hasAttachmentMount = true; _attachmentMount = mount; }

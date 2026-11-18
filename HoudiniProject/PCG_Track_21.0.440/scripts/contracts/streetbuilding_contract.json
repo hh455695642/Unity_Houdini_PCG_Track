@@ -62,7 +62,9 @@
     "REAL_INSTANCE_FILTER": "blast",
     "FRONT_INSTANCE_ATTRIBUTES": "attribdelete",
     "SIDE_REAR_INSTANCE_ATTRIBUTES": "attribdelete",
-    "REAL_INSTANCE_ATTRIBUTES": "attribdelete"
+    "REAL_INSTANCE_ATTRIBUTES": "attribdelete",
+    "PLAN_STYLE3_ATTACHMENTS": "attribwrangle",
+    "COMMIT_STYLE3_BALCONY_PAIRS": "attribwrangle"
   },
   "required_outputs": [
     "OUT_BUILDING_LOD0",
@@ -161,7 +163,15 @@
     "chimney_count_mode": 0,
     "chimney_count_min": 0,
     "chimney_count_max": 3,
-    "roof_prop_position_mode": 0
+    "roof_prop_position_mode": 0,
+    "wall_lamp_enabled": 0,
+    "wall_lamp_count": 0,
+    "wall_lamp_layout": 0,
+    "balcony_enabled": 0,
+    "balcony_count": 0,
+    "balcony_floor_start": 2,
+    "balcony_floor_end": 99,
+    "balcony_door_count": 0
   },
   "menus": {
     "water_tower_count_mode": [
@@ -216,6 +226,10 @@
     "rear_facade_mode": [
       "0",
       "2"
+    ],
+    "wall_lamp_layout": [
+      "0",
+      "1"
     ]
   },
   "budgets": {
@@ -431,6 +445,13 @@
     "StreetBuilding.Reference.InterfacePromotion",
     "StreetBuilding.Reference.InterfaceStorageTypes",
     "StreetBuilding.Reference.RoofPropSeparation",
+    "StreetBuilding.Attachments.UnifiedParameterPolicy",
+    "StreetBuilding.Attachments.CandidateDependencies",
+    "StreetBuilding.Attachments.RandomGroupIsolation",
+    "StreetBuilding.Attachments.QuantityMigration",
+    "StreetBuilding.Attachments.ScopeFieldsDirect",
+    "StreetBuilding.Attachments.PolicyPersistence",
+    "StreetBuilding.Attachments.SideRearFaceSubsets",
     "StreetBuilding.Roof.CountModes",
     "StreetBuilding.Roof.LegacyPlacement",
     "StreetBuilding.Roof.SeededDeterminism",
@@ -452,7 +473,26 @@
     "StreetBuilding.Pipe.CapacityRetainsRequest",
     "StreetBuilding.Tests.ExactHdaAssetLookup",
     "StreetBuilding.Validation.RetiredAssetsAbsent",
-    "StreetBuilding.Tests.PipelineStatusTransport"
+    "StreetBuilding.Tests.PipelineStatusTransport",
+    "StreetBuilding.Style3.DefaultOffCompatibility",
+    "StreetBuilding.Style3.WallLampQuotaAndPairing",
+    "StreetBuilding.Style3.BalconyAtomicPairing",
+    "StreetBuilding.Style3.BalconyCollisionRetry",
+    "StreetBuilding.Style3.BalconyFailurePreservesWalls",
+    "StreetBuilding.Style3.BalconyDrainPipeCoexistence",
+    "StreetBuilding.Style3.LegacyBalconyDoorCountInert",
+    "StreetBuilding.Style3.ActualMountsAndUnitScale",
+    "StreetBuilding.Style3.MissingMaterialDiagnostics",
+    "StreetBuilding.Style3.AttachmentGroupIsolation",
+    "StreetBuilding.Style3.LShapePhysicalFaceQuota",
+    "StreetBuilding.Style3.SharedDetailBudget",
+    "StreetBuilding.Style3.MultibuildingQuota",
+    "StreetBuilding.Style3.BalconyStructuralContact",
+    "StreetBuilding.Style3.BalconyOpeningClearance",
+    "StreetBuilding.Style3.AuthoredVolumesFallback",
+    "StreetBuilding.Style3.StableBakeIdentity",
+    "StreetBuilding.Style3.InterfacePromotionIdempotence",
+    "StreetBuilding.Tests.PipelineTypedCommandCompatibility"
   ],
   "three_layer_rules": {
     "version": 1,
@@ -516,7 +556,8 @@
     ],
     "50_ATTACHMENT_INSTANCES": [
       "SELECT_ATTACHMENT_MODULES",
-      "DETAIL_INSTANCE_POINTS"
+      "DETAIL_INSTANCE_POINTS",
+      "PLAN_STYLE3_ATTACHMENTS"
     ],
     "60_PROXY_MODEL": [
       "RESOLVE_MASSING",
@@ -528,6 +569,7 @@
     "70_UNITY_CONTRACT": [
       "MERGE_DIRECT_BUILDING_INSTANCES",
       "FILTER_REAL_INSTANCES",
+      "COMMIT_STYLE3_BALCONY_PAIRS",
       "VALIDATE_DIRECT_BUILDING_INSTANCES",
       "VALIDATE_DIRECT_DETAIL_INSTANCES",
       "PREVIEW_MISSING_MODULES",
@@ -547,7 +589,8 @@
     ]
   },
   "hidden_compatibility_parameters": [
-    "lod_outputs_enabled"
+    "lod_outputs_enabled",
+    "balcony_door_count"
   ],
   "maintenance_reference_vex": {
     "DIRECT_UNITY_INSTANCE_FACADE": "// STREETBUILDING_V9_CONSUME_FRONT_SEMANTICS\nfor (int p=npoints(0)-1;p>=0;p--) if (point(0,\"facade_target\",p)>1) removepoint(0,p);\nfor (int prim=nprimitives(0)-1;prim>=0;prim--) removeprim(0,prim,1);\nstring keep[]=array(\"P\",\"orient\",\"scale\",\"unity_instance\",\"instance_prefix\",\"name\",\"building_id\",\n    \"face_index\",\"floor_index\",\"cell_index\",\"module_span\",\"selection_seed\",\n    \"module_role\",\"module_variant\",\"surface_role\",\"facade_band\",\n    \"is_building_entrance\",\"is_shop_entrance\",\"lod\",\"chunk_id\",\"pcg_kind\",\"pcg_variant\",\"preview_missing\",\"preview_size\");\nstring attributes[]=detailintrinsic(0,\"pointattributes\");\nforeach (string name;attributes) if (find(keep,name)<0) removeattrib(0,\"point\",name);\nstring primitive_attributes[]=detailintrinsic(0,\"primitiveattributes\");\nstring vertex_attributes[]=detailintrinsic(0,\"vertexattributes\");\nforeach (string name;primitive_attributes) removeattrib(0,\"prim\",name);\nforeach (string name;vertex_attributes) removeattrib(0,\"vertex\",name);\nsetdetailattrib(0,\"output_role\",\"front_and_secondary_instances\",\"set\");\n",

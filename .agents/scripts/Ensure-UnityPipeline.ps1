@@ -94,6 +94,22 @@ function Find-ProjectInstance {
         Select-Object -First 1
 }
 
+function Get-ProjectUnityEditorProcess {
+    param([Parameter(Mandatory)][string]$NormalizedProjectPath)
+
+    # Pipeline 1.0 can retain isRunning=true after a native crash. Verify the
+    # actual project main process; import workers must never prevent bootstrap.
+    return @(Get-CimInstance Win32_Process -Filter "Name='Unity.exe'" -ErrorAction Stop) |
+        Where-Object {
+            $commandLine = $_.CommandLine
+            if (-not $commandLine -or $commandLine -match '(?i)(?:^|\s)-assetImportWorker(?:\s|$)|(?:^|\s)-name\s+"?AssetImportWorker') { return $false }
+            $match = [regex]::Match($commandLine, '(?i)(?:^|\s)-projectPath\s+(?:"([^"]+)"|(\S+))')
+            if (-not $match.Success) { return $false }
+            $projectArgument = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+            (Get-NormalizedPath $projectArgument).Equals($NormalizedProjectPath, [StringComparison]::OrdinalIgnoreCase)
+        } | Select-Object -First 1
+}
+
 function Invoke-UnityMcpTool {
     param(
         [Parameter(Mandatory)][string]$ToolName,
@@ -165,7 +181,8 @@ $pipelineList = Invoke-UnityJson -Arguments @(
 ) -Operation 'unity pipeline list'
 $instance = Find-ProjectInstance -PipelineList $pipelineList -NormalizedProjectPath $resolvedProjectPath
 
-if (-not $instance -or -not $instance.isRunning) {
+$editorProcess = Get-ProjectUnityEditorProcess -NormalizedProjectPath $resolvedProjectPath
+if (-not $editorProcess) {
     if ($NoLaunch) {
         throw "Unity Editor is not running for $resolvedProjectPath and -NoLaunch was specified."
     }
@@ -192,6 +209,7 @@ $menuStartAttempted = $false
 $editorStatusCommand = $null
 
 while ([DateTime]::UtcNow -lt $deadline) {
+    $editorProcess = Get-ProjectUnityEditorProcess -NormalizedProjectPath $resolvedProjectPath
     $pipelineList = Invoke-UnityJson -Arguments @(
         'pipeline', 'list', '--format', 'json', '--non-interactive'
     ) -Operation 'unity pipeline list' -AllowFailure
@@ -202,7 +220,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
             $lastPipelineSummary = $instance
         }
 
-        if ($instance -and $instance.isRunning -and $instance.hasPipelinePackage -and $instance.pipelineServer.isReachable) {
+        if ($editorProcess -and $instance -and $instance.isRunning -and $instance.hasPipelinePackage -and $instance.pipelineServer.isReachable) {
             if (-not $editorStatusCommand) {
                 # Pipeline 0.9 groups typed commands; 0.8 used editor_status.
                 $catalog = Invoke-UnityJson -Arguments @('command', '--project-path', $resolvedProjectPath,
@@ -214,10 +232,12 @@ while ([DateTime]::UtcNow -lt $deadline) {
             $lastEditorStatus = Invoke-UnityJson -Arguments @(
                 'command',
                 '--project-path', $resolvedProjectPath,
-                $(if ($editorStatusCommand) { $editorStatusCommand } else { 'editor_status' }),
+                # CLI metadata must precede the positional Editor command; older
+                # clients otherwise forward these flags as Editor parameters.
                 '--caller', 'plugin', '--skill', 'unity-cli',
                 '--format', 'json',
-                '--non-interactive'
+                '--non-interactive',
+                $(if ($editorStatusCommand) { $editorStatusCommand } else { 'editor_status' })
             ) -Operation 'unity command editor_status' -AllowFailure
 
             if ($lastEditorStatus -and $lastEditorStatus.success) {
@@ -246,7 +266,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
                         expectedUnityVersion = $expectedUnityVersion
                         actualUnityVersion = $statusData.unityVersion
                         unityCliVersion = $cliVersion
-                        editorPid = $instance.pid
+                        editorPid = $editorProcess.ProcessId
                         pipelineVersion = $instance.pipelineVersion
                         pipelineReachable = $true
                         editorStatus = $statusData.status
@@ -256,7 +276,7 @@ while ([DateTime]::UtcNow -lt $deadline) {
             }
         }
 
-        if ($instance -and $instance.isRunning -and $instance.hasPipelinePackage -and -not $instance.pipelineServer.isReachable) {
+        if ($editorProcess -and $instance -and $instance.isRunning -and $instance.hasPipelinePackage -and -not $instance.pipelineServer.isReachable) {
             $waitedSeconds = ([DateTime]::UtcNow - $startedWaitingAt).TotalSeconds
 
             if (-not $assetRefreshAttempted -and $waitedSeconds -ge 10) {

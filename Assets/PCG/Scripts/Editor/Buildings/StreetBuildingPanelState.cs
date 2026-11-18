@@ -22,7 +22,7 @@ namespace PCGBike.Editor.Buildings
     [Serializable] public sealed class StreetBuildingPanelResult
     {
         public int version = 1, actualUse;
-        public string inputHash, completedUtc, facades, attachments, referenceAttachments, summary, ruleRevision;
+        public string inputHash, completedUtc, facades, attachments, referenceAttachments, style3Attachments, style3Hosts, summary, ruleRevision;
         public List<StreetBuildingPanelInput> inputs = new();
     }
 
@@ -40,7 +40,7 @@ namespace PCGBike.Editor.Buildings
             public readonly Dictionary<string, string> DuringCook = new();
             public readonly HashSet<string> DuringCookFloats = new();
             public readonly HashSet<string> DuringCookStrings = new();
-            public string CurrentHash, Error, ReferenceDiagnosticText;
+            public string CurrentHash, Error, ReferenceDiagnosticText, Style3DiagnosticText;
             public bool Cooking, Requested, Valid, Retained, ConnectionAvailable, NeedsResultValidation;
             public StreetBuildingOutputRetention Backup;
         }
@@ -80,6 +80,7 @@ namespace PCGBike.Editor.Buildings
                 state.AttachmentDiagnostics = StreetBuildingAttachmentDiagnostics.Parse(state.Result.attachments);
                 state.ReferenceDiagnosticText = string.IsNullOrEmpty(state.Result.referenceAttachments) ? null
                     : StreetBuildingAttachmentDiagnostics.FormatReference(state.Result.referenceAttachments);
+                state.Style3DiagnosticText = StreetBuildingAttachmentDiagnostics.FormatStyle3(state.Result.style3Attachments);
             }
             if (author.PanelVerification == 2) state.Error = "上次生成被会话或脚本重载中断；结果版本尚未验证，请重新生成。";
             States[author] = state;
@@ -163,6 +164,7 @@ namespace PCGBike.Editor.Buildings
             if (author.gameObject.scene.IsValid()) UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(author.gameObject.scene);
         }
 
+        // ReferenceFields 只补齐附件输入身份；字段是否参与本次抽样由 policy 的语义活性决定。
         internal static bool IsInput(string name) => name.StartsWith("facade_override", StringComparison.Ordinal)
             || name.StartsWith("attachment_override", StringComparison.Ordinal)
             || name.StartsWith("random_", StringComparison.Ordinal)
@@ -179,6 +181,8 @@ namespace PCGBike.Editor.Buildings
             "attachment_global_density", "ground_attachment_placement", "awning_density", "awning_max_count", "sign_density",
             "sign_max_count", "fire_escape_density", "fire_escape_max_count", "wall_ac_density", "wall_ac_max_count",
             "roof_props_density", "roof_props_max_count", "variation_seed", "layout_seed", "site_source_auto", "site_source"
+            , "wall_lamp_enabled", "wall_lamp_count", "wall_lamp_layout", "balcony_enabled", "balcony_count",
+            "balcony_floor_start", "balcony_floor_end"
             , StreetBuildingGenerationPolicy.Parameter, StreetBuildingGenerationPolicy.SequenceParameter
         };
 
@@ -296,6 +300,7 @@ namespace PCGBike.Editor.Buildings
             state.Result = result; state.AttachmentDiagnostics = StreetBuildingAttachmentDiagnostics.Parse(result.attachments);
             state.ReferenceDiagnosticText = string.IsNullOrEmpty(result.referenceAttachments) ? null
                 : StreetBuildingAttachmentDiagnostics.FormatReference(result.referenceAttachments);
+            state.Style3DiagnosticText = StreetBuildingAttachmentDiagnostics.FormatStyle3(result.style3Attachments);
             state.Cooking = false; state.Requested = false; state.Error = null;
             state.NeedsResultValidation = false; SetAudit(author, 3);
             state.Backup?.Dispose(); state.Backup = null;
@@ -378,16 +383,33 @@ namespace PCGBike.Editor.Buildings
                     var report = StreetBuildingAttachmentDiagnostics.ParseReference(reference);
                     if (report.Error != null) throw new InvalidOperationException(report.Error);
                 }
+                string style3 = DetailString(session, geo.GeoID, part.PartID, "style3_attachment_diagnostics");
+                string style3Hosts = DetailString(session, geo.GeoID, part.PartID, "style3_balcony_host_diagnostics");
+                if (HasStyle3Request(asset) || !string.IsNullOrEmpty(style3) || !string.IsNullOrEmpty(style3Hosts))
+                {
+                    var parsed = StreetBuildingAttachmentDiagnostics.ParseStyle3(style3);
+                    string error = parsed.Error
+                        ?? StreetBuildingAttachmentDiagnostics.ValidateStyle3Hosts(style3Hosts, parsed.Balcony);
+                    if (error != null) throw new InvalidOperationException(error);
+                }
                 return new StreetBuildingPanelResult
                 {
                     actualUse = DetailInt(session, geo.GeoID, part.PartID, "effective_ground_use"), facades = mapping, ruleRevision = revision,
                     attachments = DetailString(session, geo.GeoID, part.PartID, "attachment_diagnostics"),
                     referenceAttachments = reference,
+                    style3Attachments = style3, style3Hosts = style3Hosts,
                     summary = StreetBuildingRecook.ReadGroundSummary(asset, StreetBuildingRecook.ReadEntranceCell(asset), StreetBuildingInstanceParameters.Int(asset, "layout_seed"))
                 };
             }
             throw new InvalidOperationException("缺少可验证的 metadata 输出");
         }
+
+        internal static bool HasStyle3Request(HEU_HoudiniAsset asset)
+            => StreetBuildingInstanceParameters.Int(asset, "attachments_enabled") != 0
+                && ((StreetBuildingInstanceParameters.Int(asset, "wall_lamp_enabled") != 0
+                        && StreetBuildingInstanceParameters.Int(asset, "wall_lamp_count") > 0)
+                    || (StreetBuildingInstanceParameters.Int(asset, "balcony_enabled") != 0
+                        && StreetBuildingInstanceParameters.Int(asset, "balcony_count") > 0));
 
         internal static string DetailString(HEU_SessionBase session, int geo, int part, string name)
         {

@@ -14,8 +14,9 @@ namespace PCGBike.Editor.Buildings
         internal const string Parameter = "unity_generation_policy";
         internal const string SequenceParameter = "generation_sequence";
         internal const string FacesKey = "@shopfront_faces";
+        internal const string LegacyBalconyDoorCount = "balcony_door_count";
 
-        // 固定附件只读写 HDA 原生字段；禁止区间配置成为第二套数量／立面事实源。
+        // 附件输入与诊断分类。生成范围仍只保存在 HDA 实例 policy；不能用此集合禁止抽样。
         internal static readonly HashSet<string> ReferenceFields = new(StringComparer.Ordinal)
         {
             "roof_props_layout_mode", "water_tower_count", "chimney_count",
@@ -49,16 +50,53 @@ namespace PCGBike.Editor.Buildings
             return true;
         }
 
+        // 扩展点：生成字段与技术／作用域字段显式分开，不能按“数字类型”一律随机。
+        internal static bool IsDirectField(string name)
+        {
+            if (name is "balcony_floor_start" or "balcony_floor_end") return true;
+            if (name is "variation_seed" or "layout_seed" or "debug_metadata_enabled"
+                or "fire_escape_floor_start" or "fire_escape_floor_end") return true;
+            if (name == SequenceParameter || name.StartsWith("random_", StringComparison.Ordinal)) return true;
+            if (name.StartsWith("facade_override_target", StringComparison.Ordinal)
+                || name.StartsWith("facade_override_floor_start", StringComparison.Ordinal)
+                || name.StartsWith("facade_override_floor_end", StringComparison.Ordinal)) return true;
+            return name.StartsWith("attachment_override_floor_start", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_floor_end", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_front", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_secondary_front", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_side", StringComparison.Ordinal)
+                || name.StartsWith("attachment_override_rear", StringComparison.Ordinal);
+        }
+
+        private static bool IsRoofQuantityTransport(string name)
+            => name is "water_tower_count_mode" or "water_tower_count_min" or "water_tower_count_max"
+                or "chimney_count_mode" or "chimney_count_min" or "chimney_count_max";
+
         internal static bool CanSampleField(string name, Func<string, int> read)
-            => !ReferenceFields.Contains(name)
-                && (!(name == "roof_props_density" || name == "roof_props_max_count") || read("roof_props_layout_mode") == 0)
-                && (!(name == "fire_escape_density" || name == "fire_escape_max_count") || read("fire_escape_layout_mode") == 0);
+        {
+            if (name == LegacyBalconyDoorCount || IsDirectField(name) || IsRoofQuantityTransport(name)) return false;
+            if (name is "wall_lamp_enabled" or "balcony_enabled") return read("attachments_enabled") != 0;
+            if (name.StartsWith("wall_lamp_", StringComparison.Ordinal))
+                return read("attachments_enabled") != 0 && read("wall_lamp_enabled") != 0;
+            if (name.StartsWith("balcony_", StringComparison.Ordinal))
+                return read("attachments_enabled") != 0 && read("balcony_enabled") != 0 && read("floor_count") > 1;
+            if (name is "water_tower_count" or "chimney_count")
+                return read("attachments_enabled") != 0 && read("roof_enabled") != 0 && read("roof_props_layout_mode") == 1;
+            if (ReferenceFields.Contains(name) || name is "roof_props_density" or "roof_props_max_count"
+                or "fire_escape_density" or "fire_escape_max_count") return ReferenceFieldActive(name, read);
+            return StreetBuildingRandom.ForField(name) != StreetBuildingRandom.Group.Attachments
+                || name == "attachments_enabled" || read("attachments_enabled") != 0;
+        }
+
+        private static int ChoicePriority(Rule rule) => rule.name is "attachments_enabled" or "roof_enabled" ? 0
+            : rule.name is "roof_props_layout_mode" or "fire_escape_layout_mode" or "drainpipe_enabled"
+                or "wall_lamp_enabled" or "balcony_enabled" ? 1 : 2;
 
         [Serializable]
         internal sealed class Rule
         {
             public string name;
-            public string kind; // number, choice, quantity, faces
+            public string kind; // number, choice, quantity, faces, attachment_faces
             public float min, max;
             public int mask;
         }
@@ -162,6 +200,15 @@ namespace PCGBike.Editor.Buildings
             return subsets[RandomFor(sequence, name).Next(subsets.Count)];
         }
 
+        internal static int AttachmentFaceCandidates(string name, int mask)
+        {
+            // 消防梯和落水管只允许侧／背面；原始请求保留，禁止把正面静默替换成其它立面。
+            int supported = mask & 12;
+            if (supported == 0)
+                throw new InvalidOperationException(name + " 的立面候选与允许的侧面／背面没有交集；请修正候选。原请求已保留。");
+            return supported;
+        }
+
         private static int Int(HEU_HoudiniAsset asset, string name, int fallback = 0)
             => StreetBuildingInstanceParameters.Int(asset, name, fallback);
         private static float Float(HEU_HoudiniAsset asset, string name, float fallback = 0)
@@ -202,13 +249,37 @@ namespace PCGBike.Editor.Buildings
             Add(data, new Rule { name = key, kind = "quantity", min = min, max = max });
         }
 
+        private static void AddRoofQuantity(Data data, HEU_HoudiniAsset asset, string prefix)
+        {
+            string key = prefix + "_count";
+            if (!StreetBuildingInstanceParameters.Exists(asset, key)) return;
+            var existing = Find(data, key);
+            if (existing?.kind == "quantity") return;
+            // 旧附件 policy 从未生效。首次迁移以当前生效的原生固定值／范围为准，不复活隐藏旧请求。
+            data.rules.RemoveAll(r => r.name == key);
+            int mode = Int(asset, key + "_mode");
+            int low = mode == 1 ? Int(asset, key + "_min") : Int(asset, key);
+            int high = mode == 1 ? Int(asset, key + "_max") : low;
+            Add(data, new Rule { name = key, kind = "quantity", min = low, max = high });
+        }
+
+        private static void AddAttachmentFaces(Data data, HEU_HoudiniAsset asset, string name)
+        {
+            if (!StreetBuildingInstanceParameters.Exists(asset, name)) return;
+            if (Find(data, name)?.kind == "attachment_faces") return;
+            // 旧数字型 policy 未参与过生成，按当前原生立面集合迁移；不可把 mask 当整数范围抽样。
+            data.rules.RemoveAll(r => r.name == name);
+            Add(data, new Rule { name = name, kind = "attachment_faces", mask = Int(asset, name) });
+        }
+
         // Migration reads current instance fields only. No StyleConfig default can enter this path.
         internal static Data WithDefaults(HEU_HoudiniAsset asset)
         {
             var data = Load(asset);
             RemoveTechnicalRules(data);
             foreach (string name in new[] { "l_notch_width_cells", "l_notch_depth_cells", "floor_count",
-                     "awning_max_count", "sign_max_count", "fire_escape_max_count", "wall_ac_max_count", "roof_props_max_count" }) AddNumber(data, asset, name, false);
+                     "awning_max_count", "sign_max_count", "fire_escape_max_count", "wall_ac_max_count", "roof_props_max_count",
+                     "fire_escape_group_count", "drainpipe_count", "wall_lamp_count", "balcony_count" }) AddNumber(data, asset, name, false);
             foreach (string name in new[] { "building_width", "building_depth", "shopfront_ratio", "parapet_height", "attachment_global_density",
                      "awning_density", "sign_density", "fire_escape_density", "wall_ac_density", "roof_props_density" }) AddNumber(data, asset, name, true);
             AddChoice(data, asset, "massing_shape", new[] { 0, 1 });
@@ -220,11 +291,17 @@ namespace PCGBike.Editor.Buildings
             AddChoice(data, asset, "facade_rhythm", new[] { 0, 1, 3, 4 });
             AddChoice(data, asset, "corner_street_side", new[] { 0, 1, 2 });
             AddChoice(data, asset, "ground_attachment_placement", new[] { 0, 1 });
+            foreach (string name in new[] { "roof_props_layout_mode", "roof_prop_position_mode", "fire_escape_layout_mode",
+                     "fire_escape_roof_access", "drainpipe_enabled", "wall_lamp_enabled", "wall_lamp_layout", "balcony_enabled" }) AddChoice(data, asset, name, new[] { 0, 1 });
             foreach (string name in new[] { "residential_door_enabled", "roof_enabled", "parapet_enabled", "architectural_trim_enabled", "corner_building", "attachments_enabled" })
                 AddChoice(data, asset, name, new[] { 0, 1 });
             AddQuantity(data, asset, "entrance_count", "entrance_count_min", "entrance_count_max", Int(asset, "ground_quantity_mode"));
             AddQuantity(data, asset, "shopfront_count", "shopfront_count_min", "shopfront_count_max", Int(asset, "shopfront_quantity_mode"));
             AddQuantity(data, asset, "window_count", "window_count_min", "window_count_max", Int(asset, "facade_layout_mode"));
+            AddRoofQuantity(data, asset, "water_tower");
+            AddRoofQuantity(data, asset, "chimney");
+            AddAttachmentFaces(data, asset, "fire_escape_face_mask");
+            AddAttachmentFaces(data, asset, "drainpipe_face_mask");
             int faces = 0;
             for (int i = 0; i < 4; i++) if (Int(asset, "shopfront_face_" + i) != 0) faces |= 1 << i;
             Add(data, new Rule { name = FacesKey, kind = "faces", mask = faces == 0 ? 1 : faces });
@@ -241,6 +318,7 @@ namespace PCGBike.Editor.Buildings
             }
             for (int row = 1; row <= attachmentRows; row++)
             {
+                AddChoice(data, asset, "attachment_override_kind" + row, new[] { 0, 1, 2, 3, 4 });
                 AddNumber(data, asset, "attachment_override_density" + row, true);
                 AddNumber(data, asset, "attachment_override_max_count" + row, false);
             }
@@ -249,9 +327,8 @@ namespace PCGBike.Editor.Buildings
 
         private static void RemoveTechnicalRules(Data data)
         {
-            // Seeds and diagnostics read their direct instance controls. Retired range
-            // entries must never overwrite them; persist this cleanup only on Generate.
-            data.rules.RemoveAll(r => r.name == "variation_seed" || r.name == "layout_seed" || r.name == "debug_metadata_enabled");
+            // 重绘只清理内存视图；仅显式编辑／生成才保存，作用域和传输字段不能被遗留规则覆盖。
+            data.rules.RemoveAll(r => IsDirectField(r.name) || IsRoofQuantityTransport(r.name));
         }
 
         internal static void SampleInto(HEU_HoudiniAsset asset, Data data, int sequence)
@@ -262,7 +339,9 @@ namespace PCGBike.Editor.Buildings
                 SampleV2Into(asset, data, sequence);
                 return;
             }
-            foreach (var rule in data.rules)
+            // 开关／模式先选定，再逐项检查本次活性，避免模式切换当次沿用旧分支。
+            foreach (var rule in data.rules.OrderBy(r => r.kind == "choice" ? 0 : 1)
+                         .ThenBy(r => r.kind == "choice" ? ChoicePriority(r) : 0).ThenBy(r => r.name, StringComparer.Ordinal))
             {
                 if (!CanSampleField(rule.name, name => Int(asset, name))) continue;
                 if (rule.kind == "number")
@@ -300,6 +379,11 @@ namespace PCGBike.Editor.Buildings
                     int selected = PickSubset(rule.mask, sequence, rule.name);
                     for (int i = 0; i < 4; i++) StreetBuildingInstanceParameters.SetInt(asset, "shopfront_face_" + i, (selected >> i) & 1);
                 }
+                else if (rule.kind == "attachment_faces")
+                {
+                    int selected = PickSubset(AttachmentFaceCandidates(rule.name, rule.mask), sequence, rule.name);
+                    StreetBuildingInstanceParameters.SetInt(asset, rule.name, selected);
+                }
                 else if (rule.kind == "quantity")
                 {
                     WriteQuantity(asset, rule);
@@ -325,12 +409,14 @@ namespace PCGBike.Editor.Buildings
         private static void SampleV2Into(HEU_HoudiniAsset asset, Data data, int sequence)
         {
             var context = StreetBuildingRandom.Capture(asset);
-            var ordered = data.rules.Where(r => CanSampleField(r.name, name => Int(asset, name)))
+            // Keep legacy rows in the stored policy, without including them in validation or sampling.
+            var ordered = data.rules.Where(r => r.name != LegacyBalconyDoorCount)
                 .OrderBy(r => r.name, StringComparer.Ordinal).ToArray();
             if (ordered.Select(r => r.name).Distinct(StringComparer.Ordinal).Count() != ordered.Length)
                 throw new InvalidOperationException("随机配置存在重复字段，请先修复请求。");
-            foreach (var r in ordered.Where(r => r.kind == "choice"))
+            foreach (var r in ordered.Where(r => r.kind == "choice").OrderBy(ChoicePriority).ThenBy(r => r.name, StringComparer.Ordinal))
             {
+                if (!CanSampleField(r.name, name => Int(asset, name))) continue;
                 var values = Values(r.name);
                 if (values == null || !StreetBuildingInstanceParameters.Exists(asset, r.name)) continue;
                 StreetBuildingInstanceParameters.SetInt(asset, r.name, values[StreetBuildingRandom.Pick(context, r.name, r.mask, values.Length)]);
@@ -346,6 +432,7 @@ namespace PCGBike.Editor.Buildings
             }
             foreach (var r in ordered.Where(r => r.kind == "number"))
             {
+                if (!CanSampleField(r.name, name => Int(asset, name))) continue;
                 if (r.name == "building_width" || r.name == "building_depth" || !StreetBuildingInstanceParameters.Exists(asset, r.name)) continue;
                 bool notch = r.name == "l_notch_width_cells" || r.name == "l_notch_depth_cells";
                 if (notch && (Int(asset, "massing_shape") == 0 || Int(asset, "l_notch_units") != 1)) continue;
@@ -371,6 +458,7 @@ namespace PCGBike.Editor.Buildings
             }
             foreach (var r in ordered.Where(r => r.kind == "quantity"))
             {
+                if (!CanSampleField(r.name, name => Int(asset, name))) continue;
                 if (r.name == "entrance_count" && Int(asset, "ground_floor_use") != 2
                     || r.name == "shopfront_count" && (Int(asset, "ground_floor_use") != 2 || Int(asset, "shopfront_control") != 0)
                     || r.name == "window_count" && Int(asset, "floor_count") < 2) continue;
@@ -378,6 +466,16 @@ namespace PCGBike.Editor.Buildings
                 int minimum = r.name == "entrance_count" ? 1 : 0, maximum = r.name == "entrance_count" ? 4 : 64;
                 if (low < minimum || high > maximum || low > high) throw new InvalidOperationException("数量请求范围无效：" + r.name);
                 WriteQuantity(asset, r); // 各楼层／物理立面的实际抽样继续由 HDA 执行。
+            }
+            foreach (var r in ordered.Where(r => r.kind == "attachment_faces"))
+            {
+                if (!CanSampleField(r.name, name => Int(asset, name))) continue;
+                int mask = AttachmentFaceCandidates(r.name, r.mask);
+                var subsets = new List<int>();
+                for (int s = mask; s != 0; s = (s - 1) & mask) subsets.Add(s);
+                int selected = subsets[StreetBuildingRandom.Integer(0, subsets.Count - 1,
+                    context.Key(StreetBuildingRandom.Group.Attachments, r.name))];
+                StreetBuildingInstanceParameters.SetInt(asset, r.name, selected);
             }
             var faces = Find(data, FacesKey);
             if (faces != null && Int(asset, "ground_floor_use") == 2)
@@ -445,6 +543,8 @@ namespace PCGBike.Editor.Buildings
             if (rule.name == "entrance_count") { minName = "entrance_count_min"; maxName = "entrance_count_max"; modeName = "ground_quantity_mode"; }
             else if (rule.name == "shopfront_count") { minName = "shopfront_count_min"; maxName = "shopfront_count_max"; modeName = "shopfront_quantity_mode"; }
             else if (rule.name == "window_count") { minName = "window_count_min"; maxName = "window_count_max"; modeName = "facade_layout_mode"; }
+            else if (rule.name is "water_tower_count" or "chimney_count")
+            { minName = rule.name + "_min"; maxName = rule.name + "_max"; modeName = rule.name + "_mode"; }
             else if (rule.name.StartsWith("facade_override_shopfront_", StringComparison.Ordinal))
             { string row = rule.name.Substring("facade_override_shopfront_".Length); minName = "facade_override_shopfront_min" + row; maxName = "facade_override_shopfront_max" + row; modeName = "facade_override_layout_mode" + row; }
             else if (rule.name.StartsWith("facade_override_window_", StringComparison.Ordinal))
@@ -454,6 +554,8 @@ namespace PCGBike.Editor.Buildings
             StreetBuildingInstanceParameters.SetInt(asset, minName, lo);
             StreetBuildingInstanceParameters.SetInt(asset, maxName, hi);
             if (rule.name == "shopfront_count") StreetBuildingInstanceParameters.SetInt(asset, "shopfront_count", lo);
+            if (rule.name is "water_tower_count" or "chimney_count")
+                StreetBuildingInstanceParameters.SetInt(asset, rule.name, lo);
             if (!modeName.StartsWith("facade_override_", StringComparison.Ordinal))
                 StreetBuildingInstanceParameters.SetInt(asset, modeName, lo == hi ? 0 : 1);
         }
@@ -462,7 +564,11 @@ namespace PCGBike.Editor.Buildings
         {
             if (name == "massing_shape" || name == "shopfront_control" || name == "ground_attachment_placement"
                 || name == "residential_door_enabled" || name == "roof_enabled" || name == "parapet_enabled"
-                || name == "architectural_trim_enabled" || name == "corner_building" || name == "attachments_enabled") return new[] { 0, 1 };
+                || name == "architectural_trim_enabled" || name == "corner_building" || name == "attachments_enabled"
+                || name == "roof_props_layout_mode" || name == "roof_prop_position_mode" || name == "fire_escape_layout_mode"
+                || name == "fire_escape_roof_access" || name == "drainpipe_enabled"
+                || name == "wall_lamp_enabled" || name == "wall_lamp_layout" || name == "balcony_enabled") return new[] { 0, 1 };
+            if (name.StartsWith("attachment_override_kind", StringComparison.Ordinal)) return new[] { 0, 1, 2, 3, 4 };
             if (name == "ground_floor_use") return new[] { 1, 2 };
             if (name == "rear_facade_mode") return new[] { 0, 2 };
             if (name == "ground_rhythm" || name == "facade_rhythm") return new[] { 0, 1, 3, 4 };
