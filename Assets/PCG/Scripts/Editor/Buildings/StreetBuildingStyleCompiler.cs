@@ -91,6 +91,8 @@ namespace PCGBike.Editor.Buildings
                 StreetBuildingModuleRole.Cornice, StreetBuildingModuleRole.RoofSurface,
                 StreetBuildingModuleRole.Parapet,
             };
+            if (style.HalfBayParapetCorners)
+                ValidateHalfBayParapet(style, report);
             if (!requireComplete) return report;
             foreach (StreetBuildingModuleRole role in required)
                 if (!roleCounts.ContainsKey(role) && !HasUnifiedWallCoverage(style, role))
@@ -100,6 +102,36 @@ namespace PCGBike.Editor.Buildings
                 if (!roleCounts.ContainsKey(role))
                     report.Warning("Optional dedicated body corner role is missing; HDA will use semantic corner fallback: " + role);
             return report;
+        }
+
+        private static void ValidateHalfBayParapet(StreetBuildingStyleConfig style, StreetBuildingStyleValidationReport report)
+        {
+            var roles = new[] { StreetBuildingModuleRole.Parapet, StreetBuildingModuleRole.ParapetCorner,
+                StreetBuildingModuleRole.ParapetConcaveCorner };
+            var roofModules = style.EnumerateLayerModules()
+                .Where(entry => entry.Floor == StreetBuildingFloorMask.Roof && entry.Module is { Enabled: true })
+                .Select(entry => entry.Module).ToArray();
+            const float tolerance = .002f;
+            float halfBay = style.CellWidth * .5f;
+            foreach (var role in roles)
+            {
+                var candidates = roofModules.Where(module => module.ModuleRole == role).ToArray();
+                if (candidates.Length == 0) report.Error("Half-bay parapet requires a roof module: " + role);
+                foreach (var module in candidates)
+                {
+                    if (module.Prefab == null || !TryGetLocalBounds(module.Prefab, out var bounds))
+                        continue;
+                    float otherEnd = role switch
+                    {
+                        StreetBuildingModuleRole.ParapetCorner => -bounds.min.z,
+                        StreetBuildingModuleRole.ParapetConcaveCorner => bounds.max.z,
+                        _ => -bounds.min.x,
+                    };
+                    if (module.WidthSpan != 1 || Mathf.Abs(bounds.max.x - halfBay) > tolerance ||
+                        Mathf.Abs(otherEnd - halfBay) > tolerance)
+                        report.Error(module.Prefab.name + " does not reach both half-bay parapet joins.");
+                }
+            }
         }
 
         // Legacy role requirements are fulfilled by direction-compatible walls in both layers.
@@ -410,6 +442,7 @@ namespace PCGBike.Editor.Buildings
             }
             lines.AddRange(rows.OrderBy(value => value, StringComparer.Ordinal));
             lines.AddRange(metadata.Values);
+            if (style.HalfBayParapetCorners) lines.Add("R|1|half_bay_parapet");
             string payload = string.Join("\n", lines);
             using SHA256 sha = SHA256.Create();
             string digest = string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(payload))

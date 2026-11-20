@@ -282,6 +282,7 @@
     "StreetBuilding.V7.RectangleAndLShapeOnly",
     "StreetBuilding.V7.LShapeConcaveCorner",
     "StreetBuilding.V7.LShapeRoofAndParapetCoverage",
+    "StreetBuilding.Roof.HalfBayCornerContinuity",
     "StreetBuilding.V11.ExplicitStyleConfigPerHda",
     "StreetBuilding.V7.SingleSidedAssetPolicy",
     "StreetBuilding.V7.UnitySixBuildingShowcase",

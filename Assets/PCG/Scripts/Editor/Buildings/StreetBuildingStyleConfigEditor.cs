@@ -51,6 +51,9 @@ namespace PCGBike.Editor.Buildings
                 EditorGUI.indentLevel++;
                 if (property != "_roof")
                     EditorGUILayout.PropertyField(layer.FindPropertyRelative("_height"), new GUIContent("楼层高度 (m)"));
+                else
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty("_halfBayParapetCorners"),
+                        new GUIContent("女儿墙半格转角", "阴阳角两臂各长半格，直件在格线居中拼接。仅用于配套模块。"));
                 foreach (var field in new[] { ("_facade", "正面墙面 / 门窗"), ("_sideRear", "侧墙 / 背墙"),
                              ("_corners", "阴角 / 阳角"), ("_trim", "柱 / 腰线 / 檐口"),
                              ("_roofSurface", "屋面 / 女儿墙及转角"), ("_attachments", "配件") })

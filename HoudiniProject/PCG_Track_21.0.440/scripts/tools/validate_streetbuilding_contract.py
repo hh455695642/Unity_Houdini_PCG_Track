@@ -885,6 +885,125 @@ def assert_l_shape(asset: hou.Node) -> dict[str, Any]:
     return results
 
 
+def assert_half_bay_parapet(asset: hou.Node) -> dict[str, Any]:
+    """Verify compact parapets against the exposed edges of occupied roof cells."""
+    test = asset.parent().createNode(ASSET_TYPE, "VERIFY_HALF_BAY_PARAPET")
+    marker = "\nR|1|half_bay_parapet"
+    edge_directions = {(1, 0): 0, (0, 1): -90, (-1, 0): -180, (0, -1): 90}
+    width, depth, cell = 6, 5, 2
+    results = {}
+
+    def edge(doubled_x, doubled_z):
+        # Work on a half-cell lattice before converting from Unity to Houdini.
+        return (width * cell / 2 - doubled_x * cell / 2, -doubled_z * cell / 2)
+
+    def expected_outline(notch):
+        occupied = {(x, z) for x in range(width) for z in range(depth)}
+        if notch is not None:
+            notch_x = range(2) if notch in (0, 2) else range(width - 2, width)
+            notch_z = depth - 1 if notch in (0, 1) else 0
+            occupied.difference_update((x, notch_z) for x in notch_x)
+        incoming, outgoing = {}, {}
+        for x, z in occupied:
+            for neighbor, a, b in (
+                ((x, z - 1), (x, z), (x + 1, z)),
+                ((x + 1, z), (x + 1, z), (x + 1, z + 1)),
+                ((x, z + 1), (x + 1, z + 1), (x, z + 1)),
+                ((x - 1, z), (x, z + 1), (x, z)),
+            ):
+                if neighbor in occupied:
+                    continue
+                heading = (b[0] - a[0], b[1] - a[1])
+                outgoing[a], incoming[b] = heading, heading
+
+        corners, legacy, half_bay = {}, {}, {}
+        for a, heading in outgoing.items():
+            x, z = a
+            dx, dz = heading
+            px, pz = incoming[a]
+            yaw = edge_directions[heading]
+            if (px, pz) == heading:
+                half_bay[edge(2 * x, 2 * z)] = ("Parapet", yaw)
+                if outgoing[x + dx, z + dz] == heading:
+                    legacy[edge(2 * x + dx, 2 * z + dz)] = ("Parapet", yaw)
+            else:
+                role = "ParapetCorner" if px * dz - pz * dx > 0 else "ParapetConcaveCorner"
+                corners[edge(2 * x, 2 * z)] = (role, yaw)
+        return corners, legacy, half_bay, occupied
+
+    def role(point):
+        return point.stringAttribValue("module_role")
+
+    def verify_edges(output, expected, label):
+        found = set()
+        for point in output.points():
+            if not role(point).startswith("Parapet"):
+                continue
+            x, y, z = point.position()
+            key = (round(x, 4), round(z, 4))
+            require(key not in found and key in expected, f"{label} unexpected/duplicate edge {key}")
+            found.add(key)
+            expected_role, yaw = expected[key]
+            require(role(point) == expected_role and quaternion_matches(point.attribValue("orient"), yaw),
+                    f"{label} {key} expected {expected_role}, yaw {yaw}")
+            require(abs(y - 10) <= 1e-4 and tuple(point.attribValue("scale")) == (1, 1, 1),
+                    f"{label} {key} changed roof elevation or module scale")
+        require(found == expected.keys(), f"{label} missing edge points: {expected.keys() - found}")
+
+    def stable_records(output):
+        names = sorted(attribute.name() for attribute in output.pointAttribs())
+        return [tuple(point.attribValue(name) for name in names)
+                for point in output.points() if role(point) != "Parapet"]
+
+    def straight_selections(output):
+        return {(point.intAttribValue("face_index"), point.intAttribValue("cell_index")):
+                (point.intAttribValue("selection_seed"), point.stringAttribValue("module_variant"),
+                 point.stringAttribValue("unity_instance"), point.stringAttribValue("name"))
+                for point in output.points() if role(point) == "Parapet"}
+
+    try:
+        require(not test.isEditable(), "Half-bay fixture must exercise a fresh locked asset")
+        for notch, label in ((None, "rectangle"), (0, "rear_left"), (1, "rear_right"),
+                             (2, "front_left"), (3, "front_right")):
+            configure(test, STYLE_CATALOG, width=width * cell, depth=depth * cell, floors=3,
+                      shape=int(notch is not None), notch_width=4, notch_depth=2,
+                      notch_side=notch if notch is not None else 0, attachments=0)
+            test.parm("parapet_enabled").set(1)
+            corners, full_runs, half_runs, occupied = expected_outline(notch)
+            full = geometry(test)
+            verify_edges(full, corners | full_runs, f"{label} legacy")
+            full_sha = signature(full)
+            full_stable = stable_records(full)
+            full_selection = straight_selections(full)
+            test.parm("unity_style_catalog").set(STYLE_CATALOG + marker)
+            half = geometry(test)
+            verify_edges(half, corners | half_runs, f"{label} half-bay")
+            require(stable_records(half) == full_stable, f"{label} opt-in changed non-straight output")
+            half_selection = straight_selections(half)
+            require(all(half_selection.get(key) == value for key, value in full_selection.items()),
+                    f"{label} opt-in changed an existing straight selection")
+            require(sum(role(point) == "RoofSurface" for point in half.points()) == len(occupied),
+                    f"{label} opt-in changed roof footprint tile count")
+            half_sha = signature(half)
+            require(signature(geometry(test)) == half_sha, f"{label} opt-in did not replay")
+
+            test.parm("roof_enabled").set(0)
+            roof_off = geometry(test)
+            require(not any(role(point) == "RoofSurface" for point in roof_off.points()),
+                    f"{label} roof surface survived roof disable")
+            verify_edges(roof_off, corners | half_runs, f"{label} independent parapet")
+            test.parm("parapet_enabled").set(0)
+            verify_edges(geometry(test), {}, f"{label} parapet disabled")
+            test.setParms(dict(roof_enabled=1, parapet_enabled=1, unity_style_catalog=STYLE_CATALOG))
+            require(signature(geometry(test)) == full_sha, f"{label} removing opt-in changed legacy output")
+            results[label] = {"corners": len(corners), "legacy_straights": len(full_runs),
+                              "half_bay_straights": len(half_runs), "roof_cells": len(occupied),
+                              "legacy_sha256": full_sha, "half_bay_sha256": half_sha}
+        return results
+    finally:
+        test.destroy()
+
+
 def semantic_counts(value: hou.Geometry, target: int, floor_one_based: int) -> dict[str, int]:
     result: dict[str, int] = {}
     for point in value.points():
@@ -2230,7 +2349,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
                      "StreetBuilding.Roof.SeededDeterminism", "StreetBuilding.Roof.IndependentRandomDomains",
                      "StreetBuilding.Roof.CapacityRetainsRequest", "StreetBuilding.Roof.SourceBoundsAndReservations",
                      "StreetBuilding.Roof.InstanceDefaults", "StreetBuilding.Roof.GroupNamespace",
-                     "StreetBuilding.Roof.V2AttachmentRedraw"})
+                     "StreetBuilding.Roof.V2AttachmentRedraw", "StreetBuilding.Roof.HalfBayCornerContinuity"})
     require(expected.issubset(contract["contract_ids"]), "Cumulative behavior IDs are missing")
     hou.hipFile.clear(suppress_save_prompt=True)
     hou.hipFile.load(str(hip), suppress_save_prompt=True, ignore_load_warnings=False)
@@ -2239,6 +2358,7 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
     require(not fresh.isEditable(), "Fresh validation instance must remain locked")
     assert_interface(fresh, contract)
     assert_network(fresh, contract)
+    half_bay_parapet = assert_half_bay_parapet(fresh)
     from validate_streetbuilding_random import validate_random
     random_v2 = validate_random(fresh)
     from validate_streetbuilding_core_cleanup import validate_core_cleanup
@@ -2297,7 +2417,8 @@ def validate(hda: Path, hip: Path, contract_path: Path) -> dict[str, Any]:
             "unified_ground": assert_unified_ground(fresh),
             "upper_wall_fallback": assert_upper_wall_fallback(fresh),
             "upper_windows": assert_upper_windows(fresh), "window_module_counts": window_counts,
-            "roof_trim": assert_roof_trim(fresh), "single_ground_trim": single_ground_trim,
+            "roof_trim": assert_roof_trim(fresh), "half_bay_parapet": half_bay_parapet,
+            "single_ground_trim": single_ground_trim,
             "roof_lower_trim": roof_lower_trim,
             "ground_attachment_hosts": ground_attachment_hosts,
             "ac_solid_walls": assert_ac_solid_walls(fresh), "ac_notches": ac_notches, "arrangement": arrangement,

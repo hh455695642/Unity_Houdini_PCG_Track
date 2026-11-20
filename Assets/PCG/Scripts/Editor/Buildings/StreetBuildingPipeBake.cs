@@ -15,6 +15,8 @@ namespace PCGBike.Editor.Buildings
     public static class StreetBuildingPipeBake
     {
         static readonly Regex PartName = new Regex(@"SB_REF_(B\d+_DrainPipe_\d+_[A-Za-z_]+)_F\d+_P\d+", RegexOptions.CultureInvariant);
+        static readonly Regex StyleBakePath = new Regex(
+            @"^Assets/PCG/Art/Building_Test/Style[1-9][0-9]*/Baked(?:/|$)", RegexOptions.CultureInvariant);
 
         internal static void Attach(HEU_HoudiniAsset asset)
         {
@@ -85,7 +87,8 @@ namespace PCGBike.Editor.Buildings
                     .Select(filter => AssetDatabase.GetAssetPath(filter.sharedMesh))
                     .Where(path => (path.StartsWith("Assets/PCG/Generated/", StringComparison.Ordinal)
                         || path.StartsWith("Assets/__PCGValidation/", StringComparison.Ordinal)
-                        || path.StartsWith("Assets/HoudiniEngineAssetCache/Baked/", StringComparison.Ordinal))
+                        || path.StartsWith("Assets/HoudiniEngineAssetCache/Baked/", StringComparison.Ordinal)
+                        || StyleBakePath.IsMatch(path))
                         && path.EndsWith("_meshes.asset", StringComparison.Ordinal)
                         && Path.GetDirectoryName(path).Replace('\\', '/').EndsWith("/Meshes", StringComparison.Ordinal))
                     .Select(path => Path.GetDirectoryName(Path.GetDirectoryName(path)).Replace('\\', '/'))
@@ -125,7 +128,8 @@ namespace PCGBike.Editor.Buildings
             if (root == null) throw new ArgumentNullException(nameof(root));
             destination = destination.Replace('\\', '/').TrimEnd('/');
             if (!destination.StartsWith("Assets/", StringComparison.Ordinal)
-                || destination.Contains("/../") || destination.Contains("/Art/"))
+                || destination.Contains("/../") || destination.EndsWith("/..", StringComparison.Ordinal)
+                || (destination.Contains("/Art/") && !StyleBakePath.IsMatch(destination)))
                 throw new ArgumentException("Pipe Bake requires a generated output directory", nameof(destination));
             var groups = root.GetComponentsInChildren<MeshFilter>(true)
                 .Where(filter => filter.sharedMesh != null && filter.GetComponent<MeshRenderer>() != null)

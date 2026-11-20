@@ -53,6 +53,7 @@ namespace PCGBike.Buildings
     public sealed class StreetBuildingStyleConfig : ScriptableObject
     {
         [SerializeField, Min(.01f)] private float _cellWidth = 2f;
+        [SerializeField] private bool _halfBayParapetCorners;
         [SerializeField, HideInInspector] private float _groundFloorHeight = 4f;
         [SerializeField, HideInInspector] private float _typicalFloorHeight = 3f;
         [SerializeField, HideInInspector] private int _layerSchema;
@@ -69,6 +70,7 @@ namespace PCGBike.Buildings
         [SerializeField, HideInInspector] private List<StreetBuildingModuleDefinition> _attachments = new();
 
         public float CellWidth => _cellWidth;
+        public bool HalfBayParapetCorners => _halfBayParapetCorners;
         public float GroundFloorHeight => _layerSchema == 0 ? _groundFloorHeight : _ground.Height;
         public float TypicalFloorHeight => _layerSchema == 0 ? _typicalFloorHeight : _upper.Height;
         public StreetBuildingLayerConfig Ground => _ground;
@@ -113,6 +115,8 @@ namespace PCGBike.Buildings
         }
 
 #if UNITY_EDITOR
+        public void SetHalfBayParapetCorners(bool enabled) => _halfBayParapetCorners = enabled;
+
         // 首层旧分组仅用于兼容读取；迁移保留方向、权重和原始序列化值。
         public bool MigrateGroundWalls() => _ground.MigrateWalls(StreetBuildingModuleRole.GroundWall);
         public bool MigrateUpperWalls() => _upper.MigrateWalls(StreetBuildingModuleRole.MiddleBlank);
