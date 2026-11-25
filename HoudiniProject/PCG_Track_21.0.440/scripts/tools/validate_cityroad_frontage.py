@@ -154,6 +154,23 @@ def validate(asset):
         road.parm('stash').set(degenerate);build.cook(force=True)
         assert len(clean.geometry().prims())==2,'Thin triangle pollutes boundary incidence'
         assert before==[tuple(p.position()) for p in build.geometry().points()],'Thin triangle removed a frontage side'
+        # A long, valid sliver borders a slightly turning street. Its centroid is
+        # inside the original edge but lies outside the final merged chord.
+        bent = hou.Geometry()
+        corners = []
+        for x,z in [(0,-8),(100,-8),(20,-7.999),(115,-7.88),(0,8),(100,8),(115,8)]:
+            point = bent.createPoint()
+            point.setPosition((x,0,z))
+            corners.append(point)
+        for indices in [(0,1,2),(0,2,4),(2,1,5),(2,5,4),(1,3,6),(1,6,5)]:
+            face = bent.createPolygon()
+            for index in indices:
+                face.addVertex(corners[index])
+        road.parm('stash').set(bent)
+        build.cook(force=True)
+        exposed = [p.position()[0] for p in build.geometry().points()
+                   if p.position()[2] < -8 and p.attribValue('N')[2] > .99]
+        assert len(exposed) >= 7 and max(exposed)-min(exposed) > 70, 'Merged street edge lost its outward side'
         # Short tessellation pieces must still generate complete rows after collinear merging.
         strips=hou.Geometry();rows=[]
         for x in range(0,121,3):

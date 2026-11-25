@@ -40,20 +40,25 @@ for(int i=1;i<=chi("variants");i++){
     if(strlen(path)>0)append(prefabs,path);
 }
 if(len(prefabs)==0){setdetailattrib(0,"building_count",0);return;}
-vector ea[],eb[],inside[];
+vector ea[],eb[],outward[],witnesses[];
 for(int pr=0;pr<nprimitives(1);pr++) {
     int h=primhedge(1,pr), first=h;
     if(h<0)continue;
     do {
         if(hedge_equivcount(1,h)==1) {
             vector a=point(1,"P",hedge_srcpoint(1,h)),b=point(1,"P",hedge_dstpoint(1,h));
-            vector witness=0;int pp[]=primpoints(1,pr);foreach(int p;pp)witness+=point(1,"P",p);witness/=max(1,len(pp));
-            if(distance(a,b)>0.02){append(ea,a);append(eb,b);append(inside,witness);}
+            if(distance(a,b)>0.02){
+                vector edge=b-a, side=normalize(set(-edge.z,0,edge.x));
+                vector third=point(1,"P",hedge_dstpoint(1,hedge_next(1,h)));
+                if(dot(side,third-a)>0)side=-side;
+                append(ea,a);append(eb,b);append(outward,side);
+                append(witnesses,(a+b+third)/3.0);
+            }
         }
         h=hedge_next(1,h);
     }while(h!=first&&h>=0);
 }
-// Merge collinear tessellation pieces. Keep the source triangle's interior witness.
+// Carry the original exterior direction through endpoint reversals and small bends.
 int again=1;
 while(again){again=0;for(int i=0;i<len(ea)&&!again;i++)for(int j=i+1;j<len(ea);j++){
     vector p,q,r;int join=1;
@@ -61,7 +66,7 @@ while(again){again=0;for(int i=0;i<len(ea)&&!again;i++)for(int j=i+1;j<len(ea);j
     else if(distance(eb[i],eb[j])<.01){p=ea[i];q=eb[i];r=ea[j];}
     else if(distance(ea[i],ea[j])<.01){p=eb[i];q=ea[i];r=eb[j];}
     else if(distance(ea[i],eb[j])<.01){p=eb[i];q=ea[i];r=ea[j];}else join=0;
-    if(join&&dot(normalize(q-p),normalize(r-q))>.9995){ea[i]=p;eb[i]=r;removeindex(ea,j);removeindex(eb,j);removeindex(inside,j);again=1;break;}
+    if(join&&dot(normalize(q-p),normalize(r-q))>.9995){ea[i]=p;eb[i]=r;removeindex(ea,j);removeindex(eb,j);removeindex(outward,j);removeindex(witnesses,j);again=1;break;}
 }}
 // True terminals only. Coincident endpoints of adjacent graph primitives cancel.
 vector ep[],ed[];int ec[];
@@ -86,9 +91,19 @@ float within_group_jitter=max(0,chf("within_group_jitter"));
 int layout_seed=chi("seed")+chi("layout_seed_offset");
 vector centers[],xs[],zs[];float ws[],ds[];
 int skipped=0,empty_by_rule=0,requested_slots=0;
-for(int e=0;e<len(ea);e++){
+// Reserve established runs first. A recovered run may fill free space at a
+// junction only after its neighbors have claimed their original footprints.
+int established[], recovered[];
+for(int i=0;i<len(ea);i++){
+    vector t=normalize(eb[i]-ea[i]), side=set(-t.z,0,t.x);
+    vector previous=dot(side,witnesses[i]-(ea[i]+eb[i])*.5)>0 ? -side : side;
+    if(dot(previous,outward[i])<0)append(recovered,i);else append(established,i);
+}
+int runs[]=established;
+foreach(int i;recovered)append(runs,i);
+foreach(int e;runs){
     vector a=ea[e],b=eb[e],t=normalize(b-a),out=set(-t.z,0,t.x);float len=distance(a,b);
-    if(dot(out,inside[e]-(a+b)*.5)>0)out=-out;
+    if(dot(out,outward[e])<0)out=-out;
     // 4m trials fill short segments; the reservation enforces the final spacing.
     for(float s=min(2.0,len*.5);s<len;s+=4){
         if(s<margin || len-s<margin)continue;
