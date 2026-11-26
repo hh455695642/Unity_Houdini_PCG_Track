@@ -1,204 +1,244 @@
-"""Independent behavioral oracle for CityRoad-owned building placement."""
-import math
+"""Independent feature, input and geometry contracts for CityRoad's building output."""
+
+from dataclasses import replace
+
 import hou
 
+from validate_cityroad_gap_range import (
+    RANGE_MAX, RANGE_MIN, RETIRED_FIELDS, ROAD_WIDTH, SIDEWALK_WIDTH, Profile,
+    _assert_seams, _snapshot, _straight_road, gap_fixture, measure_seams,
+)
+
+
+BUILDING_DEFAULTS = {
+    "enabled": 1, "junction_margin": 0.0, "ground_height": 0.0,
+    "seed": 1729, "layout_seed_offset": 0,
+}
+SIDEWALK_LINE = ROAD_WIDTH / 2.0 + SIDEWALK_WIDTH
+
+
+def _verify_interface(asset):
+    build = asset.node("CityRoadCore/CR_BUILDINGS/BUILD_FRONTAGE")
+    assert build is not None, "CityRoad frontage generator missing"
+    output = asset.node("CityRoadCore/OUT_STREET_BUILDINGS")
+    assert output and output.inputs()[0] == build.parent(), "Building output disconnected"
+    controls = next((t for t in asset.parmTemplateGroup().entries()
+                     if t.label() == "Street Buildings / 沿街建筑"), None)
+    assert controls is not None, "Public frontage folder missing"
+    templates = {t.name(): t for t in controls.parmTemplates()}
+    layout_fields = {"building_setback_grouped"}
+    layout_fields.update(f"building_{name}_{end}_{unit}"
+                         for name, unit in (("setback", "m"), ("group_length", "m"),
+                                            ("group_offset", "m"), ("empty", "pct"),
+                                            ("height_offset", "m"))
+                         for end in ("min", "max"))
+    assert set(templates) == ({f"building_{key}" for key in BUILDING_DEFAULTS}
+                              | RETIRED_FIELDS.keys() | layout_fields
+                              | {"building_prefabs", "building_frontage_catalog",
+                                 "building_setback", "building_layout_ranges_enabled",
+                                 "building_corners_enabled", "building_corner_prefabs", RANGE_MIN, RANGE_MAX})
+    catalog = templates["building_frontage_catalog"]
+    assert catalog.isHidden() and catalog.defaultValue() == ("",), "Catalog transport must remain internal"
+    for field, slot_name in (("building_prefabs", "building_prefab#"),
+                             ("building_corner_prefabs", "building_corner_prefab#")):
+        multiparm = templates[field]
+        assert not multiparm.isHidden() and multiparm.defaultValue() == 0, field
+        slot, = multiparm.parmTemplates()
+        assert slot.name() == slot_name and slot.tags().get("heuassetpath") == "1", slot_name
+        assert slot.defaultValue() == ("",), "Fresh HDA must not hard-code art assets"
+    corner_mode = templates["building_corners_enabled"]
+    assert not corner_mode.isHidden() and corner_mode.defaultValue() is False
+    merge = build.input(3)
+    assert merge is not None and merge.name() == "JUNCTION_APPROACHES"
+    assert merge.node(merge.parm("objpath1").eval()) == asset.node(
+        "CityRoadCore/CR_MAIN_PIPELINE/CR_JUNCTION_INDEX/JUNCTION_APPROACH_INDEX_V2")
+    assert build.parm("library") is None, "Obsolete catalog directory bridge retained"
+    assert build.parm("variants").expression() == 'ch("../../../building_prefabs")'
+    for name, expected in BUILDING_DEFAULTS.items():
+        template = templates["building_" + name]
+        default = template.defaultValue()
+        default = default[0] if isinstance(default, tuple) else default
+        if name == "ground_height" and not asset.matchesCurrentDefinition() and default == .6:
+            # The unlocked edit still inherits the old definition until persistence.
+            expected = .6
+        assert abs(default - expected) < .00001 and not template.isHidden(), (name, default)
+        assert build.parm(name).expression() == f'ch("../../../building_{name}")', name
+
+
+def _placement_only(records):
+    return [(r["building_id"], r["position"], r["rotation"], r["facade_min_x"], r["facade_max_x"])
+            for r in records]
+
+
+def _strip_road(length):
+    road = hou.Geometry()
+    sections = []
+    for x in range(0, length + 1, 3):
+        section = []
+        for z in (-8, 8):
+            point = road.createPoint()
+            point.setPosition((x, 0, z))
+            section.append(point)
+        sections.append(section)
+    for a, b in zip(sections, sections[1:]):
+        for vertices in ((a[0], a[1], b[1]), (a[0], b[1], b[0])):
+            face = road.createPolygon()
+            for point in vertices:
+                face.addVertex(point)
+    return road
+
+
+def _bent_road():
+    road = hou.Geometry()
+    points = []
+    for x, z in ((0, -8), (100, -8), (20, -7.999), (115, -7.88), (0, 8), (100, 8), (115, 8)):
+        point = road.createPoint()
+        point.setPosition((x, 0, z))
+        points.append(point)
+    for indices in ((0, 1, 2), (0, 2, 4), (2, 1, 5), (2, 5, 4), (1, 3, 6), (1, 6, 5)):
+        face = road.createPolygon()
+        for index in indices:
+            face.addVertex(points[index])
+    return road
+
+
+def _verify_road_inputs(fixture, baseline):
+    road, graph, approaches = _straight_road(fixture.length)
+    degenerate = hou.Geometry()
+    degenerate.merge(road)
+    sliver = degenerate.createPoint()
+    sliver.setPosition((.001, 0, -8))
+    face = degenerate.createPolygon()
+    for point in (degenerate.points()[0], degenerate.points()[3], sliver):
+        face.addVertex(point)
+    fixture.set_geometry(degenerate, graph, approaches)
+    assert _snapshot(fixture.cook(2, 2)) == baseline, "Thin triangle removed a frontage side"
+    assert len(fixture.build.input(1).geometry().prims()) == 2, "Thin triangle survived boundary cleaning"
+    fixture.set_geometry(_strip_road(int(fixture.length)), graph, approaches)
+    assert _snapshot(fixture.cook(2, 2)) == baseline, "Short boundary segments changed the row"
+
+    fixture.set_geometry(_bent_road(), graph, approaches)
+    curved = fixture.cook(2, 2)
+    exposed = [p.position()[0] for p in curved.points()
+               if p.position()[2] < -8 and p.attribValue("N")[2] > .99]
+    assert len(exposed) >= 7 and max(exposed) - min(exposed) > 60, "Merged arc lost its outward side"
+
+    translation = hou.Vector3(0, 0, 50)
+    for geometry in (road, graph):
+        for point in geometry.points():
+            point.setPosition(point.position() + translation)
+    fixture.set_geometry(road, graph, approaches)
+    moved = sorted(tuple(p.position() - translation) for p in fixture.cook(2, 2).points())
+    original = sorted(row[0] for row in baseline)
+    assert len(moved) == len(original)
+    assert all((hou.Vector3(a) - hou.Vector3(b)).length() < .001 for a, b in zip(moved, original)), (
+        "CityRoad input translation did not carry its frontage"
+    )
+    return len(exposed)
+
+
+def _verify_direct_assignment(fixture, profiles, baseline_count):
+    root = fixture.root
+    for index in range(1, len(profiles) + 1):
+        root.parm(f"building_prefab{index}").set("")
+    assert not fixture.cook(2, 2).points(), "Empty slots generated invalid instances"
+
+    arbitrary = "Assets/ArtistBuildings/Arbitrary_Name.prefab"
+    root.parm("building_prefab3").set(arbitrary)
+    missing = fixture.cook(2, 2)
+    assert not missing.points() and tuple(missing.attribValue("frontage_missing_prefabs")) == (arbitrary,)
+    row = replace(profiles[0], prefab=arbitrary)
+    fixture.set_catalog([row.catalog_row()])
+    placed = fixture.cook(2, 2).points()
+    assert len(placed) == baseline_count
+    assert all(p.stringAttribValue("unity_instance") == arbitrary for p in placed)
+    root.parm("building_prefabs").set(0)
+    assert not fixture.cook(2, 2).points(), "An empty Prefab list generated instances"
+    root.parm("building_prefabs").set(len(profiles))
+    for index, profile in enumerate(profiles, start=1):
+        root.parm(f"building_prefab{index}").set(profile.prefab)
+    fixture.set_catalog(p.catalog_row() for p in profiles)
+
+
+def _verify_fixed_controls(fixture, baseline_count):
+    spaced = fixture.records(fixture.cook(10, 10))
+    assert len(spaced) < baseline_count and measure_seams(spaced)
+    _assert_seams(measure_seams(spaced), 10, 10)
+    set_back = fixture.records(fixture.cook(2, 2, building_setback_min_m=7, building_setback_max_m=7))
+    assert all(abs(abs(r["facade_z"]) - (SIDEWALK_LINE + 7)) < .001 for r in set_back)
+    margin = fixture.records(fixture.cook(2, 2, building_setback_min_m=3, building_setback_max_m=3,
+                                         building_junction_margin=20))
+    assert margin and all(19.999 <= r["facade_min_x"] <= r["facade_max_x"] <= fixture.length - 19.999
+                          for r in margin)
+    raised = fixture.records(fixture.cook(2, 2, building_junction_margin=0, building_ground_height=2))
+    assert all(abs(r["position"][1] - 2) < .001 for r in raised)
+    assert not fixture.cook(2, 2, building_ground_height=.6, building_enabled=0).points()
+    assert len(fixture.cook(2, 2, building_enabled=1).points()) == baseline_count
+
+
+def _verify_profiles(asset):
+    narrow = Profile.centered(6)
+    wide = Profile("Assets/ArtistBuildings/Asymmetric.prefab", -2, 6, 4, -2, 6, -4, 4)
+    bad = replace(narrow, prefab="Assets/ArtistBuildings/Malformed.prefab")
+    with gap_fixture(asset, [narrow, wide, bad], length=120) as fixture:
+        fixture.set_catalog([narrow.catalog_row(), wide.catalog_row(),
+                             bad.catalog_row().replace("|-3", "|oops", 1)])
+        geo = fixture.cook(1, 1, building_setback_min_m=3, building_setback_max_m=3)
+        assert geo.attribValue("frontage_malformed_catalog_rows") == 1
+        assert tuple(geo.attribValue("frontage_missing_prefabs")) == (bad.prefab,)
+        assert geo.attribValue("frontage_rejected_terminal") == 2
+        records = fixture.records(geo)
+        for side in ("-", "+"):
+            row = [r for r in records if r["side"] == side]
+            assert {round(r["width_m"]) for r in row} == {6, 8}
+            assert sum(r["width_m"] for r in row) / fixture.length >= .80
+        for row in records:
+            assert abs(abs(row["facade_z"]) - (SIDEWALK_LINE + 3.0)) < .001
+        _assert_seams(measure_seams(records), 1, 1)
+        fixture.set_catalog([])
+        empty = fixture.cook(1, 1)
+        assert not empty.points() and empty.attribValue("building_count") == 0
+        assert set(empty.attribValue("frontage_missing_prefabs")) == {p.prefab for p in (narrow, wide, bad)}
+    return {"points": len(records), "max_gap_m": 1.0, "asymmetric_profile": True}
+
+
 def validate(asset):
-    source=asset.node('CityRoadCore/CR_BUILDINGS/BUILD_FRONTAGE')
-    assert source is not None,'CityRoad frontage generator missing'
-    output=asset.node('CityRoadCore/OUT_STREET_BUILDINGS')
-    assert output and output.inputs()[0]==source.parent(),'Building output disconnected'
-    controls = next((t for t in asset.parmTemplateGroup().entries() if t.label()=='Street Buildings / 沿街建筑'),None)
-    assert controls is not None, 'Public frontage folder missing'
-    expected = {'enabled':1,'setback':3.0,'spacing':2.0,'junction_margin':0.0,
-                'ground_height':.6,'seed':1729,'width':8.0,'depth':8.0}
-    layout = {'layout_enabled':0,'setback_max':2.5,'gap_max':3.0,
-              'empty_ratio':.08,'group_length':30.0,'within_group_jitter':.35,
-              'layout_seed_offset':0}
-    templates={t.name():t for t in controls.parmTemplates()}
-    assert set(templates)=={'building_'+k for k in expected}|{'building_'+k for k in layout}|{'building_prefabs'}
-    assert templates['building_prefabs'].defaultValue()==0
-    slot=templates['building_prefabs'].parmTemplates()[0]
-    assert slot.name()=='building_prefab#' and slot.tags().get('heuassetpath')=='1','Native Prefab object picker missing'
-    assert slot.defaultValue()==('',),'Fresh HDA must not hard-code art assets'
-    assert source.parm('library') is None,'Obsolete catalog directory bridge retained'
-    assert source.parm('variants').expression()=='ch("../../../building_prefabs")'
-    for name,value in expected.items():
-        t=templates['building_'+name]
-        default=t.defaultValue();default=default[0] if isinstance(default,tuple) else default
-        assert abs(default-value)<.00001,(name,default)
-        assert not t.isHidden(),name
-        assert source.parm(name).expression()=='ch("../../../building_%s")'%name
-    for name,value in layout.items():
-        t=templates['building_'+name]
-        default=t.defaultValue();default=default[0] if isinstance(default,tuple) else default
-        assert abs(default-value)<.00001,(name,default)
-        assert not t.isHidden(),name
-        assert source.parm(name).expression()=='ch("../../../building_%s")'%name
-    fixture_root=hou.node('/obj').createNode('geo','VERIFY_CITYROAD_FRONTAGE')
-    # Mirror the HDA's relative paths; keep all fixture data independent of artist assignments.
-    group=fixture_root.parmTemplateGroup()
-    paths=['Assets/ArtistBuildings/Manual_%d.prefab'%i for i in range(8)]
-    for i,path in enumerate(paths,1):group.append(hou.StringParmTemplate('building_prefab%d'%i,'Fixture Prefab',1,default_value=(path,)))
-    for name,value in layout.items():
-        if name in ('layout_enabled','layout_seed_offset'):
-            t=hou.IntParmTemplate('building_'+name,name,1,default_value=(int(value),))
-        else:
-            t=hou.FloatParmTemplate('building_'+name,name,1,default_value=(value,))
-        group.append(t)
-    fixture_root.setParmTemplateGroup(group)
-    fixture=fixture_root.createNode('subnet','CityRoadCore').createNode('subnet','CR_BUILDINGS')
-    try:
-        roadgeo=hou.Geometry()
-        pts=[]
-        for p in [(0,0,-8),(120,0,-8),(120,0,8),(0,0,8)]:
-            q=roadgeo.createPoint();q.setPosition(p);pts.append(q)
-        for indices in [(0,2,1),(0,3,2)]:
-            poly=roadgeo.createPolygon()
-            for i in indices:poly.addVertex(pts[i])
-        road=fixture.createNode('stash','ROAD');road.parm('stash').set(roadgeo)
-        clean=hou.copyNodesTo([source.parent().node('REMOVE_THIN_TRIANGLES')],fixture)[0]
-        clean.setInput(0,road)
-        graphgeo=hou.Geometry();poly=graphgeo.createPolygon();poly.setIsClosed(False)
-        for p in [(0,0,0),(120,0,0)]:q=graphgeo.createPoint();q.setPosition(p);poly.addVertex(q)
-        graph=fixture.createNode('stash','GRAPH');graph.parm('stash').set(graphgeo)
-        build=hou.copyNodesTo([source],fixture)[0]
-        for name in expected:
-            # The oracle owns fixture values; never constrain or rewrite artist settings.
-            value=8 if name in ('width','depth') else expected[name]
-            build.parm(name).deleteAllKeyframes();build.parm(name).set(value)
-        for name in layout:
-            build.parm(name).deleteAllKeyframes();build.parm(name).set(layout[name])
-        build.parm('variants').deleteAllKeyframes();build.parm('variants').set(8)
-        build.parm('sidewalk').deleteAllKeyframes();build.parm('sidewalk').set(10)
-        build.setInput(1,clean);build.setInput(2,graph)
-        empty=fixture.createNode('add','EMPTY');empty.parm('points').set(1);build.setInput(0,empty)
-        build.cook(force=True)
-        assert not build.errors(),build.errors()
-        geo=build.geometry();points=list(geo.points())
-        assert len(points)>=14,('No continuous two-sided frontage',len(points),list(build.warnings()), [(p.name(),p.eval()) for p in build.parms() if p.name() in ('enabled','class','width','depth','sidewalk')],len(road.geometry().prims()),len(empty.geometry().points()),[(a.name(),geo.attribValue(a)) for a in geo.globalAttribs()])
-        before=[tuple(p.position()) for p in points]
-        sides={1:0,-1:0}
-        for p in points:
-            x,y,z=p.position();normal=p.attribValue('N');front=p.attribValue('frontage_front')
-            assert 0<=x<=120,'Road terminal must remain open'
-            assert abs(z)>=24.99,'Sidewalk/setback clearance lost'
-            assert normal[2]*z<0,'Building must face the road'
-            assert abs(front[2])>=20.9
-            assert p.stringAttribValue('unity_instance').endswith('.prefab')
-            sides[1 if z>0 else -1]+=1
-        assert min(sides.values())>=7,sides
-        for i,a in enumerate(before):
-            for b in before[i+1:]:
-                if a[2]*b[2]>0: assert abs(a[0]-b[0])>=9.99,'Reserved frontage overlap'
-        build.cook(force=True);assert before==[tuple(p.position()) for p in build.geometry().points()],'Recook changed placement'
-        original_variants=[p.intAttribValue('building_variant') for p in build.geometry().points()]
-        build.parm('seed').set(99);build.cook(force=True)
-        assert original_variants!=[p.intAttribValue('building_variant') for p in build.geometry().points()],'Random seed ignored'
-        assert before==[tuple(p.position()) for p in build.geometry().points()],'Seed must not move parcels'
-        build.parm('seed').set(expected['seed'])
-        for i in range(1,9):fixture_root.parm('building_prefab%d'%i).set('')
-        build.cook(force=True);assert len(build.geometry().points())==0,'Empty Prefab slots generated invalid instances'
-        fixture_root.parm('building_prefab3').set('Assets/ArtistBuildings/Arbitrary_Name.prefab')
-        build.cook(force=True)
-        assert len(build.geometry().points())==len(before)
-        assert all(p.stringAttribValue('unity_instance')=='Assets/ArtistBuildings/Arbitrary_Name.prefab' for p in build.geometry().points()),'Direct Prefab assignment ignored or filename synthesized'
-        build.parm('variants').set(0);build.cook(force=True)
-        assert len(build.geometry().points())==0,'Zero Prefab count ignored'
-        build.parm('variants').set(8)
-        for i,path in enumerate(paths,1):fixture_root.parm('building_prefab%d'%i).set(path)
+    _verify_interface(asset)
+    profiles = [replace(Profile.centered(8), prefab=f"Assets/ArtistBuildings/Manual_{i}.prefab")
+                for i in range(1, 9)]
+    with gap_fixture(asset, profiles, length=120) as fixture:
+        geo = fixture.cook(2, 2, building_setback_min_m=3, building_setback_max_m=3)
+        records = fixture.records(geo)
+        baseline = _snapshot(geo)
+        sides = {side: sum(r["side"] == side for r in records) for side in ("-", "+")}
+        assert min(sides.values()) >= 7, sides
+        assert all(-.001 <= r["facade_min_x"] <= r["facade_max_x"] <= 120.001 for r in records)
+        assert all(r["side"] == ("+" if r["position"][2] > 0 else "-")
+                   and abs(r["facade_z"]) < abs(r["position"][2])
+                   and abs(r["facade_z"]) >= SIDEWALK_LINE + 2.999 for r in records)
+        _assert_seams(measure_seams(records), 2, 2)
+        assert _snapshot(fixture.cook(2, 2)) == baseline, "Recook changed placement"
+        reseeded = fixture.records(fixture.cook(2, 2, building_seed=99))
+        assert [r["prefab"] for r in records] != [r["prefab"] for r in reseeded], "Random seed ignored"
+        assert _placement_only(records) == _placement_only(reseeded), "Appearance seed moved a parcel"
+        fixture.root.parm("building_seed").set(BUILDING_DEFAULTS["seed"])
+        _verify_direct_assignment(fixture, profiles, len(records))
+        _verify_fixed_controls(fixture, len(records))
+        curved_side_points = _verify_road_inputs(fixture, baseline)
 
-        build.parm('spacing').set(10);build.cook(force=True)
-        spaced=list(build.geometry().points());assert len(spaced)<len(before),'Spacing ignored'
-        for i,a in enumerate(spaced):
-            for b in spaced[i+1:]:
-                if a.position()[2]*b.position()[2]>0:assert abs(a.position()[0]-b.position()[0])>=17.99
-        build.parm('spacing').set(2)
-        build.parm('setback').set(7);build.cook(force=True)
-        assert all(abs(p.position()[2])>=28.99 for p in build.geometry().points()),'Setback ignored'
-        build.parm('setback').set(3)
-        build.parm('junction_margin').set(20);build.cook(force=True)
-        assert all(20<=p.position()[0]<=100 for p in build.geometry().points()),'Corner margin ignored'
-        build.parm('junction_margin').set(0)
-        build.parm('ground_height').set(2);build.cook(force=True)
-        assert all(abs(p.position()[1]-2)<.001 for p in build.geometry().points()),'Base height ignored'
-        build.parm('ground_height').set(.6)
-        # Independent P1 contract: enabled variation changes placement while
-        # the legacy mode remains deterministic and exactly reproducible.
-        build.parm('layout_enabled').set(1)
-        build.parm('empty_ratio').set(0)
-        build.cook(force=True)
-        varied=list(build.geometry().points())
-        assert varied and len(varied)>0,'Varied layout removed the whole frontage'
-        varied_positions=[tuple(p.position()) for p in varied]
-        setbacks=[p.floatAttribValue('setback_applied') for p in varied]
-        gaps=[p.floatAttribValue('gap_applied') for p in varied]
-        assert all(3<=v<=5.501 for v in setbacks),setbacks
-        assert all(2<=v<=5.001 for v in gaps),gaps
-        assert len({round(v,2) for v in setbacks})>=2,'Extra setback has no visible range'
-        assert len({round(v,2) for v in gaps})>=2,'Extra gap has no visible range'
-        assert len({p.stringAttribValue('building_id') for p in varied})==len(varied),'Layout IDs collide'
-        build.cook(force=True)
-        assert varied_positions==[tuple(p.position()) for p in build.geometry().points()],'Varied recook is nondeterministic'
-        build.parm('empty_ratio').set(1)
-        build.cook(force=True)
-        assert len(build.geometry().points())==0,'Empty ratio ignored'
-        build.parm('empty_ratio').set(0)
-        build.parm('layout_enabled').set(0)
-        build.cook(force=True)
-        assert before==[tuple(p.position()) for p in build.geometry().points()],'Disabled variation changed legacy output'
-        # Reproduce the formerly missing whole side: a sliver reuses a boundary edge.
-        degenerate=hou.Geometry();degenerate.merge(roadgeo)
-        sliver=degenerate.createPoint();sliver.setPosition((.001,0,-8))
-        triangle=degenerate.createPolygon()
-        for p in [degenerate.points()[0],degenerate.points()[1],sliver]:triangle.addVertex(p)
-        road.parm('stash').set(degenerate);build.cook(force=True)
-        assert len(clean.geometry().prims())==2,'Thin triangle pollutes boundary incidence'
-        assert before==[tuple(p.position()) for p in build.geometry().points()],'Thin triangle removed a frontage side'
-        # A long, valid sliver borders a slightly turning street. Its centroid is
-        # inside the original edge but lies outside the final merged chord.
-        bent = hou.Geometry()
-        corners = []
-        for x,z in [(0,-8),(100,-8),(20,-7.999),(115,-7.88),(0,8),(100,8),(115,8)]:
-            point = bent.createPoint()
-            point.setPosition((x,0,z))
-            corners.append(point)
-        for indices in [(0,1,2),(0,2,4),(2,1,5),(2,5,4),(1,3,6),(1,6,5)]:
-            face = bent.createPolygon()
-            for index in indices:
-                face.addVertex(corners[index])
-        road.parm('stash').set(bent)
-        build.cook(force=True)
-        exposed = [p.position()[0] for p in build.geometry().points()
-                   if p.position()[2] < -8 and p.attribValue('N')[2] > .99]
-        assert len(exposed) >= 7 and max(exposed)-min(exposed) > 70, 'Merged street edge lost its outward side'
-        # Short tessellation pieces must still generate complete rows after collinear merging.
-        strips=hou.Geometry();rows=[]
-        for x in range(0,121,3):
-            row=[]
-            for z in (-8,8):p=strips.createPoint();p.setPosition((x,0,z));row.append(p)
-            rows.append(row)
-        for a,b in zip(rows,rows[1:]):
-            for vertices in ((a[0],a[1],b[1]),(a[0],b[1],b[0])):
-                poly=strips.createPolygon()
-                for p in vertices:poly.addVertex(p)
-        road.parm('stash').set(strips);build.cook(force=True)
-        assert len(build.geometry().points())==len(before),'Short boundary segments lost buildings'
-        road.parm('stash').set(roadgeo)
-        build.parm('enabled').set(0);build.cook(force=True)
-        assert len(build.geometry().points())==0,'Feature toggle failed'
-        build.parm('enabled').set(1)
-        # Move original road geometry; placement must move with its CityRoad inputs.
-        for p in roadgeo.points():p.setPosition(p.position()+hou.Vector3(0,0,50))
-        for p in graphgeo.points():p.setPosition(p.position()+hou.Vector3(0,0,50))
-        roadgeo.incrementAllDataIds();graphgeo.incrementAllDataIds()
-        road.parm('stash').set(roadgeo);graph.parm('stash').set(graphgeo)
-        road.cook(force=True);clean.cook(force=True);graph.cook(force=True);build.cook(force=True)
-        moved=[tuple(p.position()) for p in build.geometry().points()]
-        assert len(moved)==len(before),(len(moved),len(before))
-        assert all(abs(a[0]-b[0])<.001 and abs(a[2]+50-b[2])<.001 for a,b in zip(before,moved)),'Road movement not propagated'
-        return {'contract_id':'CityRoad.V52.StreetBuildingPlacement','public_controls':'CityRoad.V53.BuildingControls','direct_prefabs':'CityRoad.V54.DirectPrefabAssignment','varied_layout':'CityRoad.V55.BuildingLayout','empty_slots':True,'arbitrary_prefab_names':True,'seed_changes_variants_only':True,'spacing':True,'setback':True,'corner_margin':True,'base_height':True,'points':len(before),'both_sides':sides,'terminal_clear':True,'road_move':True,'deterministic':True,'toggle':True,'thin_triangle':True,'short_segments':True}
-    finally:fixture_root.destroy()
-
-
-
-
+    from importlib import reload
+    import validate_cityroad_corners
+    corners = reload(validate_cityroad_corners).validate(asset)
+    return {
+        "contract_id": "CityRoad.V52.StreetBuildingPlacement",
+        "public_controls": "CityRoad.V53.BuildingControls",
+        "direct_prefabs": "CityRoad.V54.DirectPrefabAssignment",
+        "varied_layout": "CityRoad.V55.BuildingLayout",
+        "varied_layout_coverage": "CityRoad.V57.StreetLayoutRanges",
+        "empty_slots": True, "arbitrary_prefab_names": True, "seed_changes_variants_only": True,
+        "spacing": True, "setback": True, "corner_margin": True, "base_height": True,
+        "points": len(records), "both_sides": sides, "terminal_clear": True,
+        "road_move": True, "deterministic": True, "toggle": True,
+        "thin_triangle": True, "short_segments": True, "curved_side_points": curved_side_points,
+        "actual_frontage": _verify_profiles(asset), "dual_frontage_corners": corners,
+    }

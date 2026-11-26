@@ -630,7 +630,7 @@ try {
     $houdiniFilePatterns = @($manifest.allowed_files | ForEach-Object { ([string]$_).Replace('\', '/') })
     $definitionWriteAllowed = @($houdiniFilePatterns | Where-Object { $moduleConfig[$Module].Hda -clike $_ }).Count -gt 0
     $hipWriteAllowed = @($houdiniFilePatterns | Where-Object { $moduleConfig[$Module].Hip -clike $_ }).Count -gt 0
-    $persisted = $Module -ne 'StreetBuilding' -or ($definitionWriteAllowed -and $hipWriteAllowed)
+    $persisted = $Module -notin @('CityRoad', 'StreetBuilding') -or ($definitionWriteAllowed -and $hipWriteAllowed)
     Invoke-Hython -Arguments @(
         $gateScript, '--module', $Module, '--stage', 'persist',
         '--manifest', $manifestPath, '--project-root', $projectRoot,

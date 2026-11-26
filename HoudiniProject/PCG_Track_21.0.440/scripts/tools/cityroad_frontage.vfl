@@ -1,5 +1,6 @@
 // CityRoad owns placement. Editor cook only; Unity consumes these instance points.
 // Input 1: unpacked/fused road triangles. Input 2: original centerline graph.
+// CITYROAD_ALWAYS_ACTUAL_FRONTAGE
 int intersects(vector ca; vector xa; vector za; float wa; float da;
                vector cb; vector xb; vector zb; float wb; float db; float gap)
 {
@@ -11,24 +12,146 @@ int intersects(vector ca; vector xa; vector za; float wa; float da;
     }
     return 1;
 }
-int hitsroad(vector c; vector x; vector z; float w; float d; float gap)
+// Actual-width mode tests horizontal geometry. The cheap AABB rejects the
+// distant triangles before constructing their separating axes.
+int frontage_hits_road(vector center; vector axis_x; vector axis_z;
+                      float half_x; float half_z; float clearance)
 {
-    for(int pr=0;pr<nprimitives(1);pr++) {
-        int pts[]=primpoints(1,pr);if(len(pts)<3)continue;
-        vector a=point(1,"P",pts[0]), b=point(1,"P",pts[1]), cc=point(1,"P",pts[2]);
-        vector axes[]=array(x,z,normalize(set(-(b-a).z,0,(b-a).x)),
-            normalize(set(-(cc-b).z,0,(cc-b).x)),normalize(set(-(a-cc).z,0,(a-cc).x)));
-        int separated=0;
-        foreach(vector axis;axes) {
-            if(length2(axis)<0.5)continue;
-            float r=abs(dot(x,axis))*w+abs(dot(z,axis))*d;
-            float v=dot(c,axis), lo=min(dot(a,axis),dot(b,axis),dot(cc,axis)), hi=max(dot(a,axis),dot(b,axis),dot(cc,axis));
-            if(v+r+gap<=lo+0.001||hi+gap<=v-r+0.001){separated=1;break;}
+    float extent_x = abs(axis_x.x) * half_x + abs(axis_z.x) * half_z + clearance;
+    float extent_z = abs(axis_x.z) * half_x + abs(axis_z.z) * half_z + clearance;
+    for (int prim = 0; prim < nprimitives(1); prim++) {
+        int points[] = primpoints(1, prim);
+        if (len(points) < 3) continue;
+        vector a = point(1, "P", points[0]);
+        vector b = point(1, "P", points[1]);
+        vector c = point(1, "P", points[2]);
+        if (center.x + extent_x <= min(a.x, b.x, c.x) ||
+            center.x - extent_x >= max(a.x, b.x, c.x) ||
+            center.z + extent_z <= min(a.z, b.z, c.z) ||
+            center.z - extent_z >= max(a.z, b.z, c.z)) continue;
+
+        vector ab = b-a, bc = c-b, ca = a-c;
+        vector axes[] = array(axis_x, axis_z, normalize(set(-ab.z,0,ab.x)),
+                              normalize(set(-bc.z,0,bc.x)), normalize(set(-ca.z,0,ca.x)));
+        int separated = 0;
+        foreach (vector axis; axes) {
+            if (length2(axis) < 0.5) continue;
+            float radius = abs(dot(axis_x, axis)) * half_x + abs(dot(axis_z, axis)) * half_z;
+            float offset = dot(center, axis);
+            float low = min(dot(a, axis), dot(b, axis), dot(c, axis));
+            float high = max(dot(a, axis), dot(b, axis), dot(c, axis));
+            if (offset + radius + clearance <= low + 0.001 ||
+                offset - radius - clearance >= high - 0.001) {
+                separated = 1;
+                break;
+            }
         }
-        if(!separated)return 1;
+        if (!separated) return 1;
     }
     return 0;
 }
+
+int frontage_number(string value)
+{
+    return re_match("^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$", value);
+}
+
+float sample_layout_range(vector2 bounds; string key)
+{
+    if (bounds.x == bounds.y) return bounds.x;
+    return lerp(bounds.x, bounds.y, rand(random_shash(key)));
+}
+
+// At the minimum gap, discard profiles that cannot lead to any remaining
+// profile. Survivors can continue even if the following draw is the minimum.
+function int[] frontage_chain_profiles(float incoming[]; float outgoing[]; float gap)
+{
+    int usable[];
+    resize(usable,len(incoming));
+    for (int i = 0; i < len(usable); i++) usable[i] = 1;
+    int changed = 1;
+    while (changed) {
+        changed = 0;
+        float smallest_incoming = 1e10;
+        foreach (int i; int keep; usable)
+            if (keep) smallest_incoming = min(smallest_incoming,incoming[i]);
+        foreach (int i; int keep; usable) {
+            if (keep && outgoing[i]+smallest_incoming > gap+.001) {
+                usable[i] = 0;
+                changed = 1;
+            }
+        }
+    }
+    return usable;
+}
+
+// Street stations and clearance are measured in the horizontal plane.
+vector corner_planar(vector p)
+{
+    return set(p.x, 0, p.z);
+}
+
+vector corner_road_side(vector a; vector b; vector witness)
+{
+    vector tangent = normalize(corner_planar(b-a));
+    vector outward = set(-tangent.z, 0, tangent.x);
+    return dot(outward,witness) < 0 ? -outward : outward;
+}
+
+int corner_find_run(vector junction; vector arm; vector sector; vector mouth; float width;
+                    vector starts[]; vector ends[]; vector normals[])
+{
+    int closest = -1;
+    float best = 1e10;
+    for (int run = 0; run < len(starts); run++) {
+        vector a = starts[run], b = ends[run], delta = corner_planar(b-a);
+        float edge_length = length(delta);
+        if (edge_length < max(1.0, width*.25)) continue;
+        vector tangent = delta/edge_length;
+        if (abs(dot(tangent,arm)) < .995 || dot(normals[run],sector) < .1) continue;
+
+        // The road mouth selects the bordering half-edge, even when the
+        // boundary is triangulated or a rounded bend emits short edges.
+        float station = clamp(dot(corner_planar(mouth-a),tangent),0,edge_length);
+        vector p = lerp(a,b,station/edge_length);
+        float distance = length(corner_planar(p-mouth));
+        if (distance > max(2.0,width*.5) || abs(p.y-mouth.y) > .75) continue;
+        if (dot(corner_planar(p-junction),arm) < -.1) continue;
+        if (dot(corner_planar(a-junction),arm) < -.25 &&
+            dot(corner_planar(b-junction),arm) < -.25) continue;
+        if (distance < best-.001 ||
+            (abs(distance-best) <= .001 && closest >= 0 &&
+             edge_length > length(corner_planar(ends[closest]-starts[closest]))+.001)) {
+            best = distance;
+            closest = run;
+        }
+    }
+    return closest;
+}
+
+vector corner_meet_lines(vector a; vector ta; vector b; vector tb)
+{
+    vector d = b-a;
+    float s = (d.x*tb.z-d.z*tb.x)/(ta.x*tb.z-ta.z*tb.x);
+    return corner_planar(a)+ta*s;
+}
+
+// Project an occupied footprint along a run and reserve both lanes of frontage.
+vector2 corner_span(vector center; vector axis_x; vector axis_z;
+                    float half_x; float half_z; vector start; vector tangent)
+{
+    float station = dot(center-start,tangent);
+    float radius = abs(dot(axis_x,tangent))*half_x+abs(dot(axis_z,tangent))*half_z;
+    return set(station-radius,station+radius);
+}
+
+string corner_run_key(vector a; vector b)
+{
+    return sprintf("%d_%d_%d_%d",int(rint(a.x*100)),int(rint(a.z*100)),
+                   int(rint(b.x*100)),int(rint(b.z*100)));
+}
+
+
 // Explicit seed input permits a Cook even when the source graph is empty.
 for(int p=npoints(0)-1;p>=0;p--)removepoint(0,p);
 // No source primitives are copied to output; this is a dedicated point contract.
@@ -39,7 +162,48 @@ for(int i=1;i<=chi("variants");i++){
     string path=strip(chs(sprintf("../../../building_prefab%d",i)));
     if(strlen(path)>0)append(prefabs,path);
 }
-if(len(prefabs)==0){setdetailattrib(0,"building_count",0);return;}
+int corners_enabled = chi("../../../building_corners_enabled");
+vector2 setback_range = set(chf("../../../building_setback_min_m"), chf("../../../building_setback_max_m"));
+int grouped_setback = setback_range.x < setback_range.y && chi("../../../building_setback_grouped");
+vector2 group_length_range = set(chf("../../../building_group_length_min_m"), chf("../../../building_group_length_max_m"));
+vector2 group_offset_range = set(chf("../../../building_group_offset_min_m"), chf("../../../building_group_offset_max_m"));
+vector2 empty_pct_range = set(chf("../../../building_empty_min_pct"), chf("../../../building_empty_max_pct"));
+// 给组内偏移留足余量，无需钳制任何已抽取的偏移。
+vector2 group_base_range = setback_range - group_offset_range;
+string empty_ids[];
+vector empty_fronts[];
+float empty_widths[];
+string bad_field = "";
+if (!(setback_range.x >= 0 && setback_range.x <= setback_range.y))
+    bad_field = "人行道外退距需要满足 0 ≤ 最小值 ≤ 最大值";
+else if (!(empty_pct_range.x >= 0 && empty_pct_range.x <= empty_pct_range.y && empty_pct_range.y <= 100))
+    bad_field = "留空概率需要满足 0 ≤ 最小值 ≤ 最大值 ≤ 100";
+else if (grouped_setback) {
+    if (!(group_length_range.x >= 1 && group_length_range.x <= group_length_range.y))
+        bad_field = "组长度需要满足 1 米 ≤ 最小值 ≤ 最大值";
+    else if (!(group_offset_range.x <= group_offset_range.y))
+        bad_field = "组内偏移需要满足最小值 ≤ 最大值";
+    else if (!(group_base_range.x <= group_base_range.y))
+        bad_field = "组内偏移的区间宽度不能超过人行道外退距的区间宽度";
+}
+setdetailattrib(0,"frontage_layout_active",1);
+if (bad_field != "") {
+    setdetailattrib(0,"frontage_layout_error",bad_field);
+    setdetailattrib(0,"building_count",0);
+    return;
+}
+vector2 wall_gap = set(chf("../../../building_gap_min_m"), chf("../../../building_gap_max_m"));
+int gap_blocked_runs = 0;
+setdetailattrib(0,"frontage_gap_range_active",1);
+setdetailattrib(0,"frontage_gap_min_m",wall_gap.x);
+setdetailattrib(0,"frontage_gap_max_m",wall_gap.y);
+if (!(wall_gap.x >= 0 && wall_gap.y >= wall_gap.x)) {
+    setdetailattrib(0,"frontage_gap_range_error",
+        "楼与楼净间距（米）需要满足 0 ≤ 最小值 ≤ 最大值");
+    setdetailattrib(0,"building_count",0);
+    return;
+}
+if(len(prefabs)==0 && !corners_enabled){setdetailattrib(0,"building_count",0);return;}
 vector ea[],eb[],outward[],witnesses[];
 for(int pr=0;pr<nprimitives(1);pr++) {
     int h=primhedge(1,pr), first=h;
@@ -79,18 +243,9 @@ for(int pr=0;pr<nprimitives(2);pr++) {
         if(found<0){append(ep,p);append(ed,d);append(ec,1);}else ec[found]++;
     }
 }
-float width=max(.1,chf("width")),depth=max(.1,chf("depth")),clearance=chf("sidewalk")+max(0,chf("setback"));
-float spacing=max(0,chf("spacing")),margin=max(0,chf("junction_margin"));
-// P1 layout extension: disabled by default, preserving the captured legacy output.
-// Group and slot random streams are independent of Prefab selection.
-int varied=chi("layout_enabled");
-float setback_max=max(0,chf("setback_max")),gap_max=max(0,chf("gap_max"));
-float empty_ratio=clamp(chf("empty_ratio"),0,1);
-float group_length=max(4,chf("group_length"));
-float within_group_jitter=max(0,chf("within_group_jitter"));
-int layout_seed=chi("seed")+chi("layout_seed_offset");
+float margin=max(0,chf("junction_margin"));
 vector centers[],xs[],zs[];float ws[],ds[];
-int skipped=0,empty_by_rule=0,requested_slots=0;
+int skipped=0;
 // Reserve established runs first. A recovered run may fill free space at a
 // junction only after its neighbors have claimed their original footprints.
 int established[], recovered[];
@@ -101,54 +256,670 @@ for(int i=0;i<len(ea);i++){
 }
 int runs[]=established;
 foreach(int i;recovered)append(runs,i);
-foreach(int e;runs){
-    vector a=ea[e],b=eb[e],t=normalize(b-a),out=set(-t.z,0,t.x);float len=distance(a,b);
-    if(dot(out,outward[e])<0)out=-out;
-    // 4m trials fill short segments; the reservation enforces the final spacing.
-    for(float s=min(2.0,len*.5);s<len;s+=4){
-        if(s<margin || len-s<margin)continue;
-        requested_slots++;
-        int slot=int(floor(s/4.0));
-        string edgekey=sprintf("%d_%d_%d_%d",int(rint(a.x*100)),int(rint(a.z*100)),int(rint(b.x*100)),int(rint(b.z*100)));
-        string slotkey=sprintf("%s_%d_%d",edgekey,slot,layout_seed);
-        if(varied && rand(random_shash(concat(slotkey,"_empty")))<empty_ratio){empty_by_rule++;continue;}
-        int groupid=int(floor(s/group_length));
-        string groupkey=sprintf("%s_%d_%d_group",edgekey,groupid,layout_seed);
-        float extra_setback=0,extra_gap=0;
-        if(varied){
-            float group_setback=setback_max*rand(random_shash(groupkey));
-            float local_delta=within_group_jitter*(2*rand(random_shash(concat(slotkey,"_depth")))-1);
-            extra_setback=clamp(group_setback+local_delta,0,setback_max);
-            extra_gap=gap_max*rand(random_shash(concat(slotkey,"_gap")));
+// 整栋素材规格以 Unity 根空间存储。HEU 会反转 X，Z 正向仍为临街面。
+{
+    string catalog_paths[], duplicate_paths[];
+    vector catalog_faces[];   // 临街面的 min X, max X, 平面 Z。
+    vector4 catalog_bounds[]; // 占地的 min X, max X, min Z, max Z。
+    // The same asset may have independent ordinary and corner authoring.
+    string corner_catalog_paths[], corner_duplicate_paths[];
+    vector corner_catalog_faces[];
+    vector4 corner_catalog_bounds[], corner_catalog_sides[];
+    int malformed = 0;
+    foreach (string row; split(chs("../../../building_frontage_catalog"), "\n")) {
+        if (strip(row) == "") continue;
+        string fields[] = split(strip(row), "|");
+        int field_count = len(fields);
+        int corner_row = field_count == 12;
+        if (corner_row && !corners_enabled) continue;
+        int valid = field_count == 8 || corner_row;
+        string path = valid ? strip(fields[0]) : "";
+        float numbers[];
+        for (int field = 1; valid && field < field_count; field++) {
+            string token = strip(fields[field]);
+            float number = atof(token);
+            valid = frontage_number(token) && abs(number) <= 100000.0;
+            append(numbers, number);
         }
-        vector front=a+t*s+out*(clearance+extra_setback),center=front+out*depth*.5;
-        int terminal=0;
-        for(int j=0;j<len(ep);j++)if(ec[j]==1&&dot(out,ed[j])>.98&&dot(center-ep[j],ed[j])>0&&length(cross(center-ep[j],ed[j]))<width+clearance){terminal=1;break;}
-        if(terminal)continue;
-        // Full rectangle test, including side and rear reserve. No junction corner intrusion.
-        vector reserve=front+out*(depth+5)*.5;
-        float reserve_w=(width+spacing+extra_gap)*.5;
-        float reserve_d=(depth+5)*.5;
-        if(hitsroad(reserve,t,out,reserve_w,reserve_d,clearance+extra_setback-1.0)){skipped++;continue;}
-        int bad=0;
-        for(int j=0;j<len(centers);j++)if(intersects(reserve,t,out,reserve_w,reserve_d,centers[j],xs[j],zs[j],ws[j],ds[j],0)){bad=1;break;}
-        if(bad)continue;
-        append(centers,reserve);append(xs,t);append(zs,out);append(ws,reserve_w);append(ds,reserve_d);
-        string id=varied?sprintf("frontage_%s_%d",edgekey,slot):sprintf("frontage_%d_%d_%d",int(rint(front.x*100)),int(rint(front.z*100)),chi("seed"));
-        int variant=int(floor(rand(random_shash(varied?concat(id,sprintf("_%d_variant",chi("seed"))):id))*len(prefabs)));
-        int pt=addpoint(0,center+set(0,chf("ground_height"),0));
-        vector facing=-out;
-        setpointattrib(0,"orient",pt,quaternion(maketransform(facing,{0,1,0})));
-        setpointattrib(0,"N",pt,facing);setpointattrib(0,"up",pt,{0,1,0});
-        setpointattrib(0,"unity_instance",pt,prefabs[variant]);
-        setpointattrib(0,"building_id",pt,id);setpointattrib(0,"building_variant",pt,variant);
-        setpointattrib(0,"frontage_width",pt,width);setpointattrib(0,"frontage_depth",pt,depth);
-        setpointattrib(0,"frontage_front",pt,front);setpointattrib(0,"road_edge",pt,a+t*s);
-        if(varied){setpointattrib(0,"setback_applied",pt,chf("setback")+extra_setback);setpointattrib(0,"gap_applied",pt,spacing+extra_gap);}
+        if (path != "" && (corner_row ? find(corner_catalog_paths,path) : find(catalog_paths,path)) >= 0) {
+            if (corner_row) {
+                if (find(corner_duplicate_paths,path) < 0) append(corner_duplicate_paths,path);
+            } else if (find(duplicate_paths,path) < 0) {
+                append(duplicate_paths,path);
+            }
+            malformed++;
+            continue;
+        }
+        if (!valid || path == "") {
+            malformed++;
+            continue;
+        }
+        float fx0 = -numbers[1], fx1 = -numbers[0], fz = numbers[2];
+        float x0 = -numbers[4], x1 = -numbers[3], z0 = numbers[5], z1 = numbers[6];
+        if (fx1 - fx0 <= 0.01 || x1 - x0 <= 0.01 || z1 - z0 <= 0.01 ||
+            fx0 < x0 - .001 || fx1 > x1 + .001 || fz < z0 - .001 || fz > z1 + .001) {
+            malformed++;
+            continue;
+        }
+        if (corner_row) {
+            float sign_x = -numbers[7], side_x = -numbers[10];
+            float side_z0 = numbers[8], side_z1 = numbers[9];
+            if (abs(sign_x) != 1 || side_z1-side_z0 <= .01 ||
+                side_x < x0-.001 || side_x > x1+.001 ||
+                side_z0 < z0-.001 || side_z1 > z1+.001) {
+                malformed++;
+                continue;
+            }
+            append(corner_catalog_paths,path);
+            append(corner_catalog_faces,set(fx0,fx1,fz));
+            append(corner_catalog_bounds,set(x0,x1,z0,z1));
+            append(corner_catalog_sides,set(sign_x,side_z0,side_z1,side_x));
+            continue;
+        }
+        append(catalog_paths, path);
+        append(catalog_faces, set(fx0, fx1, fz));
+        append(catalog_bounds, set(x0, x1, z0, z1));
     }
+
+    // 先以几何规格决定占地，再由外观种子在完全同规格的候选间选择。
+    string profiles[], missing[];
+    vector faces[];
+    vector4 bounds[];
+    int variant_profile[];
+    foreach (string path; prefabs) {
+        int catalog_index = find(catalog_paths, path);
+        if (catalog_index < 0 || find(duplicate_paths, path) >= 0) {
+            if (find(missing, path) < 0) append(missing, path);
+            append(variant_profile, -1);
+            continue;
+        }
+        vector face = catalog_faces[catalog_index];
+        vector4 box = catalog_bounds[catalog_index];
+        string profile = sprintf("%.9g|%.9g|%.9g|%.9g|%.9g|%.9g|%.9g",
+                                 face.x, face.y, face.z, box.x, box.y, box.z, box.w);
+        int index = find(profiles, profile);
+        if (index < 0) {
+            index = len(profiles);
+            append(profiles, profile);
+            append(faces, face);
+            append(bounds, box);
+        }
+        append(variant_profile, index);
+    }
+
+    float sidewalk_clear = max(0, chf("sidewalk"));
+    float ground_height = chf("ground_height");
+    float min_width = 1e10;
+    foreach (vector face; faces) min_width = min(min_width, face.y-face.x);
+    float left_overhangs[], right_overhangs[];
+    foreach (int i; vector face; faces) {
+        append(left_overhangs,max(0,face.x-bounds[i].x));
+        append(right_overhangs,max(0,bounds[i].y-face.y));
+    }
+    int forward_chain[] = frontage_chain_profiles(left_overhangs,right_overhangs,wall_gap.x);
+    int reverse_chain[] = frontage_chain_profiles(right_overhangs,left_overhangs,wall_gap.x);
+    int has_chain = find(forward_chain,1) >= 0 || find(reverse_chain,1) >= 0;
+    float min_left = 1e10, min_right = 1e10;
+    foreach (float overhang; left_overhangs) min_left = min(min_left,overhang);
+    foreach (float overhang; right_overhangs) min_right = min(min_right,overhang);
+    int geometry_seed = chi("layout_seed_offset");
+    int appearance_seed = chi("seed");
+    int rejected_terminal = 0, rejected_building = 0, unfilled_runs = 0;
+    float total_length = 0, total_covered = 0, largest_gap = 0, largest_tail = 0;
+    vector2 building_extents[];
+    int placed_buildings = 0;
+    int constraint_breaks = 0;
+    float constraint_break_max = 0;
+
+    float corner_min_station[], corner_max_station[];
+    float corner_min_wall[], corner_max_wall[];
+    if (corners_enabled) {
+        vector starts[], ends[], normals[];
+        for (int edge = 0; edge < len(ea); edge++) {
+            vector a = ea[edge], b = eb[edge];
+            if (b.x < a.x || (b.x == a.x && b.z < a.z)) {
+                vector swap = a;
+                a = b;
+                b = swap;
+            }
+            append(starts,a);
+            append(ends,b);
+            append(normals,corner_road_side(a,b,outward[edge]));
+            append(corner_min_station,0.0);
+            append(corner_max_station,length(corner_planar(b-a)));
+            append(corner_min_wall,0.0);
+            append(corner_max_wall,length(corner_planar(b-a)));
+        }
+
+        string corner_paths[], corner_missing[];
+        int corner_specs[];
+        for (int n = 1; n <= chi("../../../building_corner_prefabs"); n++) {
+            string path = strip(chs(sprintf("../../../building_corner_prefab%d",n)));
+            if (path == "" || find(corner_paths,path) >= 0 || find(corner_missing,path) >= 0) continue;
+            int spec = find(corner_catalog_paths,path);
+            if (spec < 0 || find(corner_duplicate_paths,path) >= 0) {
+                append(corner_missing,path);
+                continue;
+            }
+            append(corner_paths,path);
+            append(corner_specs,spec);
+        }
+
+        int junction_approaches[] = expandpointgroup(3,"junction_approaches");
+        // 多条原始道路可在同一物理路口产生不同索引。按同层三维位置合并进路，
+        // 保留不同标高的路口，避免已占用的角楼被再次尝试并误报冲突。
+        string approach_keys[];
+        int cluster_points[];
+        string cluster_keys[];
+        foreach (int p; junction_approaches) {
+            vector center = point(3,"junction_center",p);
+            int level = point(3,"road_level",p);
+            string key = sprintf("%+d_%+d_%+d_%+d",level,int(rint(center.x*100)),
+                                 int(rint(center.y*100)),int(rint(center.z*100)));
+            append(approach_keys,key);
+            if (find(cluster_keys,key) >= 0) continue;
+            append(cluster_keys,key);
+            append(cluster_points,p);
+        }
+
+        int corner_count = 0, corner_sectors = 0;
+        int rejected_angle = 0, rejected_edge = 0, rejected_fit = 0;
+        foreach (int cluster; argsort(cluster_keys)) {
+            int ref_point = cluster_points[cluster];
+            vector junction = point(3,"junction_center",ref_point);
+            string cluster_key = cluster_keys[cluster];
+            int level = point(3,"road_level",ref_point);
+            int arm_points[];
+            vector directions[];
+            float bearings[];
+            foreach (int index; int p; junction_approaches) {
+                if (approach_keys[index] != cluster_key) continue;
+                vector dir = normalize(corner_planar(vector(point(3,"approach_direction",p))));
+                if (length2(dir) < .5) continue;
+                int duplicate = 0;
+                foreach (vector previous; directions) {
+                    if (dot(previous,dir) > .9999) {
+                        duplicate = 1;
+                        break;
+                    }
+                }
+                if (duplicate) continue;
+                append(arm_points,p);
+                append(directions,dir);
+                append(bearings,atan2(dir.z,dir.x));
+            }
+            if (len(arm_points) < 3) continue;
+            int arms[] = argsort(bearings);
+            for (int sector_index = 0; sector_index < len(arms); sector_index++) {
+                int ia = arms[sector_index], ib = arms[(sector_index+1)%len(arms)];
+                float angle = bearings[ib]-bearings[ia];
+                if (angle < 0) angle += 2*M_PI;
+                // A T junction's open side has no building corner.
+                if (angle >= M_PI-radians(1.0)) continue;
+                corner_sectors++;
+                if (abs(angle-M_PI*.5) > radians(6.0)) {
+                    rejected_angle++;
+                    continue;
+                }
+                vector sector_dir = normalize(directions[ia]+directions[ib]);
+                int sector_arms[] = array(ia,ib);
+                int edge_ids[];
+                foreach (int arm_index; sector_arms) {
+                    int p = arm_points[arm_index];
+                    vector left = point(3,"approach_mouth_left",p);
+                    vector right = point(3,"approach_mouth_right",p);
+                    vector mouth = dot(left-junction,sector_dir) > dot(right-junction,sector_dir) ? left : right;
+                    float road_width = max(1.0,length(corner_planar(right-left)));
+                    append(edge_ids,corner_find_run(junction,directions[arm_index],sector_dir,
+                                                   mouth,road_width,starts,ends,normals));
+                }
+                if (min(edge_ids[0],edge_ids[1]) < 0 || edge_ids[0] == edge_ids[1]) {
+                    rejected_edge++;
+                    continue;
+                }
+                if (len(corner_specs) == 0) {
+                    rejected_fit++;
+                    continue;
+                }
+
+                string id = sprintf("corner_%+d_%+d_%+d_%+d_%+d",level,int(rint(junction.x*100)),
+                                    int(rint(junction.z*100)),int(rint(bearings[ia]*10000)),
+                                    int(rint(bearings[ib]*10000)));
+                float scores[];
+                foreach (string path; corner_paths) {
+                    append(scores,rand(random_shash(sprintf("%s_%d_%s",id,geometry_seed,path))));
+                }
+                int placed_corner = 0;
+                foreach (int candidate; argsort(scores)) {
+                    int spec = corner_specs[candidate];
+                    vector face = corner_catalog_faces[spec];
+                    vector4 box = corner_catalog_bounds[spec], side = corner_catalog_sides[spec];
+                    float half_x = (box.y-box.x)*.5, half_z = (box.w-box.z)*.5;
+                    for (int assignment = 0; assignment < 2; assignment++) {
+                        int primary = edge_ids[assignment], secondary = edge_ids[1-assignment];
+                        vector a = starts[primary], b = ends[primary];
+                        vector c = starts[secondary], d = ends[secondary];
+                        vector delta_a = corner_planar(b-a), delta_b = corner_planar(d-c);
+                        float run_a = length(delta_a), run_b = length(delta_b);
+                        vector ta = delta_a/run_a, tb = delta_b/run_b;
+                        vector out_a = normals[primary], out_b = normals[secondary];
+                        vector facing = -out_a, axis_x = cross({0,1,0},facing);
+                        vector side_normal = axis_x*side.x;
+                        if (dot(side_normal,-out_b) < .994 || abs(dot(ta,tb)) > .12) continue;
+
+                        vector local_front0 = axis_x*face.x+facing*face.z;
+                        vector local_front1 = axis_x*face.y+facing*face.z;
+                        vector local_side0 = axis_x*side.w+facing*side.y;
+                        vector local_side1 = axis_x*side.w+facing*side.z;
+                        if (abs(dot(local_side1-local_side0,out_b)) > .5) continue;
+
+                        // 角楼两面分别按对应街边抽取退距，切换候选时保持原请求。
+                        string setback_key = sprintf("%s_%d_",id,geometry_seed);
+                        float setback_a = sample_layout_range(setback_range,concat(setback_key,corner_run_key(a,b)));
+                        float setback_b = sample_layout_range(setback_range,concat(setback_key,corner_run_key(c,d)));
+                        vector local_center = axis_x*(box.x+box.y)*.5+facing*(box.z+box.w)*.5;
+                        float extent_a = abs(dot(axis_x,out_a))*half_x+abs(dot(facing,out_a))*half_z;
+                        float extent_b = abs(dot(axis_x,out_b))*half_x+abs(dot(facing,out_b))*half_z;
+                        float offset_a = setback_a-min(dot(local_front0,out_a),dot(local_front1,out_a));
+                        float offset_b = setback_b-min(dot(local_side0,out_b),dot(local_side1,out_b));
+                        if (offset_a+dot(local_center,out_a) < extent_a-.001 ||
+                            offset_b+dot(local_center,out_b) < extent_b-.001) continue;
+                        offset_a += sidewalk_clear;
+                        offset_b += sidewalk_clear;
+                        vector root = corner_meet_lines(a+out_a*offset_a,ta,c+out_b*offset_b,tb);
+                        vector center = root+local_center;
+                        vector2 span_a = corner_span(center,axis_x,facing,half_x,half_z,a,ta);
+                        vector2 span_b = corner_span(center,axis_x,facing,half_x,half_z,c,tb);
+                        if (span_a.x < max(margin,corner_min_station[primary])-.01 ||
+                            span_a.y > min(run_a-margin,corner_max_station[primary])+.01 ||
+                            span_b.x < max(margin,corner_min_station[secondary])-.01 ||
+                            span_b.y > min(run_b-margin,corner_max_station[secondary])+.01) continue;
+
+                        vector front_center = root+(local_front0+local_front1)*.5;
+                        vector side_center = root+(local_side0+local_side1)*.5;
+                        float front_s = clamp(dot(front_center-a,ta),0,run_a);
+                        float side_s = clamp(dot(side_center-c,tb),0,run_b);
+                        float ground_a = lerp(a.y,b.y,front_s/run_a);
+                        float ground_b = lerp(c.y,d.y,side_s/run_b);
+                        if (abs(ground_a-ground_b) > .75) continue;
+                        root.y = ground_a+ground_height;
+                        center.y = root.y;
+                        if (frontage_hits_road(center,axis_x,facing,half_x,half_z,sidewalk_clear)) continue;
+
+                        int blocked = 0;
+                        for (int j = 0; j < len(centers); j++) {
+                            if (intersects(center,axis_x,facing,half_x,half_z,
+                                           centers[j],xs[j],zs[j],ws[j],ds[j],0)) {
+                                blocked = 1;
+                                break;
+                            }
+                        }
+                        if (blocked) continue;
+
+                        int pt = addpoint(0,root);
+                        setpointattrib(0,"orient",pt,quaternion(maketransform(facing,{0,1,0})));
+                        setpointattrib(0,"N",pt,facing);
+                        setpointattrib(0,"up",pt,{0,1,0});
+                        setpointattrib(0,"unity_instance",pt,corner_paths[candidate]);
+                        setpointattrib(0,"building_id",pt,id);
+                        setpointattrib(0,"building_variant",pt,candidate);
+                        setpointattrib(0,"building_role",pt,"corner");
+                        setpointattrib(0,"corner_sector",pt,id);
+                        setpointattrib(0,"corner_junction",pt,junction);
+                        setpointattrib(0,"corner_primary_edge",pt,corner_run_key(a,b));
+                        setpointattrib(0,"corner_secondary_edge",pt,corner_run_key(c,d));
+                        setpointattrib(0,"frontage_width",pt,face.y-face.x);
+                        setpointattrib(0,"frontage_depth",pt,2*half_z);
+                        setpointattrib(0,"frontage_front",pt,root+(local_front0+local_front1)*.5);
+                        setpointattrib(0,"frontage_start",pt,root+(dot(ta,local_front0)<dot(ta,local_front1)?local_front0:local_front1));
+                        setpointattrib(0,"frontage_end",pt,root+(dot(ta,local_front0)<dot(ta,local_front1)?local_front1:local_front0));
+                        setpointattrib(0,"corner_secondary_N",pt,side_normal);
+                        setpointattrib(0,"corner_secondary_start",pt,root+(dot(tb,local_side0)<dot(tb,local_side1)?local_side0:local_side1));
+                        setpointattrib(0,"corner_secondary_end",pt,root+(dot(tb,local_side0)<dot(tb,local_side1)?local_side1:local_side0));
+                        setpointattrib(0,"road_edge",pt,lerp(a,b,front_s/run_a));
+                        setpointattrib(0,"setback_applied",pt,setback_a);
+                        setpointattrib(0,"corner_secondary_setback_applied",pt,setback_b);
+
+                        append(centers,center);
+                        append(xs,axis_x);
+                        append(zs,facing);
+                        append(ws,half_x);
+                        append(ds,half_z);
+                        append(building_extents,set(abs(axis_x.x)*half_x+abs(facing.x)*half_z,
+                                                   abs(axis_x.z)*half_x+abs(facing.z)*half_z));
+                        placed_buildings++;
+
+                        // 占地用于碰撞，主立面端点用于量两条街的接缝。
+                        vector2 face_a = set(dot(root+local_front0-a,ta),dot(root+local_front1-a,ta));
+                        vector2 face_b = set(dot(root+local_side0-c,tb),dot(root+local_side1-c,tb));
+                        if (length2(corner_planar(a-junction)) < length2(corner_planar(b-junction))) {
+                            corner_min_station[primary] = span_a.y;
+                            corner_min_wall[primary] = max(face_a.x,face_a.y);
+                        } else {
+                            corner_max_station[primary] = span_a.x;
+                            corner_max_wall[primary] = min(face_a.x,face_a.y);
+                        }
+                        if (length2(corner_planar(c-junction)) < length2(corner_planar(d-junction))) {
+                            corner_min_station[secondary] = span_b.y;
+                            corner_min_wall[secondary] = max(face_b.x,face_b.y);
+                        } else {
+                            corner_max_station[secondary] = span_b.x;
+                            corner_max_wall[secondary] = min(face_b.x,face_b.y);
+                        }
+
+                        corner_count++;
+                        placed_corner = 1;
+                        break;
+                    }
+                    if (placed_corner) break;
+                }
+                if (!placed_corner) rejected_fit++;
+            }
+        }
+        setdetailattrib(0,"corner_count",corner_count);
+        setdetailattrib(0,"corner_sectors",corner_sectors);
+        setdetailattrib(0,"corner_missing_prefabs",corner_missing);
+        setdetailattrib(0,"corner_rejected_angle",rejected_angle);
+        setdetailattrib(0,"corner_rejected_edge",rejected_edge);
+        setdetailattrib(0,"corner_rejected_fit",rejected_fit);
+    }
+
+
+    int double_anchor_runs = 0, double_anchor_connected = 0;
+    float double_anchor_max_tail = 0;
+    foreach (int edge; runs) {
+        if (len(profiles) == 0) break;
+        vector a = ea[edge], b = eb[edge];
+        // 对边的几何方向规范化，绕过多边形端点顺序对铺排方向和 ID 的影响。
+        if (b.x < a.x || (b.x == a.x && b.z < a.z)) {
+            vector swap = a;
+            a = b;
+            b = swap;
+        }
+        string edgekey = corner_run_key(a,b);
+        vector t = corner_planar(b-a);
+        float run_length = length(t);
+        if (run_length < 0.02) continue;
+        float reserved_min = corners_enabled ? corner_min_station[edge] : 0;
+        float reserved_max = corners_enabled ? corner_max_station[edge] : run_length;
+        float near_wall = corners_enabled ? corner_min_wall[edge] : 0;
+        float far_wall = corners_enabled ? corner_max_wall[edge] : run_length;
+        int near_corner = reserved_min > .001;
+        int far_corner = reserved_max < run_length-.001;
+        // Pack outward from the corner. Starting at the far end would leave
+        // any length remainder beside the corner instead of down the street.
+        if (far_corner && !near_corner) {
+            vector swap = a;
+            a = b;
+            b = swap;
+            t = -t;
+            reserved_min = run_length-reserved_max;
+            reserved_max = run_length;
+            near_wall = run_length-far_wall;
+            far_wall = run_length;
+            near_corner = 1;
+            far_corner = 0;
+        }
+        t /= run_length;
+        vector out = set(-t.z, 0, t.x);
+        if (dot(out, outward[edge]) < 0) out = -out;
+        vector facing = -out;
+        vector local_x = cross({0,1,0}, facing);
+
+        // 真端头只可通行。主边仍可延伸至各自转角安全线。
+        int end_cap = 0;
+        for (int terminal = 0; terminal < len(ep); terminal++) {
+            if (ec[terminal] != 1) continue;
+            vector terminal_dir = normalize(set(ed[terminal].x, 0, ed[terminal].z));
+            if (dot(out, terminal_dir) <= .98) continue;
+            vector delta = (a+b)*.5-ep[terminal];
+            delta.y = 0;
+            if (length(cross(delta, terminal_dir)) <= run_length*.5 + .01 &&
+                dot(delta, terminal_dir) >= -.01) {
+                end_cap = 1;
+                break;
+            }
+        }
+        if (end_cap) {
+            rejected_terminal++;
+            continue;
+        }
+
+        float low_anchor = max(margin,reserved_min);
+        float high_anchor = min(run_length-margin,reserved_max);
+        string layout_key = sprintf("%s_%d",edgekey,geometry_seed);
+        float run_empty_pct = sample_layout_range(empty_pct_range,concat(layout_key,"_empty_pct"));
+        total_length += max(0, high_anchor-low_anchor);
+        int double_anchor = near_corner && far_corner;
+        if (double_anchor) double_anchor_runs++;
+
+        // 双端有角楼时保持单向接排，远端放不下的长度作为独立尾量记录。
+        {
+            vector scan_a = a;
+            vector scan_b = b;
+            vector scan_t = t;
+            float direction = dot(scan_t,local_x);
+            float first_station = low_anchor;
+            float limit = high_anchor;
+            float wall_limit = far_corner ? min(limit,far_wall-wall_gap.x) : limit;
+            float requested_gap = near_corner ? sample_layout_range(wall_gap,concat(layout_key,"_corner_gap")) : -1;
+            float end_of_last_face = near_corner ? near_wall : first_station;
+            float cursor = near_corner ? near_wall+requested_gap : first_station;
+            int previous_built = near_corner;
+            int blocked_run = 0;
+            int searching_after_conflict = 0;
+            int group_index = -1;
+            float group_end = first_station;
+            float sampled_length = 0;
+            float group_base = 0;
+            int slot = 0;
+            while (cursor + min_width <= wall_limit + .001) {
+                string id = sprintf("frontage_fit_%s_%d",edgekey,slot);
+                string slot_key = sprintf("%s_%d",layout_key,slot);
+                float setback_request;
+                float group_offset = 0;
+                if (grouped_setback) {
+                    while (cursor >= group_end) {
+                        group_index++;
+                        string group_key = sprintf("%s_group_%d",layout_key,group_index);
+                        sampled_length = sample_layout_range(group_length_range,concat(group_key,"_length"));
+                        group_base = sample_layout_range(group_base_range,concat(group_key,"_setback"));
+                        group_end += sampled_length;
+                    }
+                    group_offset = sample_layout_range(group_offset_range,concat(slot_key,"_group_offset"));
+                    setback_request = group_base + group_offset;
+                } else {
+                    setback_request = sample_layout_range(setback_range,concat(slot_key,"_setback"));
+                }
+                int leave_empty = run_empty_pct >= 100 ||
+                    (run_empty_pct > 0 && rand(random_shash(concat(slot_key,"_empty_slot"))) < run_empty_pct*.01);
+                float scores[];
+                string gap_key = sprintf("%s_%d_%d_straight_wall_gap", edgekey, geometry_seed, slot);
+                float next_gap = sample_layout_range(wall_gap,gap_key);
+                foreach (int index; string profile; profiles) {
+                    string key = sprintf("%s_%d_%s", id, geometry_seed, profile);
+                    float score = rand(random_shash(key));
+                    float width = faces[index].y-faces[index].x;
+                    if (cursor+width+next_gap+min_width <= wall_limit+.001) {
+                        int chainable = direction > 0 ? forward_chain[index] : reverse_chain[index];
+                        float minimum_occupied_gap = direction > 0 ? right_overhangs[index]+min_left :
+                                                                     left_overhangs[index]+min_right;
+                        if (!chainable) score += minimum_occupied_gap <= next_gap+.001 ? 1 : 2;
+                    }
+                    append(scores,score);
+                }
+                int order[] = argsort(scores);
+                int placed = 0;
+                int fits_run = 0;
+                foreach (int index; order) {
+                    vector face = faces[index];
+                    vector4 box = bounds[index];
+                    float first_x = min(direction*face.x, direction*face.y);
+                    float front_width = face.y-face.x;
+                    float occ_first_x = min(direction*box.x,direction*box.y);
+                    float station = cursor;
+                    if (slot == 0 && !near_corner)
+                        station = max(cursor,first_station+first_x-occ_first_x);
+                    float root_s = station-first_x;
+                    float occupied_start = root_s+occ_first_x;
+                    float occupied_end = root_s+max(direction*box.x, direction*box.y);
+                    if (station+front_width > wall_limit+.001 || occupied_end > limit+.001) continue;
+                    fits_run = 1;
+                    if (occupied_start < first_station-.001) continue;
+
+                    float projection = max(0, box.w-face.z);
+                    if (setback_request + .001 < projection) {
+                        skipped++;
+                        continue;
+                    }
+                    float front_clear = sidewalk_clear+setback_request;
+                    float front_s = station+front_width*.5;
+                    float y = lerp(scan_a.y,scan_b.y,clamp(front_s/run_length,0,1));
+                    vector road_edge = set(scan_a.x+scan_t.x*front_s, y, scan_a.z+scan_t.z*front_s);
+                    vector front = road_edge+out*front_clear+set(0,ground_height,0);
+                    vector root = front+scan_t*(root_s-front_s)-facing*face.z;
+                    vector center = root+local_x*(box.x+box.y)*.5+facing*(box.z+box.w)*.5;
+                    float half_x = (box.y-box.x)*.5, half_z = (box.w-box.z)*.5;
+                    if (frontage_hits_road(center,local_x,facing,half_x,half_z,sidewalk_clear)) {
+                        skipped++;
+                        continue;
+                    }
+                    int blocked = 0;
+                    vector2 extent = set(abs(local_x.x)*half_x+abs(facing.x)*half_z,
+                                         abs(local_x.z)*half_x+abs(facing.z)*half_z);
+                    for (int j = 0; j < len(centers); j++) {
+                        if (abs(center.x-centers[j].x) > extent.x+building_extents[j].x ||
+                            abs(center.z-centers[j].z) > extent.y+building_extents[j].y) continue;
+                        if (intersects(center,local_x,facing,half_x,half_z,centers[j],xs[j],zs[j],ws[j],ds[j],0)) {
+                            blocked = 1;
+                            break;
+                        }
+                    }
+                    if (blocked) {
+                        rejected_building++;
+                        continue;
+                    }
+
+                    int variant = -1;
+                    float best_score = -1;
+                    for (int candidate = 0; candidate < len(prefabs); candidate++) {
+                        if (variant_profile[candidate] != index) continue;
+                        string key = sprintf("%s_%d_%s", id, appearance_seed, prefabs[candidate]);
+                        float score = rand(random_shash(key));
+                        if (score > best_score) {
+                            best_score = score;
+                            variant = candidate;
+                        }
+                    }
+
+                    if (leave_empty) {
+                        append(empty_ids,id);
+                        append(empty_fronts,front);
+                        append(empty_widths,front_width);
+                    } else {
+                        int pt = addpoint(0,root);
+                        setpointattrib(0,"orient",pt,quaternion(maketransform(facing,{0,1,0})));
+                        setpointattrib(0,"N",pt,facing);
+                        setpointattrib(0,"up",pt,{0,1,0});
+                        setpointattrib(0,"unity_instance",pt,prefabs[variant]);
+                        setpointattrib(0,"building_id",pt,id);
+                        if (corners_enabled) setpointattrib(0,"building_role",pt,"frontage");
+                        setpointattrib(0,"building_variant",pt,variant);
+                        setpointattrib(0,"frontage_width",pt,front_width);
+                        setpointattrib(0,"frontage_depth",pt,2*half_z);
+                        setpointattrib(0,"frontage_front",pt,front);
+                        setpointattrib(0,"frontage_start",pt,front-scan_t*front_width*.5);
+                        setpointattrib(0,"frontage_end",pt,front+scan_t*front_width*.5);
+                        setpointattrib(0,"road_edge",pt,road_edge);
+                        setpointattrib(0,"setback_applied",pt,front_clear-sidewalk_clear);
+                        setpointattrib(0,"gap_applied",pt,previous_built ? requested_gap : 0.0);
+                        setpointattrib(0,"frontage_gap_requested",pt,previous_built ? requested_gap : -1.0);
+                        setpointattrib(0,"frontage_gap_measured",pt,previous_built ? station-end_of_last_face : -1.0);
+                        if (searching_after_conflict) {
+                            float constrained_span = station-end_of_last_face;
+                            setpointattrib(0,"frontage_constraint_break_before_m",pt,constrained_span);
+                            constraint_breaks++;
+                            constraint_break_max = max(constraint_break_max,constrained_span);
+                        }
+                        setpointattrib(0,"frontage_layout_slot",pt,slot);
+                        setpointattrib(0,"frontage_group_index",pt,group_index);
+                        setpointattrib(0,"frontage_group_length_m",pt,sampled_length);
+                        setpointattrib(0,"frontage_group_base_setback_m",pt,group_base);
+                        setpointattrib(0,"frontage_group_offset_m",pt,group_offset);
+                        setpointattrib(0,"frontage_setback_requested_m",pt,setback_request);
+                        setpointattrib(0,"frontage_height_offset_m",pt,ground_height);
+                        setpointattrib(0,"frontage_empty_probability_pct",pt,run_empty_pct);
+                        if (previous_built) largest_gap = max(largest_gap, station-end_of_last_face);
+                        placed_buildings++;
+                        total_covered += front_width;
+                    }
+                    previous_built = !leave_empty;
+                    searching_after_conflict = 0;
+
+                    append(centers,center);
+                    append(xs,local_x);
+                    append(zs,facing);
+                    append(ws,half_x);
+                    append(ds,half_z);
+                    append(building_extents,extent);
+                    end_of_last_face = station+front_width;
+                    // 每条墙缝只取一次值。试换 Prefab 时保持下一站位不动。
+                    requested_gap = next_gap;
+                    cursor = end_of_last_face+requested_gap;
+                    slot++;
+                    placed = 1;
+                    break;
+                }
+                if (!placed) {
+                    if (!fits_run) break;
+                    if (!blocked_run) gap_blocked_runs++;
+                    blocked_run = 1;
+                    // 原站位的所有候选均被实体约束拒绝。角楼接缝仍要精确，
+                    // 普通街段从障碍后重新起排，跨过的区段单独标记。
+                    if (near_corner || far_corner || !has_chain) break;
+                    searching_after_conflict = 1;
+                    previous_built = 0;
+                    cursor += max(.25,min_width*.25);
+                }
+            }
+            if (slot == 0 && limit > first_station) unfilled_runs++;
+            float tail = (far_corner ? far_wall : limit)-end_of_last_face;
+            if (double_anchor && slot > 0 && tail >= wall_gap.x-.001 && tail <= wall_gap.y+.001) {
+                double_anchor_connected++;
+                largest_gap = max(largest_gap,tail);
+            } else {
+                if (slot > 0 || double_anchor) largest_tail = max(largest_tail,tail);
+                if (double_anchor) double_anchor_max_tail = max(double_anchor_max_tail,tail);
+            }
+        }
+    }
+
+    setdetailattrib(0,"building_count",placed_buildings);
+    setdetailattrib(0,"placement_owner","CityRoad/CR_BUILDINGS");
+    setdetailattrib(0,"boundary_runs",len(ea));
+    setdetailattrib(0,"frontage_profiles",len(profiles));
+    setdetailattrib(0,"frontage_missing_prefabs",missing);
+    setdetailattrib(0,"frontage_malformed_catalog_rows",malformed);
+    setdetailattrib(0,"frontage_unfilled_runs",unfilled_runs);
+    setdetailattrib(0,"frontage_run_length",total_length);
+    setdetailattrib(0,"frontage_covered_length",total_covered);
+    setdetailattrib(0,"frontage_max_internal_gap",largest_gap);
+    setdetailattrib(0,"frontage_max_tail",largest_tail);
+    setdetailattrib(0,"frontage_gap_blocked_runs",gap_blocked_runs);
+    setdetailattrib(0,"frontage_constraint_breaks",constraint_breaks);
+    setdetailattrib(0,"frontage_constraint_break_max",constraint_break_max);
+    setdetailattrib(0,"frontage_layout_blocked_runs",gap_blocked_runs);
+    setdetailattrib(0,"frontage_layout_empty_count",len(empty_ids));
+    setdetailattrib(0,"frontage_layout_empty_ids",empty_ids);
+    setdetailattrib(0,"frontage_layout_empty_fronts",empty_fronts);
+    setdetailattrib(0,"frontage_layout_empty_widths",empty_widths);
+    if (corners_enabled) {
+        setdetailattrib(0,"frontage_double_anchor_runs",double_anchor_runs);
+        setdetailattrib(0,"frontage_double_anchor_connected",double_anchor_connected);
+        setdetailattrib(0,"frontage_double_anchor_max_tail",double_anchor_max_tail);
+    }
+    setdetailattrib(0,"rejected_road",skipped);
+    setdetailattrib(0,"frontage_rejected_terminal",rejected_terminal);
+    setdetailattrib(0,"frontage_rejected_building",rejected_building);
+    return;
 }
-setdetailattrib(0,"building_count",len(centers));
-setdetailattrib(0,"placement_owner","CityRoad/CR_BUILDINGS");
-setdetailattrib(0,"boundary_runs",len(ea));
-setdetailattrib(0,"rejected_road",skipped);
-if(varied){setdetailattrib(0,"requested_slots",requested_slots);setdetailattrib(0,"empty_by_rule",empty_by_rule);}

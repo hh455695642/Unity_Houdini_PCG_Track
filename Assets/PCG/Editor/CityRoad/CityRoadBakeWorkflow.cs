@@ -129,6 +129,13 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
+            if (!CityRoadLocalFrontageApplier.TryApply(root, root.gameObject, out _, out string frontageReport))
+            {
+                Debug.LogErrorFormat(root,
+                    "CityRoad Bake: local frontage is invalid; Bake was not changed.\n{0}", frontageReport);
+                return false;
+            }
+
             CityRoadLivePreviewController.EnterLivePreview(root);
             ApplyCollisionOutputContract(root.gameObject);
             ApplyShadowContract(root.gameObject);
@@ -199,7 +206,16 @@ namespace PCG.CityRoad.Editor
                 return false;
             }
 
-            EnsureBakeInstanceAndOverrides(root, prefab);
+            GameObject instance = EnsureBakeInstanceAndOverrides(root, prefab);
+            if (!CityRoadLocalFrontageApplier.TryApply(root, instance, out _, out frontageReport))
+            {
+                // Keep the Live preview usable if the native result does not match the validated locks.
+                CityRoadLivePreviewController.EnterLivePreview(root);
+                Debug.LogErrorFormat(root,
+                    "CityRoad Bake: local frontage does not match the updated Bake instance.\n{0}", frontageReport);
+                return false;
+            }
+
             MakeAuthoringSourceEditorOnly(root);
             CityRoadLivePreviewController.MarkBaked(root);
 
@@ -929,7 +945,7 @@ namespace PCG.CityRoad.Editor
             return string.Join("/", names);
         }
 
-        private static void EnsureBakeInstanceAndOverrides(
+        private static GameObject EnsureBakeInstanceAndOverrides(
             HEU_HoudiniAssetRoot source,
             GameObject prefab)
         {
@@ -964,6 +980,7 @@ namespace PCG.CityRoad.Editor
             EditorUtility.SetDirty(instance);
             EditorUtility.SetDirty(overrides.gameObject);
             EditorSceneManager.MarkSceneDirty(source.gameObject.scene);
+            return instance;
         }
 
         private static Transform FindSiblingByName(

@@ -2378,6 +2378,8 @@ def validate_asset(asset: hou.Node, require_locked: bool = False) -> dict[str, A
         "city_park_decoupled": validate_citypark_decoupled(asset, core),
         "v51_restore_generation": validate_v51_restore_generation(asset, core),
         "v52_streetbuilding_placement": importlib.reload(__import__('validate_cityroad_frontage')).validate(asset),
+        "v56_straight_gap_range": importlib.reload(__import__('validate_cityroad_gap_range')).validate(asset),
+        "v57_street_layout_ranges": importlib.reload(__import__('validate_cityroad_layout_ranges')).validate(asset),
         "v7_v8_v9": validate_v7_v8_v9(asset, core) if has_input else skipped,
         "v10": validate_v10(core) if has_input else skipped,
         "v11_v12_v13": validate_v11_v12_v13(core) if has_input else skipped,

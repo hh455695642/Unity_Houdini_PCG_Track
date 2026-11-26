@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 387f515c6e7f77b439421bf4ef57dc1b, type: 3}
+  m_Name: CityRoadCornerFrontages
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::PCG.CityRoad.Editor.CityRoadCornerCatalog
+  corners:
+  - prefab: {fileID: 1011592204008373161, guid: 6afe56439e3af3a469a8ae4ab525f34c,
+      type: 3}
+    side: -1
+    frontage: {x: -3, y: 3, z: 4.9349995}
+    secondFrontage: {x: -3.0650005, y: 4.9349995, z: -3}
+  - prefab: {fileID: 3383982787832583019, guid: d7d80e1b51e0a974eb12b9562b277708,
+      type: 3}
+    side: -1
+    frontage: {x: -3, y: 3, z: 4.9349995}
+    secondFrontage: {x: -3.0650005, y: 4.9349995, z: -3}
+  - prefab: {fileID: 8291978724473511872, guid: b35a484fe0d82fe499e6dcbacc76248f,
+      type: 3}
+    side: -1
+    frontage: {x: -3, y: 3, z: 4.4}
+    secondFrontage: {x: -3.6, y: 4.4, z: -3}

@@ -391,7 +391,11 @@
     "CityRoad.V52.StreetBuildingPlacement",
     "CityRoad.V53.BuildingControls",
     "CityRoad.V54.DirectPrefabAssignment",
-    "CityRoad.V55.BuildingLayout"
+    "CityRoad.V55.BuildingLayout",
+    "CityRoad.V56.StraightGapRange",
+    "CityRoad.V57.StreetLayoutRanges",
+    "CityRoad.V58.AlwaysActualFrontage",
+    "CityRoad.V59.FrontageContinuation"
   ],
   "categorized_panel": true
 }

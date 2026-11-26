@@ -266,6 +266,12 @@ namespace PCG.CityRoad.Editor
             if (!ApplyMaterialParameterContract(root, asset))
                 return false;
 
+            if (!CityRoadFrontageCatalog.TrySynchronize(asset, out string frontageReport))
+            {
+                Debug.LogError(frontageReport, root);
+                return false;
+            }
+
             if (!UploadAndCookInputNetworks(root, asset))
                 return false;
 

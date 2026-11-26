@@ -1021,6 +1021,72 @@ def persist_isolated(
     }
 
 
+def prepare_cityroad_actual_frontage_templates(group, hou):
+    """Keep archived inputs available for serialization and expose the native ranges."""
+    legacy = ("building_fit_frontage", "building_gap_range_enabled", "building_spacing",
+              "building_gap_max", "building_width", "building_depth", "building_layout_enabled",
+              "building_setback_max", "building_empty_ratio", "building_group_length",
+              "building_within_group_jitter")
+    disable_when = hou.parmCondType.DisableWhen
+    for name in legacy:
+        field = group.find(name)
+        field.hide(True)
+        field.setConditional(disable_when, "")
+        group.replace(name, field)
+    for name in ("building_gap_min_m", "building_gap_max_m"):
+        field = group.find(name)
+        field.setConditional(disable_when, "")
+        group.replace(name, field)
+    return prepare_cityroad_effective_layout_panel(group, hou)
+
+
+def prepare_cityroad_effective_layout_panel(group, hou):
+    """Expose setback endpoints, optional groups and a shared fixed base height."""
+    group_is_inactive = "{ building_setback_grouped == 0 }"
+    conditions = {
+        "building_setback_grouped": "",
+        "building_setback_min_m": "",
+        "building_setback_max_m": "",
+        "building_empty_min_pct": "",
+        "building_empty_max_pct": "",
+        "building_group_length_min_m": group_is_inactive,
+        "building_group_length_max_m": group_is_inactive,
+        "building_group_offset_min_m": group_is_inactive,
+        "building_group_offset_max_m": group_is_inactive,
+    }
+    labels = {
+        "building_setback_min_m": "人行道外退距最小值（米）",
+        "building_setback_max_m": "人行道外退距最大值（米）",
+    }
+    for name, condition in conditions.items():
+        field = group.find(name)
+        field.setConditional(hou.parmCondType.DisableWhen, "")
+        field.setConditional(hou.parmCondType.HideWhen, condition)
+        if name in labels:
+            field.setLabel(labels[name])
+        if name == "building_setback_grouped":
+            field.setHelp("最大退距大于最小退距时，同组普通楼共享退距基准，并叠加组内偏移。两端相等时直接固定退距。")
+        group.replace(name, field)
+
+    height = group.find("building_ground_height")
+    height.setDefaultValue((0.0,))
+    height.setMinValue(-3.0)
+    height.setMinIsStrict(False)
+    height.hide(False)
+    height.setConditional(hou.parmCondType.DisableWhen, "")
+    height.setConditional(hou.parmCondType.HideWhen, "")
+    height.setHelp("建筑根节点相对对应路面的竖向偏移。正值抬高，负值下沉，0 米与路面基准对齐。普通楼和角楼共用。")
+    group.replace(height.name(), height)
+    for name in ("building_setback", "building_layout_ranges_enabled",
+                 "building_height_offset_min_m", "building_height_offset_max_m"):
+        retired = group.find(name)
+        retired.hide(True)
+        retired.setConditional(hou.parmCondType.DisableWhen, "")
+        retired.setConditional(hou.parmCondType.HideWhen, "")
+        group.replace(name, retired)
+    return group
+
+
 def persist_live(
     project_root: Path,
     module: str,
@@ -1041,7 +1107,7 @@ def persist_live(
         raise GateFailure("Change manifest differs from the one used by Capture")
     definition_allowed = matches(config["definition"], manifest["allowed_files"])
     hip_allowed = matches(config["hip"], manifest["allowed_files"])
-    if module == "StreetBuilding" and not definition_allowed and not hip_allowed:
+    if module in ("CityRoad", "StreetBuilding") and not definition_allowed and not hip_allowed:
         # 美术任务仍运行完整累计验证；没有持久化权限时必须保留 HDA/HIP 原字节。
         protected_files = (config["definition"], config["hip"], *config.get("restore_files", []))
         states = file_state(project_root, protected_files)
@@ -1093,6 +1159,10 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         raise RuntimeError('Definition changed before persistence: {} != {}'.format(actual_definition, expected_definition))
     original_templates = definition.parmTemplateGroup()
     promoted_templates = asset.parmTemplateGroup()
+    cityroad_height_before = None
+    if expected_type == 'pcgbike::CityRoad::1.0' and asset.parm('building_ground_height') is not None:
+        base_height = asset.parm('building_ground_height')
+        cityroad_height_before = (base_height.rawValue(), base_height.eval(), base_height.keyframes())
     if expected_type == 'pcgbike::CityRoad::1.0' and asset.parm('building_enabled') is not None:
         # Preserve legacy definition folder identities when adding the building UI.
         addition = next(t for t in promoted_templates.entries() if t.label() == 'Street Buildings / 沿街建筑')
@@ -1112,6 +1182,17 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
                     slots = [t for t in field.parmTemplates() if t.name() == 'building_prefab#']
                     if len(slots) != 1: raise RuntimeError('Direct Prefab template is ambiguous')
                     field.setParmTemplates(slots)
+                if (not preserve_public_interface and asset.parm('building_gap_range_enabled') is not None
+                        and field.name() in ('building_spacing', 'building_gap_max')):
+                    # HOM ignores inherited template condition changes on the Live instance.
+                    field.setConditional(hou.parmCondType.DisableWhen,
+                        '{ building_fit_frontage == 1 building_corners_enabled == 0 building_gap_range_enabled == 1 }')
+                if (not preserve_public_interface and asset.parm('building_layout_ranges_enabled') is not None
+                        and field.name() in ('building_setback', 'building_ground_height',
+                            'building_layout_enabled', 'building_setback_max', 'building_empty_ratio',
+                            'building_group_length', 'building_within_group_jitter')):
+                    field.setConditional(hou.parmCondType.DisableWhen,
+                        '{ building_fit_frontage == 1 building_corners_enabled == 0 building_layout_ranges_enabled == 1 }')
             addition.setParmTemplates(fields)
         promoted_templates = hou.ParmTemplateGroup(original_templates.entries())
         existing_buildings = next((t for t in promoted_templates.entries()
@@ -1220,6 +1301,13 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
             layout = importlib.reload(cityroad_parameter_layout)
             promoted_templates = layout.organize(promoted_templates)
             layout.validate(promoted_templates)
+        source = asset.node('CityRoadCore/CR_BUILDINGS/BUILD_FRONTAGE')
+        if source and 'CITYROAD_ALWAYS_ACTUAL_FRONTAGE' in source.evalParm('snippet'):
+            import importlib, os, sys
+            sys.path.insert(0, os.path.join(os.path.dirname(expected_hip),'scripts','tools'))
+            import pcg_regression_gate
+            panel_gate = importlib.reload(pcg_regression_gate)
+            promoted_templates = panel_gate.prepare_cityroad_actual_frontage_templates(promoted_templates, hou)
     definition.updateFromNode(asset)
     if preserve_public_interface:
         # Internal network edits can make Houdini synthesize instance-only
@@ -1260,6 +1348,14 @@ def _pcg_persist_live(expected_path, expected_type, expected_hip, expected_defin
         asset.setParmTemplateGroup(live_templates)
         if assigned != [asset.parm('building_prefab%d' % i).evalAsString() for i in range(1,count+1)]:
             raise RuntimeError('Prefab slot assignments changed during spare-template cleanup')
+        base_height = asset.parm('building_ground_height')
+        if cityroad_height_before is not None and base_height.rawValue() != cityroad_height_before[0]:
+            _, value, keys = cityroad_height_before
+            base_height.deleteAllKeyframes()
+            if keys:
+                base_height.setKeyframes(keys)
+            else:
+                base_height.set(value)
         import importlib, sys, os
         sys.path.insert(0, os.path.join(os.path.dirname(expected_hip),'scripts','tools'))
         importlib.reload(__import__('validate_cityroad_frontage')).validate(asset)
@@ -1436,7 +1532,7 @@ def main() -> int:
             persistence_authorized = all(
                 matches(config[field], manifest["allowed_files"])
                 for field in ("definition", "hip"))
-            if changed and (args.module != "StreetBuilding" or persistence_authorized):
+            if changed and (args.module not in ("CityRoad", "StreetBuilding") or persistence_authorized):
                 restore_baseline(
                     project_root, args.module, config,
                     snapshot_path, args.host, args.port)

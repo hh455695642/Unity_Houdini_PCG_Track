@@ -34,8 +34,10 @@ namespace PCG.CityRoad.Editor
         {
             internal HEU_HoudiniAssetRoot Root;
             internal HEU_HoudiniAsset Asset;
+            internal UnityAction<HEU_PreAssetEventData> BeforeAssetEvent;
             internal UnityAction<HEU_CookedEventData> Cooked;
             internal UnityAction<HEU_ReloadEventData> Reloaded;
+            internal bool SyncFrontageAfterCook;
         }
 
         private static readonly Dictionary<int, Subscription> s_Subscriptions =
@@ -44,6 +46,8 @@ namespace PCG.CityRoad.Editor
             new Dictionary<int, int>();
         private static readonly Dictionary<int, double> s_IgnoreLivePreviewUntil =
             new Dictionary<int, double>();
+        private static readonly Dictionary<int, string> s_FrontageErrors =
+            new Dictionary<int, string>();
         private static double s_NextRefresh;
         private static bool s_ApplyingState;
 
@@ -86,6 +90,7 @@ namespace PCG.CityRoad.Editor
 
                 CityRoadBakeWorkflow.ApplyCollisionOutputContract(root.gameObject);
                 CityRoadBakeWorkflow.ApplyShadowContract(root.gameObject);
+                changed |= ApplyLocalFrontage(root, root.gameObject);
                 Transform bake = FindSibling(root, root.name + "_Bake");
                 if (bake != null && bake.gameObject.activeSelf)
                 {
@@ -137,10 +142,14 @@ namespace PCG.CityRoad.Editor
                 }
 
                 Transform bake = FindSibling(root, root.name + "_Bake");
-                if (bake != null && !bake.gameObject.activeSelf)
+                if (bake != null)
                 {
-                    bake.gameObject.SetActive(true);
-                    changed = true;
+                    changed |= ApplyLocalFrontage(root, bake.gameObject);
+                    if (!bake.gameObject.activeSelf)
+                    {
+                        bake.gameObject.SetActive(true);
+                        changed = true;
+                    }
                 }
 
                 SessionState.SetBool(GetSessionKey(root), false);
@@ -151,6 +160,21 @@ namespace PCG.CityRoad.Editor
             {
                 s_ApplyingState = false;
             }
+        }
+
+        private static bool ApplyLocalFrontage(HEU_HoudiniAssetRoot root, GameObject output)
+        {
+            int id = root.GetInstanceID();
+            if (CityRoadLocalFrontageApplier.TryApply(root, output, out bool changed, out string report))
+                s_FrontageErrors.Remove(id);
+            else if (!s_FrontageErrors.TryGetValue(id, out string previousReport) || previousReport != report)
+            {
+                // Preview refreshes periodically. Report a stale binding only when it changes.
+                s_FrontageErrors[id] = report;
+                Debug.LogError(report, root);
+            }
+
+            return changed;
         }
 
         internal static bool IsLivePreview(HEU_HoudiniAssetRoot root)
@@ -249,10 +273,33 @@ namespace PCG.CityRoad.Editor
                 };
                 subscription.Cooked = data =>
                 {
-                    if (data != null && data.CookSuccess)
-                        QueueLivePreview(subscription.Root);
+                    bool needsCatalog = subscription.SyncFrontageAfterCook;
+                    subscription.SyncFrontageAfterCook = false;
+                    if (data == null || !data.CookSuccess)
+                        return;
+                    QueueLivePreview(subscription.Root);
+                    if (needsCatalog)
+                        EditorApplication.delayCall += () => SyncFrontageAfterReload(root, asset);
                 };
-                subscription.Reloaded = data => QueueLivePreview(subscription.Root);
+                subscription.BeforeAssetEvent = data =>
+                {
+                    if (data == null || data.AssetType != HEU_AssetEventType.COOK)
+                        return;
+                    // A cold Recook can recreate the native node and only emit
+                    // CookedDataEvent. Sync once when the recreated node is ready.
+                    subscription.SyncFrontageAfterCook = !asset.IsAssetValid();
+                    if (subscription.SyncFrontageAfterCook)
+                        return;
+                    if (!CityRoadFrontageCatalog.TrySynchronize(asset, out string report))
+                        Debug.LogError(report, root);
+                };
+                subscription.Reloaded = data =>
+                {
+                    QueueLivePreview(subscription.Root);
+                    if (data != null && data.CookSuccess)
+                        EditorApplication.delayCall += () => SyncFrontageAfterReload(root, asset);
+                };
+                asset.PreAssetEvent.AddListener(subscription.BeforeAssetEvent);
                 asset.CookedDataEvent.RemoveListener(subscription.Cooked);
                 asset.CookedDataEvent.AddListener(subscription.Cooked);
                 asset.ReloadDataEvent.RemoveListener(subscription.Reloaded);
@@ -285,11 +332,31 @@ namespace PCG.CityRoad.Editor
                 return;
             if (subscription.Asset != null)
             {
+                subscription.Asset.PreAssetEvent.RemoveListener(subscription.BeforeAssetEvent);
                 subscription.Asset.CookedDataEvent.RemoveListener(subscription.Cooked);
                 subscription.Asset.ReloadDataEvent.RemoveListener(subscription.Reloaded);
             }
             s_Subscriptions.Remove(id);
             s_IgnoreLivePreviewUntil.Remove(id);
+            s_FrontageErrors.Remove(id);
+        }
+
+        // Native Reload may replace the HAPI node. Reapply the derived catalog
+        // once, after HEU restores the instance's Prefab slot and layout values.
+        private static void SyncFrontageAfterReload(HEU_HoudiniAssetRoot root, HEU_HoudiniAsset asset)
+        {
+            if (root == null || asset == null || root.HoudiniAsset != asset
+                || EditorApplication.isPlayingOrWillChangePlaymode || !asset.IsAssetValid()
+                || IsBakeCallbackGuardActive(root))
+                return;
+            if (!CityRoadFrontageCatalog.TrySynchronize(asset, out string report, out bool changed))
+            {
+                Debug.LogError(report, root);
+                return;
+            }
+            if (changed)
+                asset.RequestCook(bCheckParametersChanged: false, bAsync: false,
+                    bSkipCookCheck: false, bUploadParameters: false);
         }
 
         private static void QueueLivePreview(HEU_HoudiniAssetRoot root)
